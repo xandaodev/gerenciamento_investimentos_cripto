@@ -5,7 +5,7 @@ import br.com.criptovision.model.Transacao;
 
 public class CarteiraService {
 
-    public void ProcessarTransacao(Moeda moeda, Transacao transacao){
+    public void processarTransacao(Moeda moeda, Transacao transacao){
         if(transacao.getTipo().equals("COMPRA")){
             double custoTotalAntigo = moeda.getSaldo() * moeda.getPrecoMedio();
             double custoNovaCompra = transacao.getQuantidade() * transacao.getPrecoUnitario();
