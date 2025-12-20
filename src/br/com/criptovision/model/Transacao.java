@@ -8,14 +8,16 @@ public class Transacao {
     private double precoUnitario;
     private LocalDateTime data;
     private String tipo;  // se vai ser compra ou venda
+    //private double taxa;
 
     //construtor
-    public Transacao(String ticker, double quantidade, double precoUnitario, String tipo){
+public Transacao(String ticker, double quantidade, double precoUnitario, String tipo/*, double taxa*/){
         this.ticker = ticker.toUpperCase();
         this.quantidade = quantidade;
         this.precoUnitario = precoUnitario;
         this.tipo = tipo.toUpperCase();
         this.data = LocalDateTime.now();
+        //this.taxa = taxa;
     }
     
     //getters e setters
@@ -24,5 +26,6 @@ public class Transacao {
     public double getPrecoUnitario(){ return precoUnitario; }
     public String getTipo(){ return tipo; }
     public LocalDateTime getData(){ return data; }
+    //public double getTaxa(){ return taxa; }
 
 }

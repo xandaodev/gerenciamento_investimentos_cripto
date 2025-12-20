@@ -14,16 +14,17 @@ public class Main {
         //criando um array pro historico
         List<Transacao> historico = new ArrayList<>();
 
-        //focando apenas no bitcoin por enquango
+        //focando apenas no bitcoin por enquanto
         Moeda btc = new Moeda("Bitcoin", "BTC");
 
         int opcao = 0;
-        while (opcao != 4){
+        while (opcao != 5){
             System.out.println("\n--- GERENCIAMNETO DE INVESTIMENTOS CRIPTO ---");
             System.out.println("1. Nova compra");
             System.out.println("2. Ver Saldo e Preço Médio");
             System.out.println("3. Ver Histórico de Transações");
-            System.out.println("4. Sair");
+            System.out.println("4. Nova venda");
+            System.out.println("5. Sair do sistema");
             System.out.print("Escolha uma opção: ");
             
             opcao = leitor.nextInt();
@@ -46,17 +47,33 @@ public class Main {
                     System.out.println("\n--- MEU SALDO ---");
                     System.out.println("Ativo: " + btc.getTicker());
                     System.out.println("Quantidade: " + btc.getSaldo());
-                    System.out.printf("Preço Médio: R$ %.2f\n", btc.getPrecoMedio());
+                    System.out.printf("Preço Médio: $ %.2f\n", btc.getPrecoMedio());
                     break;
 
                 case 3:
                     System.out.println("\n--- HISTÓRICO ---");
                     for(Transacao tr : historico){
-                        System.out.println(tr.getTipo() + " | " + tr.getQuantidade() + " BTC | R$ " + tr.getPrecoUnitario());
+                        System.out.println(tr.getTipo() + " | " + tr.getQuantidade() + " BTC | $ " + tr.getPrecoUnitario());
                     }
                     break;
 
                 case 4:
+                    System.out.print("Quantidade vendida: ");
+                    double qtdVenda = leitor.nextDouble();
+                    if(qtdVenda>btc.getSaldo()){
+                        System.out.println("Saldo insuficiente!");
+                    }else{
+                    System.out.print("Preço unitário de venda: ");
+                    double precoVenda = leitor.nextDouble();
+                    
+                    Transacao tVenda = new Transacao("BTC", qtdVenda, precoVenda, "VENDA");
+                    carteira.processarTransacao(btc, tVenda);
+                    historico.add(tVenda); // guarda no histórico
+                    
+                    System.out.println(" Venda registrada com sucesso!");
+                    }
+                    break;
+                case 5:
                     System.out.println("Saindo...");
                     break;
 
