@@ -20,6 +20,13 @@ public class CarteiraService {
         }else if(transacao.getTipo().equals("VENDA")){
             moeda.setSaldo(moeda.getSaldo() - transacao.getQuantidade());
             //na venda o preço medio nao muda
+            double custoParteVendida = transacao.getQuantidade() * moeda.getPrecoMedio();
+            double valorRecebidoNaVenda = transacao.getQuantidade() * transacao.getPrecoUnitario();
+            double lucroOperacao =valorRecebidoNaVenda - custoParteVendida;
+
+            System.out.printf("PNL dessa venda: R$ %.2f\n", lucroOperacao);
+
+            moeda.setSaldo(moeda.getSaldo() - transacao.getQuantidade());
             
         }
     }
