@@ -56,7 +56,7 @@ public class Main {
                     historico.add(t); // guarda no histórico
                     
                     repositorio.salvar(t);//salvando no repository
-                    System.out.println(" Compra registrada com sucesso!");
+                    System.out.println("\n" +  "Compra registrada com sucesso!");
                     break;
                     
                 case 2:
