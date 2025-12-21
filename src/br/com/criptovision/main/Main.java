@@ -27,13 +27,14 @@ public class Main {
         }
 
         int opcao = 0;
-        while (opcao != 5){
+        while (opcao != 6){
             System.out.println("\n--- GERENCIAMNETO DE INVESTIMENTOS CRIPTO ---");
             System.out.println("1. Nova compra");
             System.out.println("2. Ver Saldo e Preço Médio");
             System.out.println("3. Ver Histórico de Transações");
             System.out.println("4. Nova venda");
-            System.out.println("5. Sair do sistema");
+            System.out.println("5. Simular lucro");
+            System.out.println("6. Sair do sistema");
             System.out.print("Escolha uma opção: ");
             
             opcao = leitor.nextInt();
@@ -54,9 +55,8 @@ public class Main {
                     Transacao t = new Transacao(ticker, qtd, preco, "COMPRA");
                     carteira.processarTransacao(moedaSelecionada, t);
                     historico.add(t); // guarda no histórico
-                    
-                    repositorio.salvar(t);//salvando no repository
-                    System.out.println("\n" +  "Compra registrada com sucesso!");
+                    repositorio.salvar(t);
+                    System.out.println(" Compra registrada com sucesso!");
                     break;
                     
                 case 2:
@@ -98,6 +98,23 @@ public class Main {
                     }
                     break;
                 case 5:
+                    System.out.println("\n--- SIMULADOR DE LUCRO (Mark-to-Market) ---");
+                    for (Moeda m : minhaCarteira.getMoedas().values()) {
+                        if (m.getSaldo() > 0) {
+                            System.out.print("Digite o preço atual de mercado para " + m.getTicker() + ": ");
+                            double precoMercado = leitor.nextDouble();
+                            
+                            double lucro = carteira.calcularLucroPotencial(m, precoMercado);
+                            double porcentagem = (lucro / (m.getSaldo() * m.getPrecoMedio())) * 100;
+
+                            System.out.printf("Resultado para %s:\n", m.getTicker());
+                            System.out.printf("  Saldo atual: %.8f\n", m.getSaldo());
+                            System.out.printf("  Lucro/Prejuízo: $ %.2f (%.2f%%)\n", lucro, porcentagem);
+                            System.out.println("---------------------------------------");
+                        }
+                    }
+                    break;
+                case 6:
                     System.out.println("Saindo...");
                     break;
 

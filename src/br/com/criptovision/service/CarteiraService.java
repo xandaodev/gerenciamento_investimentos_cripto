@@ -31,4 +31,13 @@ public class CarteiraService {
         }
     }
     
+    public double calcularLucroPotencial(Moeda moeda, double precoAtual){
+        if(moeda.getSaldo() <= 0){
+            return 0;
+        }
+        double valorInvestido = moeda.getSaldo() * moeda.getPrecoMedio();
+        double valorAtual = moeda.getSaldo() * precoAtual;
+        return valorAtual - valorInvestido;
+    }
+    
 }
