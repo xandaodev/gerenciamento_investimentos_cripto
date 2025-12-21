@@ -4,6 +4,7 @@ import br.com.criptovision.model.Carteira;
 import br.com.criptovision.model.Moeda;
 import br.com.criptovision.model.Transacao;
 import br.com.criptovision.service.CarteiraService;
+import br.com.criptovision.repository.TransacaoRepository;
 import java.util.Scanner;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,6 +13,7 @@ public class Main {
     public static void main(String[] args) {
         Scanner leitor = new Scanner(System.in);
         CarteiraService carteira = new CarteiraService();
+        TransacaoRepository repositorio = new TransacaoRepository();
         //criando um array pro historico
         List<Transacao> historico = new ArrayList<>();
 
@@ -47,6 +49,7 @@ public class Main {
                     carteira.processarTransacao(moedaSelecionada, t);
                     historico.add(t); // guarda no histórico
                     
+                    repositorio.salvar(t);//salvando no repository
                     System.out.println(" Compra registrada com sucesso!");
                     break;
                     
@@ -84,6 +87,7 @@ public class Main {
                     carteira.processarTransacao(moedaVenda, tVenda);
                     historico.add(tVenda); // guarda no histórico
                     
+                    repositorio.salvar(tVenda);//salvando no repository
                     System.out.println(" Venda registrada com sucesso!");
                     }
                     break;
