@@ -1,5 +1,6 @@
 package br.com.criptovision.main;
 
+import br.com.criptovision.model.Carteira;
 import br.com.criptovision.model.Moeda;
 import br.com.criptovision.model.Transacao;
 import br.com.criptovision.service.CarteiraService;
@@ -15,7 +16,7 @@ public class Main {
         List<Transacao> historico = new ArrayList<>();
 
         //focando apenas no bitcoin por enquanto
-        Moeda btc = new Moeda("Bitcoin", "BTC");
+        Carteira minhaCarteira = new Carteira();
 
         int opcao = 0;
         while (opcao != 5){
@@ -31,43 +32,56 @@ public class Main {
 
             switch (opcao){
                 case 1:
+                    System.out.print("Qual o Ticker da moeda ? ");
+                    String ticker = leitor.next().toUpperCase();
+
+                    // se não existir, é criada a moeda na hora
+                    Moeda moedaSelecionada = minhaCarteira.obterMoeda(ticker, ticker); 
+
                     System.out.print("Quantidade comprada: ");
                     double qtd = leitor.nextDouble();
                     System.out.print("Preço unitário pago: ");
                     double preco = leitor.nextDouble();
                     
-                    Transacao t = new Transacao("BTC", qtd, preco, "COMPRA");
-                    carteira.processarTransacao(btc, t);
+                    Transacao t = new Transacao(ticker, qtd, preco, "COMPRA");
+                    carteira.processarTransacao(moedaSelecionada, t);
                     historico.add(t); // guarda no histórico
                     
                     System.out.println(" Compra registrada com sucesso!");
                     break;
                     
                 case 2:
-                    System.out.println("\n--- MEU SALDO ---");
-                    System.out.println("Ativo: " + btc.getTicker());
-                    System.out.println("Quantidade: " + btc.getSaldo());
-                    System.out.printf("Preço Médio: $ %.2f\n", btc.getPrecoMedio());
+                    System.out.println("\n--- MINHAS MOEDAS ---");
+                    for(Moeda m : minhaCarteira.getMoedas().values()){
+                        if(m.getSaldo() > 0){
+                            System.out.printf("Ativo: %s | Saldo: %.8f | Preço Médio: $ %.2f\n", 
+                                m.getTicker(), m.getSaldo(), m.getPrecoMedio());
+                        }
+                    }
                     break;
 
                 case 3:
                     System.out.println("\n--- HISTÓRICO ---");
                     for(Transacao tr : historico){
-                        System.out.println(tr.getTipo() + " | " + tr.getQuantidade() + " BTC | $ " + tr.getPrecoUnitario());
+                        System.out.println(tr.getTipo() + " | " + tr.getTicker() + " | " + tr.getQuantidade() + " | $ " + tr.getPrecoUnitario());
                     }
                     break;
 
                 case 4:
+                    System.out.print("Qual o Ticker da moeda para venda? ");
+                    String tickerVenda = leitor.next().toUpperCase();
+                    Moeda moedaVenda = minhaCarteira.obterMoeda(tickerVenda, tickerVenda);
+
                     System.out.print("Quantidade vendida: ");
                     double qtdVenda = leitor.nextDouble();
-                    if(qtdVenda>btc.getSaldo()){
+                    if(qtdVenda > moedaVenda.getSaldo()){
                         System.out.println("Saldo insuficiente!");
                     }else{
                     System.out.print("Preço unitário de venda: ");
                     double precoVenda = leitor.nextDouble();
                     
-                    Transacao tVenda = new Transacao("BTC", qtdVenda, precoVenda, "VENDA");
-                    carteira.processarTransacao(btc, tVenda);
+                    Transacao tVenda = new Transacao(tickerVenda, qtdVenda, precoVenda, "VENDA");
+                    carteira.processarTransacao(moedaVenda, tVenda);
                     historico.add(tVenda); // guarda no histórico
                     
                     System.out.println(" Venda registrada com sucesso!");
