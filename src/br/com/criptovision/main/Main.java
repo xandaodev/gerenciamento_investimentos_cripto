@@ -15,10 +15,16 @@ public class Main {
         CarteiraService carteira = new CarteiraService();
         TransacaoRepository repositorio = new TransacaoRepository();
         //criando um array pro historico
-        List<Transacao> historico = new ArrayList<>();
+
+        List<Transacao> historico = repositorio.lerTudo();
 
         //focando apenas no bitcoin por enquanto
         Carteira minhaCarteira = new Carteira();
+
+        for (Transacao tAntiga : historico) {
+            Moeda m = minhaCarteira.obterMoeda(tAntiga.getTicker(), tAntiga.getTicker());
+            carteira.processarTransacao(m, tAntiga);
+        }
 
         int opcao = 0;
         while (opcao != 5){
