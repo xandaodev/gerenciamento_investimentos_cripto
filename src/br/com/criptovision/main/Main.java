@@ -98,7 +98,7 @@ public class Main {
                     }
                     break;
                 case 5:
-                    System.out.println("\n--- SIMULADOR DE LUCRO (Mark-to-Market) ---");
+                    System.out.println("\n--- SIMULADOR DE LUCRO ---");
                     for (Moeda m : minhaCarteira.getMoedas().values()) {
                         if (m.getSaldo() > 0) {
                             System.out.print("Digite o preço atual de mercado para " + m.getTicker() + ": ");
@@ -109,7 +109,7 @@ public class Main {
 
                             System.out.printf("Resultado para %s:\n", m.getTicker());
                             System.out.printf("  Saldo atual: %.8f\n", m.getSaldo());
-                            System.out.printf("  Lucro/Prejuízo: $ %.2f (%.2f%%)\n", lucro, porcentagem);
+                            System.out.printf("  PNL: $ %.2f (%.2f%%)\n", lucro, porcentagem);
                             System.out.println("---------------------------------------");
                         }
                     }
