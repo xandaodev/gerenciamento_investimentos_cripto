@@ -43,23 +43,28 @@ public class Main {
 
                 switch (opcao){
                     case 1:
-                        System.out.print("Qual o Ticker da moeda ? ");
-                        String ticker = leitor.next().toUpperCase();
+                        try{
+                            System.out.print("Qual o Ticker da moeda ? ");
+                            String ticker = leitor.next().toUpperCase();
 
-                        // se não existir, é criada a moeda na hora
-                        Moeda moedaSelecionada = minhaCarteira.obterMoeda(ticker, ticker); 
+                            // se não existir, é criada a moeda na hora
+                            Moeda moedaSelecionada = minhaCarteira.obterMoeda(ticker, ticker); 
 
-                        System.out.print("Quantidade comprada: ");
-                        double qtd = leitor.nextDouble();
-                        System.out.print("Preço unitário pago: ");
-                        double preco = leitor.nextDouble();
-                        
-                        Transacao t = new Transacao(ticker, qtd, preco, "COMPRA");
-                        carteira.processarTransacao(moedaSelecionada, t);
-                        historico.add(t); // guarda no histórico
-                        repositorio.salvar(t);
-                        System.out.println(" Compra registrada com sucesso!");
-                        break;
+                            System.out.print("Quantidade comprada: ");
+                            double qtd = leitor.nextDouble();
+                            System.out.print("Preço unitário pago: ");
+                            double preco = leitor.nextDouble();
+                            
+                            Transacao t = new Transacao(ticker, qtd, preco, "COMPRA");
+                            carteira.processarTransacao(moedaSelecionada, t);
+                            historico.add(t); // guarda no histórico
+                            repositorio.salvar(t);
+                            System.out.println(" Compra registrada com sucesso!");
+                            break;
+                        }catch(NumberFormatException e){
+                            System.out.println("ERRO: Valor inválido! Use apenas números e pontos (ex: 10.50).");
+                            leitor.nextLine(); // limpa qualquer resquício do erro
+                        }
                         
                     case 2:
                         System.out.println("\n--- MINHAS MOEDAS ---");
@@ -79,24 +84,30 @@ public class Main {
                         break;
 
                     case 4:
-                        System.out.print("Qual o Ticker da moeda para venda? ");
-                        String tickerVenda = leitor.next().toUpperCase();
-                        Moeda moedaVenda = minhaCarteira.obterMoeda(tickerVenda, tickerVenda);
+                        try{
+                            System.out.print("Qual o Ticker da moeda para venda? ");
+                            String tickerVenda = leitor.next().toUpperCase();
+                            Moeda moedaVenda = minhaCarteira.obterMoeda(tickerVenda, tickerVenda);
 
-                        System.out.print("Quantidade vendida: ");
-                        double qtdVenda = leitor.nextDouble();
-                        if(qtdVenda > moedaVenda.getSaldo()){
-                            System.out.println("Saldo insuficiente!");
-                        }else{
-                        System.out.print("Preço unitário de venda: ");
-                        double precoVenda = leitor.nextDouble();
-                        
-                        Transacao tVenda = new Transacao(tickerVenda, qtdVenda, precoVenda, "VENDA");
-                        carteira.processarTransacao(moedaVenda, tVenda);
-                        historico.add(tVenda); // guarda no histórico
-                        
-                        repositorio.salvar(tVenda);//salvando no repository
-                        System.out.println(" Venda registrada com sucesso!");
+                            System.out.print("Quantidade vendida: ");
+                            double qtdVenda = Double.parseDouble(leitor.next().replace(",", "."));
+                            
+                            if(qtdVenda > moedaVenda.getSaldo()){
+                                System.out.println("Saldo insuficiente!");
+                            }else{
+                                System.out.print("Preço unitário de venda: ");
+                                double precoVenda = Double.parseDouble(leitor.next().replace(",", "."));
+                                
+                                Transacao tVenda = new Transacao(tickerVenda, qtdVenda, precoVenda, "VENDA");
+                                carteira.processarTransacao(moedaVenda, tVenda);
+                                historico.add(tVenda); 
+                                
+                                repositorio.salvar(tVenda);
+                                System.out.println(" Venda registrada com sucesso!");
+                            }
+                        }catch(NumberFormatException e){
+                            System.out.println("ERRO: Valor inválido! Use apenas números e pontos (ex: 10.50).");
+                            leitor.nextLine(); 
                         }
                         break;
                     case 5:
