@@ -51,9 +51,10 @@ public class Main {
                             Moeda moedaSelecionada = minhaCarteira.obterMoeda(ticker, ticker); 
 
                             System.out.print("Quantidade comprada: ");
-                            double qtd = leitor.nextDouble();
+                            double qtd = Double.parseDouble(leitor.next().replace(",", "."));
+        
                             System.out.print("Preço unitário pago: ");
-                            double preco = leitor.nextDouble();
+                            double preco = Double.parseDouble(leitor.next().replace(",", "."));
                             
                             Transacao t = new Transacao(ticker, qtd, preco, "COMPRA");
                             carteira.processarTransacao(moedaSelecionada, t);
