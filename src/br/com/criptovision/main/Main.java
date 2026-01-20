@@ -87,10 +87,29 @@ public class Main {
                         break;
 
                     case 3:
-                        System.out.println("\n--- HISTÓRICO ---");
-                        for(Transacao tr : historico){
-                            System.out.println(tr.getTipo() + " | " + tr.getTicker() + " | " + tr.getQuantidade() + " | $ " + tr.getPrecoUnitario());
+                        System.out.println("\n--- DASHBOARD DE PATRIMÓNIO ---");
+                        HttpService serviceHttp = new HttpService();
+                        double totalGeral = carteira.calcularValorTotalCarteira(minhaCarteira.getMoedas(), serviceHttp);
+                        
+                        if(totalGeral == 0){
+                            System.out.println("Sua carteira está vazia ou sem conexão com a internet.");
+                        }else{
+                            System.out.printf("VALOR TOTAL DO PATRIMÓNIO: $ %.2f\n", totalGeral);
+                            System.out.println("---------------------------------------");
+                            System.out.println("Distribuição por Ativo:");
+                            
+                            for(Moeda m : minhaCarteira.getMoedas().values()){
+                                if (m.getSaldo() > 0){
+                                    double preco = serviceHttp.buscarPrecoAtual(m);
+                                    double valorNoAtivo = m.getSaldo() * preco;
+                                    double percentagem = (valorNoAtivo / totalGeral) * 100;
+                                    
+                                    System.out.printf("   %s: $ %.2f (%.1f%%)\n", 
+                                        m.getTicker(), valorNoAtivo, percentagem);
+                                }
+                            }
                         }
+                        System.out.println("---------------------------------------");
                         break;
 
                     case 4:
