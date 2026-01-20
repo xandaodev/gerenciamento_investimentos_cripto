@@ -28,7 +28,7 @@ public class Main {
         }
 
         int opcao = 0;
-        while (opcao != 6){
+        while (opcao != 7){
             try{
                 System.out.println("\n--- GERENCIAMNETO DE INVESTIMENTOS CRIPTO ---");
                 System.out.println("1. Nova compra");
@@ -128,7 +128,7 @@ public class Main {
                         for (Moeda m : minhaCarteira.getMoedas().values()) {
                             if (m.getSaldo() > 0) {
 
-                                double precoMercado = http.buscarPrecoAtual(m.getTicker());
+                                double precoMercado = http.buscarPrecoAtual(m);
                                 //double precoMercado = leitor.nextDouble();
                                 
                                 double lucro = carteira.calcularLucroPotencial(m, precoMercado);
