@@ -98,25 +98,41 @@ public class Main {
                             System.out.print("Qual o Ticker da moeda para venda? ");
                             String tickerVenda = leitor.next().toUpperCase();
                             Moeda moedaVenda = minhaCarteira.obterMoeda(tickerVenda, tickerVenda);
+                            // Mostramos o saldo disponível para ajudar o utilizador
+                            System.out.printf("Saldo disponível de %s: %.8f\n", moedaVenda.getTicker(), moedaVenda.getSaldo());
+                            
+                            if(moedaVenda.getSaldo() <= 0){
+                                System.out.println("Não tem saldo desta moeda para vender.");
+                                break;
+                            }
 
-                            System.out.print("Quantidade vendida: ");
+                            System.out.print("Quantidade a vender: ");
                             double qtdVenda = Double.parseDouble(leitor.next().replace(",", "."));
                             
-                            if(qtdVenda > moedaVenda.getSaldo()){
-                                System.out.println("Saldo insuficiente!");
-                            }else{
-                                System.out.print("Preço unitário de venda: ");
-                                double precoVenda = Double.parseDouble(leitor.next().replace(",", "."));
-                                
-                                Transacao tVenda = new Transacao(tickerVenda, qtdVenda, precoVenda, "VENDA");
-                                carteira.processarTransacao(moedaVenda, tVenda);
-                                historico.add(tVenda); 
-                                
-                                repositorio.salvar(tVenda);
-                                System.out.println(" Venda registrada com sucesso!");
+                            // Validação imediata na UI
+                            if (qtdVenda > moedaVenda.getSaldo()) {
+                                System.out.println("Erro: esta tentando vender mais do que possui!");
+                                break; 
                             }
+                            
+                            if (qtdVenda <= 0) {
+                                System.out.println("Erro: A quantidade deve ser positiva.");
+                                break;
+                            }
+                            //****************
+
+                            System.out.print("Preço unitário de venda: ");
+                            double precoVenda = Double.parseDouble(leitor.next().replace(",", "."));
+                            
+                            Transacao tVenda = new Transacao(tickerVenda, qtdVenda, precoVenda, "VENDA");
+                            carteira.processarTransacao(moedaVenda, tVenda);
+                            historico.add(tVenda); 
+                            repositorio.salvar(tVenda);
+                            
+                            System.out.println("Venda registrada com sucesso!");
+
                         }catch(NumberFormatException e){
-                            System.out.println("ERRO: Valor inválido! Use apenas números e pontos (ex: 10.50).");
+                            System.out.println("ERRO: Valor inválido! Use apenas números.");
                             leitor.nextLine(); 
                         }
                         break;

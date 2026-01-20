@@ -18,14 +18,26 @@ public class CarteiraService {
             moeda.setPrecoMedio(novoPrecoMedio);
 
         }else if(transacao.getTipo().equals("VENDA")){
-            moeda.setSaldo(moeda.getSaldo() - transacao.getQuantidade());
-            //na venda o preço medio nao muda
+            // verificação de segurança: a quantidade deve ser positiva
+            if (transacao.getQuantidade() <= 0){
+                System.out.println("Erro: A quantidade de venda deve ser maior que zero.");
+                return;
+            }
+
+            // 2. Verificação de saldo
+            if (transacao.getQuantidade() > moeda.getSaldo()){
+                System.out.println("Erro: Saldo insuficiente para realizar a venda.");
+                return;
+            }
+
+            // calculo de pnl
             double custoParteVendida = transacao.getQuantidade() * moeda.getPrecoMedio();
             double valorRecebidoNaVenda = transacao.getQuantidade() * transacao.getPrecoUnitario();
-            double lucroOperacao =valorRecebidoNaVenda - custoParteVendida;
+            double lucroOperacao = valorRecebidoNaVenda - custoParteVendida;
 
             System.out.printf("PNL dessa venda: $ %.2f\n", lucroOperacao);
 
+            // atualização do saldo (Subtraímos apenas uma vez)
             moeda.setSaldo(moeda.getSaldo() - transacao.getQuantidade());
             
         }
