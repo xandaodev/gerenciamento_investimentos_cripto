@@ -62,5 +62,28 @@ public class HttpService {
             default -> ticker.toLowerCase();
         };
     }
+
+    //funcao para verificar se existe o token antes de registrar a venda 
+    public boolean validarTicker(String ticker){
+        String idMoeda = converterTickerParaId(ticker);
+        String url = "https://api.coingecko.com/api/v3/simple/price?ids=" + idMoeda + "&vs_currencies=usd";
+        try{
+            HttpClient client = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(5))
+                    .build();
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(Duration.ofSeconds(5))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            // se o status for 200 e o corpo não for "{}", o ticker é válido
+            return response.statusCode() == 200 && !response.body().equals("{}");
+        }catch(Exception e){
+            return false;
+        }
+    }
     
 }

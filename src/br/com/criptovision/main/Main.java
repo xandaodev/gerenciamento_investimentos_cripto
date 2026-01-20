@@ -36,7 +36,8 @@ public class Main {
                 System.out.println("3. Ver Histórico de Transações");
                 System.out.println("4. Nova venda");
                 System.out.println("5. Simular lucro");
-                System.out.println("6. Sair do sistema");
+                System.out.println("6. Gerar Relatório");
+                System.out.println("7. Sair do sistema");
                 System.out.print("Escolha uma opção: ");
                 
                 opcao = leitor.nextInt();
@@ -46,6 +47,14 @@ public class Main {
                         try{
                             System.out.print("Qual o Ticker da moeda ? ");
                             String ticker = leitor.next().toUpperCase();
+                            //verificando se o token existe
+                            HttpService httpValidador = new HttpService();
+                            System.out.println("Validando ticker na API...");
+                            
+                            if (!httpValidador.validarTicker(ticker)) {
+                                System.out.println("ERRO: Ticker '" + ticker + "' não reconhecido.");
+                                break;
+                            }
 
                             // se não existir, é criada a moeda na hora
                             Moeda moedaSelecionada = minhaCarteira.obterMoeda(ticker, ticker); 
@@ -134,6 +143,11 @@ public class Main {
                         }
                         break;
                     case 6:
+                        System.out.println("Gerando relatório...");
+                        repositorio.gerarRelatorio(new ArrayList<>(minhaCarteira.getMoedas().values()));
+                        break;
+                    
+                    case 7:
                         System.out.println("Saindo...");
                         break;
 
