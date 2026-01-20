@@ -1,5 +1,6 @@
 package br.com.criptovision.repository;
 
+import br.com.criptovision.model.Moeda;
 import br.com.criptovision.model.Transacao;
 import java.io.BufferedReader;
 import java.io.FileReader;
@@ -44,4 +45,21 @@ public class TransacaoRepository {
         }
         return transacoes;
     }
+
+    public void gerarRelatorio(List<Moeda> moedas){
+    try(PrintWriter writer = new PrintWriter(new FileWriter("relatorio.txt"))){
+        writer.println("--- RELATÓRIO DE INVESTIMENTOS CRIPTO ---");
+        writer.println("Data: " + LocalDateTime.now());
+        writer.println("------------------------------------------");
+        for(Moeda m : moedas){
+            if(m.getSaldo() > 0){
+                writer.printf("Ativo: %s | Saldo: %.8f | Preço Médio: $ %.2f\n",
+                        m.getTicker(), m.getSaldo(), m.getPrecoMedio());
+            }
+        }
+        System.out.println("Relatório gerado com sucesso em 'relatorio.txt'!");
+    }catch(IOException e){
+        System.out.println("Erro ao gerar relatório: " + e.getMessage());
+    }
+}
 }
