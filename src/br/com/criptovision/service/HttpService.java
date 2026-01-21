@@ -35,12 +35,11 @@ public class HttpService {
             String json = response.body();
             if (json.equals("{}")) return 0;
 
-            // Extração simples do preço no JSON
             String valorString = json.split(":")[2].replace("}}", "");
             return Double.parseDouble(valorString);
 
         } catch (Exception e) {
-            // Se der erro de limite (429) ou interrupção, retorna 0
+            // se der erro de limite (429) ou interrupção, retorna 0
             return 0;
         }
     }
@@ -58,7 +57,6 @@ public class HttpService {
 
     public boolean validarTicker(String idMoeda) {
         try {
-            // Também adicionamos um delay na validação
             Thread.sleep(2000);
 
             String url = "https://api.coingecko.com/api/v3/simple/price?ids=" + idMoeda + "&vs_currencies=usd";

@@ -24,7 +24,7 @@ public class CarteiraService {
                 return;
             }
 
-            // 2. Verificação de saldo
+            // verifica saldo
             if (transacao.getQuantidade() > moeda.getSaldo()){
                 System.out.println("Erro: Saldo insuficiente para realizar a venda.");
                 return;
@@ -37,7 +37,7 @@ public class CarteiraService {
 
             System.out.printf("PNL dessa venda: $ %.2f\n", lucroOperacao);
 
-            // atualização do saldo (Subtraímos apenas uma vez)
+            // atualização do saldo 
             moeda.setSaldo(moeda.getSaldo() - transacao.getQuantidade());
             
         }

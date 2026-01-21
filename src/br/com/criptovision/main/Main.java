@@ -26,7 +26,6 @@ public class Main {
             String tickerOriginal = tAntiga.getTicker().toUpperCase();
             String nomeCorretoApi = httpTradutor.converterTickerParaId(tickerOriginal);
             
-            // Certifique-se de que a moeda na carteira tenha o nome da API correto
             Moeda m = minhaCarteira.obterMoeda(tickerOriginal, nomeCorretoApi);
             carteira.processarTransacao(m, tAntiga);
         }
@@ -55,12 +54,12 @@ public class Main {
                             
                             HttpService httpService = new HttpService();
                             
-                            // PRIMEIRO: Converte o ticker para o ID que a API entende
+                            // convertendo o ticker para o id que a api entende
                             String idMoeda = httpService.converterTickerParaId(ticker);
                             
                             System.out.println("Validando '" + idMoeda + "' na API...");
                             
-                            // SEGUNDO: Valida usando o ID convertido
+                            // valida usando o id convertido
                             if (!httpService.validarTicker(idMoeda)) {
                                 System.out.println("ERRO: A API não reconheceu o ativo '" + ticker + "' (ID: " + idMoeda + ").");
                                 break; 
@@ -69,7 +68,7 @@ public class Main {
                             Moeda moedaSelecionada = minhaCarteira.obterMoeda(ticker, idMoeda); 
 
                             System.out.print("Quantidade comprada: ");
-                            double qtd = Double.parseDouble(leitor.nextLine().replace(",", ".")); // Lendo linha cheia para evitar erro de buffer
+                            double qtd = Double.parseDouble(leitor.nextLine().replace(",", ".")); // lendo linha cheia
 
                             System.out.print("Preço unitário pago: ");
                             double preco = Double.parseDouble(leitor.nextLine().replace(",", "."));
@@ -99,14 +98,14 @@ public class Main {
                         HttpService serviceHttp = new HttpService();
                         
                         double totalCalculado = 0;
-                        // Criamos uma lista temporária para não ter que chamar a API de novo depois
+                        //lista temporaria que evita chamar api dnv
                         java.util.Map<String, Double> valoresPorMoeda = new java.util.HashMap<>();
 
                         System.out.println("Atualizando preços (aguarde)...");
 
                         for (Moeda m : minhaCarteira.getMoedas().values()) {
                             if (m.getSaldo() > 0) {
-                                double preco = serviceHttp.buscarPrecoAtual(m); // ÚNICA CHAMADA POR MOEDA
+                                double preco = serviceHttp.buscarPrecoAtual(m); 
                                 double valorNoAtivo = m.getSaldo() * preco;
                                 
                                 valoresPorMoeda.put(m.getTicker(), valorNoAtivo);
@@ -114,14 +113,14 @@ public class Main {
                             }
                         }
 
-                        if (totalCalculado == 0) {
+                        if(totalCalculado == 0){
                             System.out.println("Erro: Não foi possível obter preços da API ou carteira vazia.");
-                        } else {
+                        }else{
                             System.out.printf("VALOR TOTAL DO PATRIMÓNIO: $ %.2f\n", totalCalculado);
                             System.out.println("---------------------------------------");
                             System.out.println("Distribuição por Ativo:");
 
-                            for (Moeda m : minhaCarteira.getMoedas().values()) {
+                            for(Moeda m : minhaCarteira.getMoedas().values()){
                                 if (m.getSaldo() > 0) {
                                     double valorAtivo = valoresPorMoeda.get(m.getTicker());
                                     double percentagem = (valorAtivo / totalCalculado) * 100;
@@ -138,9 +137,9 @@ public class Main {
                         try {
                             System.out.print("Qual o Ticker da moeda para venda? ");
                             String tickerVenda = leitor.next().toUpperCase();
-                            leitor.nextLine(); // Limpa buffer
+                            leitor.nextLine(); // limpa buffer e evita bug
 
-                            // BUSQUE O NOME REAL QUE A API USA
+                            // busca o nome real da moeda que a api usa
                             String nomeParaApi = httpTradutor.converterTickerParaId(tickerVenda);
                             Moeda moedaVenda = minhaCarteira.obterMoeda(tickerVenda, nomeParaApi);
 
