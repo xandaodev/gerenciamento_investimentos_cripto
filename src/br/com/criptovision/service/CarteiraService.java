@@ -63,5 +63,17 @@ public class CarteiraService {
         }
         return valorTotal;
     }
+
+    //metodo para calcular pnl total da carteira
+    public double calcularPnlTotal(java.util.Map<String, Moeda> moedas, HttpService http){
+        double pnlTotal = 0;
+        for(Moeda m : moedas.values()){
+            if(m.getSaldo() > 0){
+                double precoAtual = http.buscarPrecoAtual(m);
+                pnlTotal += calcularLucroPotencial(m, precoAtual);
+            }
+        }
+        return pnlTotal;
+    }
     
 }

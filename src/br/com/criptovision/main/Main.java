@@ -94,19 +94,24 @@ public class Main {
                         break;
 
                     case 3:
-                        System.out.println("\n--- DASHBOARD DE PATRIMÓNIO ---");
+                        System.out.println("\n--- DASHBOARD DE PATRIMONIO ---");
                         HttpService serviceHttp = new HttpService();
                         
                         double totalCalculado = 0;
+                        double pnlTotalGeral = 0;
                         //lista temporaria que evita chamar api dnv
                         java.util.Map<String, Double> valoresPorMoeda = new java.util.HashMap<>();
 
                         System.out.println("Atualizando preços (aguarde)...");
+                        System.out.print("\n");
 
-                        for (Moeda m : minhaCarteira.getMoedas().values()) {
+                        for(Moeda m : minhaCarteira.getMoedas().values()){
                             if (m.getSaldo() > 0) {
                                 double preco = serviceHttp.buscarPrecoAtual(m); 
                                 double valorNoAtivo = m.getSaldo() * preco;
+
+                                double lucroDestaMoeda = carteira.calcularLucroPotencial(m, preco);
+                                pnlTotalGeral += lucroDestaMoeda;
                                 
                                 valoresPorMoeda.put(m.getTicker(), valorNoAtivo);
                                 totalCalculado += valorNoAtivo;
@@ -116,7 +121,9 @@ public class Main {
                         if(totalCalculado == 0){
                             System.out.println("Erro: Não foi possível obter preços da API ou carteira vazia.");
                         }else{
-                            System.out.printf("VALOR TOTAL DO PATRIMÓNIO: $ %.2f\n", totalCalculado);
+                            System.out.printf("VALOR TOTAL DO PATRIMONIO: $ %.2f\n", totalCalculado);
+                            String status = (pnlTotalGeral >= 0) ? "LUCRO" : "PREJUIZO";
+                            System.out.printf("PNL GERAL DA CARTEIRA: $ %.2f (%s)\n", pnlTotalGeral, status);
                             System.out.println("---------------------------------------");
                             System.out.println("Distribuição por Ativo:");
 
