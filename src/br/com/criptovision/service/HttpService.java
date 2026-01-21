@@ -4,45 +4,47 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-
 import java.time.Duration;
-
 import br.com.criptovision.model.Moeda;
 
 public class HttpService {
 
     public double buscarPrecoAtual(Moeda moeda) {
-        // convertendo o sticker pro nome correto 
-        //String idMoeda = converterTickerParaId(ticker);
-        
-        String url = "https://api.coingecko.com/api/v3/simple/price?ids=" + moeda.getNome() + "&vs_currencies=usd";
-
         try {
-        HttpClient client = HttpClient.newBuilder()
-                .connectTimeout(Duration.ofSeconds(10))
-                .build();
-        HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .timeout(Duration.ofSeconds(10))
-                .GET()
-                .build();
+            // aguarda 2 segundos para não estourar o limite da API gratuita
+            Thread.sleep(2000); 
 
-        HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+            String idParaBusca = converterTickerParaId(moeda.getTicker());
+            if (idParaBusca.isEmpty()) idParaBusca = moeda.getNome();
 
-        if (response.statusCode() != 200) return 0;
+            String url = "https://api.coingecko.com/api/v3/simple/price?ids=" + idParaBusca + "&vs_currencies=usd";
 
-        String json = response.body();
-        if (json.equals("{}")) return 0;
+            HttpClient client = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(10))
+                    .build();
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(Duration.ofSeconds(10))
+                    .GET()
+                    .build();
 
-        String valorString = json.split(":")[2].replace("}}", "");
-        return Double.parseDouble(valorString);
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
-    } catch (Exception e) {
-        return 0;
+            if (response.statusCode() != 200) return 0;
+
+            String json = response.body();
+            if (json.equals("{}")) return 0;
+
+            // Extração simples do preço no JSON
+            String valorString = json.split(":")[2].replace("}}", "");
+            return Double.parseDouble(valorString);
+
+        } catch (Exception e) {
+            // Se der erro de limite (429) ou interrupção, retorna 0
+            return 0;
+        }
     }
-}
 
-    //funcao para converter o ticket para o nome que a api usa
     public String converterTickerParaId(String ticker){
         if (ticker == null) return "";
         return switch (ticker.toUpperCase()) {
@@ -54,11 +56,13 @@ public class HttpService {
         };
     }
 
-    //funcao para verificar se existe o token antes de registrar a venda 
-    public boolean validarTicker(String ticker){
-        String idMoeda = converterTickerParaId(ticker);
-        String url = "https://api.coingecko.com/api/v3/simple/price?ids=" + idMoeda + "&vs_currencies=usd";
-        try{
+    public boolean validarTicker(String idMoeda) {
+        try {
+            // Também adicionamos um delay na validação
+            Thread.sleep(2000);
+
+            String url = "https://api.coingecko.com/api/v3/simple/price?ids=" + idMoeda + "&vs_currencies=usd";
+            
             HttpClient client = HttpClient.newBuilder()
                     .connectTimeout(Duration.ofSeconds(5))
                     .build();
@@ -70,11 +74,9 @@ public class HttpService {
 
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
-            // se o status for 200 e o corpo não for "{}", o ticker é válido
             return response.statusCode() == 200 && !response.body().equals("{}");
-        }catch(Exception e){
+        } catch(Exception e) {
             return false;
         }
     }
-    
 }

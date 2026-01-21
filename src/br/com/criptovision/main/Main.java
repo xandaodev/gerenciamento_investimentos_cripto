@@ -23,9 +23,11 @@ public class Main {
 
         HttpService httpTradutor = new HttpService();
         for (Transacao tAntiga : historico) {
-            // Traduz o ticker salvo (ex: BTC) para o nome da API (ex: bitcoin)
-            String nomeCorretoApi = httpTradutor.converterTickerParaId(tAntiga.getTicker());
-            Moeda m = minhaCarteira.obterMoeda(tAntiga.getTicker(), nomeCorretoApi);
+            String tickerOriginal = tAntiga.getTicker().toUpperCase();
+            String nomeCorretoApi = httpTradutor.converterTickerParaId(tickerOriginal);
+            
+            // Certifique-se de que a moeda na carteira tenha o nome da API correto
+            Moeda m = minhaCarteira.obterMoeda(tickerOriginal, nomeCorretoApi);
             carteira.processarTransacao(m, tAntiga);
         }
 
@@ -47,29 +49,30 @@ public class Main {
                 switch (opcao){
                     case 1:
                         try {
-                            System.out.print("Qual o Ticker da moeda ? ");
+                            System.out.print("Qual o Ticker da moeda (ex: BTC)? ");
                             String ticker = leitor.next().toUpperCase();
+                            leitor.nextLine(); 
                             
-                            HttpService httpValidador = new HttpService();
-                            System.out.println("Validando ticker na API...");
+                            HttpService httpService = new HttpService();
                             
-                            if (!httpValidador.validarTicker(ticker)) {
-                                System.out.println("ERRO: Ticker '" + ticker + "' não reconhecido.");
+                            // PRIMEIRO: Converte o ticker para o ID que a API entende
+                            String idMoeda = httpService.converterTickerParaId(ticker);
+                            
+                            System.out.println("Validando '" + idMoeda + "' na API...");
+                            
+                            // SEGUNDO: Valida usando o ID convertido
+                            if (!httpService.validarTicker(idMoeda)) {
+                                System.out.println("ERRO: A API não reconheceu o ativo '" + ticker + "' (ID: " + idMoeda + ").");
                                 break; 
                             }
 
-                            // AGORA A MÁGICA ACONTECE AQUI:
-                            // Convertemos LNK para chainlink antes de criar a moeda
-                            String nomeApiValido = httpValidador.converterTickerParaId(ticker);
-
-                            // Criamos a moeda com o Ticker (LNK) e o Nome da API (chainlink)
-                            Moeda moedaSelecionada = minhaCarteira.obterMoeda(ticker, nomeApiValido); 
+                            Moeda moedaSelecionada = minhaCarteira.obterMoeda(ticker, idMoeda); 
 
                             System.out.print("Quantidade comprada: ");
-                            double qtd = Double.parseDouble(leitor.next().replace(",", "."));
+                            double qtd = Double.parseDouble(leitor.nextLine().replace(",", ".")); // Lendo linha cheia para evitar erro de buffer
 
                             System.out.print("Preço unitário pago: ");
-                            double preco = Double.parseDouble(leitor.next().replace(",", "."));
+                            double preco = Double.parseDouble(leitor.nextLine().replace(",", "."));
                             
                             Transacao t = new Transacao(ticker, qtd, preco, "COMPRA");
                             carteira.processarTransacao(moedaSelecionada, t);
@@ -77,7 +80,7 @@ public class Main {
                             repositorio.salvar(t);
                             System.out.println("Compra registrada com sucesso!");
                         } catch (Exception e) {
-                            System.out.println("Erro: " + e.getMessage());
+                            System.out.println("Erro na compra: " + e.getMessage());
                         }
                         break;
                         
@@ -94,23 +97,37 @@ public class Main {
                     case 3:
                         System.out.println("\n--- DASHBOARD DE PATRIMÓNIO ---");
                         HttpService serviceHttp = new HttpService();
-                        double totalGeral = carteira.calcularValorTotalCarteira(minhaCarteira.getMoedas(), serviceHttp);
                         
-                        if(totalGeral == 0){
-                            System.out.println("Sua carteira está vazia ou sem conexão com a internet.");
-                        }else{
-                            System.out.printf("VALOR TOTAL DO PATRIMÓNIO: $ %.2f\n", totalGeral);
+                        double totalCalculado = 0;
+                        // Criamos uma lista temporária para não ter que chamar a API de novo depois
+                        java.util.Map<String, Double> valoresPorMoeda = new java.util.HashMap<>();
+
+                        System.out.println("Atualizando preços (aguarde)...");
+
+                        for (Moeda m : minhaCarteira.getMoedas().values()) {
+                            if (m.getSaldo() > 0) {
+                                double preco = serviceHttp.buscarPrecoAtual(m); // ÚNICA CHAMADA POR MOEDA
+                                double valorNoAtivo = m.getSaldo() * preco;
+                                
+                                valoresPorMoeda.put(m.getTicker(), valorNoAtivo);
+                                totalCalculado += valorNoAtivo;
+                            }
+                        }
+
+                        if (totalCalculado == 0) {
+                            System.out.println("Erro: Não foi possível obter preços da API ou carteira vazia.");
+                        } else {
+                            System.out.printf("VALOR TOTAL DO PATRIMÓNIO: $ %.2f\n", totalCalculado);
                             System.out.println("---------------------------------------");
                             System.out.println("Distribuição por Ativo:");
-                            
-                            for(Moeda m : minhaCarteira.getMoedas().values()){
-                                if (m.getSaldo() > 0){
-                                    double preco = serviceHttp.buscarPrecoAtual(m);
-                                    double valorNoAtivo = m.getSaldo() * preco;
-                                    double percentagem = (valorNoAtivo / totalGeral) * 100;
-                                    
+
+                            for (Moeda m : minhaCarteira.getMoedas().values()) {
+                                if (m.getSaldo() > 0) {
+                                    double valorAtivo = valoresPorMoeda.get(m.getTicker());
+                                    double percentagem = (valorAtivo / totalCalculado) * 100;
+
                                     System.out.printf("   %s: $ %.2f (%.1f%%)\n", 
-                                        m.getTicker(), valorNoAtivo, percentagem);
+                                        m.getTicker(), valorAtivo, percentagem);
                                 }
                             }
                         }
@@ -118,46 +135,40 @@ public class Main {
                         break;
 
                     case 4:
-                        try{
+                        try {
                             System.out.print("Qual o Ticker da moeda para venda? ");
                             String tickerVenda = leitor.next().toUpperCase();
-                            Moeda moedaVenda = minhaCarteira.obterMoeda(tickerVenda, tickerVenda);
-                            // Mostramos o saldo disponível para ajudar o utilizador
-                            System.out.printf("Saldo disponível de %s: %.8f\n", moedaVenda.getTicker(), moedaVenda.getSaldo());
-                            
+                            leitor.nextLine(); // Limpa buffer
+
+                            // BUSQUE O NOME REAL QUE A API USA
+                            String nomeParaApi = httpTradutor.converterTickerParaId(tickerVenda);
+                            Moeda moedaVenda = minhaCarteira.obterMoeda(tickerVenda, nomeParaApi);
+
                             if(moedaVenda.getSaldo() <= 0){
-                                System.out.println("Não tem saldo desta moeda para vender.");
+                                System.out.println("Não tem saldo de " + tickerVenda + " para vender.");
                                 break;
                             }
 
+                            System.out.printf("Saldo disponível: %.8f\n", moedaVenda.getSaldo());
                             System.out.print("Quantidade a vender: ");
-                            double qtdVenda = Double.parseDouble(leitor.next().replace(",", "."));
+                            double qtdVenda = Double.parseDouble(leitor.nextLine().replace(",", "."));
                             
-                            // Validação imediata na UI
                             if (qtdVenda > moedaVenda.getSaldo()) {
-                                System.out.println("Erro: esta tentando vender mais do que possui!");
+                                System.out.println("Erro: Saldo insuficiente!");
                                 break; 
                             }
-                            
-                            if (qtdVenda <= 0) {
-                                System.out.println("Erro: A quantidade deve ser positiva.");
-                                break;
-                            }
-                            //****************
 
                             System.out.print("Preço unitário de venda: ");
-                            double precoVenda = Double.parseDouble(leitor.next().replace(",", "."));
+                            double precoVenda = Double.parseDouble(leitor.nextLine().replace(",", "."));
                             
                             Transacao tVenda = new Transacao(tickerVenda, qtdVenda, precoVenda, "VENDA");
                             carteira.processarTransacao(moedaVenda, tVenda);
                             historico.add(tVenda); 
                             repositorio.salvar(tVenda);
                             
-                            System.out.println("Venda registrada com sucesso!");
-
-                        }catch(NumberFormatException e){
-                            System.out.println("ERRO: Valor inválido! Use apenas números.");
-                            leitor.nextLine(); 
+                            System.out.println("Venda registrada!");
+                        } catch(Exception e) {
+                            System.out.println("Erro na venda: " + e.getMessage());
                         }
                         break;
                     case 5:
