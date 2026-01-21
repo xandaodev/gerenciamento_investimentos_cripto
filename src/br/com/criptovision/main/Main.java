@@ -19,11 +19,13 @@ public class Main {
 
         List<Transacao> historico = repositorio.lerTudo();
 
-        //focando apenas no bitcoin por enquanto
         Carteira minhaCarteira = new Carteira();
 
+        HttpService httpTradutor = new HttpService();
         for (Transacao tAntiga : historico) {
-            Moeda m = minhaCarteira.obterMoeda(tAntiga.getTicker(), tAntiga.getTicker());
+            // Traduz o ticker salvo (ex: BTC) para o nome da API (ex: bitcoin)
+            String nomeCorretoApi = httpTradutor.converterTickerParaId(tAntiga.getTicker());
+            Moeda m = minhaCarteira.obterMoeda(tAntiga.getTicker(), nomeCorretoApi);
             carteira.processarTransacao(m, tAntiga);
         }
 
@@ -44,37 +46,40 @@ public class Main {
 
                 switch (opcao){
                     case 1:
-                        try{
+                        try {
                             System.out.print("Qual o Ticker da moeda ? ");
                             String ticker = leitor.next().toUpperCase();
-                            //verificando se o token existe
+                            
                             HttpService httpValidador = new HttpService();
                             System.out.println("Validando ticker na API...");
                             
                             if (!httpValidador.validarTicker(ticker)) {
                                 System.out.println("ERRO: Ticker '" + ticker + "' não reconhecido.");
-                                break;
+                                break; 
                             }
 
-                            // se não existir, é criada a moeda na hora
-                            Moeda moedaSelecionada = minhaCarteira.obterMoeda(ticker, ticker); 
+                            // AGORA A MÁGICA ACONTECE AQUI:
+                            // Convertemos LNK para chainlink antes de criar a moeda
+                            String nomeApiValido = httpValidador.converterTickerParaId(ticker);
+
+                            // Criamos a moeda com o Ticker (LNK) e o Nome da API (chainlink)
+                            Moeda moedaSelecionada = minhaCarteira.obterMoeda(ticker, nomeApiValido); 
 
                             System.out.print("Quantidade comprada: ");
                             double qtd = Double.parseDouble(leitor.next().replace(",", "."));
-        
+
                             System.out.print("Preço unitário pago: ");
                             double preco = Double.parseDouble(leitor.next().replace(",", "."));
                             
                             Transacao t = new Transacao(ticker, qtd, preco, "COMPRA");
                             carteira.processarTransacao(moedaSelecionada, t);
-                            historico.add(t); // guarda no histórico
+                            historico.add(t);
                             repositorio.salvar(t);
-                            System.out.println(" Compra registrada com sucesso!");
-                            break;
-                        }catch(NumberFormatException e){
-                            System.out.println("ERRO: Valor inválido! Use apenas números e pontos (ex: 10.50).");
-                            leitor.nextLine(); // limpa qualquer resquício do erro
+                            System.out.println("Compra registrada com sucesso!");
+                        } catch (Exception e) {
+                            System.out.println("Erro: " + e.getMessage());
                         }
+                        break;
                         
                     case 2:
                         System.out.println("\n--- MINHAS MOEDAS ---");

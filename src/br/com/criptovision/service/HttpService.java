@@ -43,13 +43,14 @@ public class HttpService {
 }
 
     //funcao para converter o ticket para o nome que a api usa
-    private String converterTickerParaId(String ticker) {
+    public String converterTickerParaId(String ticker){
+        if (ticker == null) return "";
         return switch (ticker.toUpperCase()) {
             case "BTC" -> "bitcoin";
             case "ETH" -> "ethereum";
             case "SOL" -> "solana";
             case "LNK" -> "chainlink";
-            default -> ticker.toLowerCase();
+            default -> ticker.toLowerCase(); 
         };
     }
 
