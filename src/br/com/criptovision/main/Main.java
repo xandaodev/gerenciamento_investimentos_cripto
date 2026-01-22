@@ -33,7 +33,7 @@ public class Main {
         int opcao = 0;
         while (opcao != 9){
             try{
-                System.out.println("\n--- GERENCIAMNETO DE INVESTIMENTOS CRIPTO ---");
+                System.out.println("\n--- GERENCIAMENTO DE INVESTIMENTOS CRIPTO ---");
                 System.out.println("1. Nova compra");
                 System.out.println("2. Nova venda");
                 System.out.println("3. Ver Histórico de Transações");
@@ -41,7 +41,8 @@ public class Main {
                 System.out.println("5. Simular lucro");
                 System.out.println("6. Gerar Relatório");
                 System.out.println("7. Ver lucro total realizado");
-                System.out.println("8. Sair do sistema");
+                System.out.println("8. Consultar preço em tempo real");
+                System.out.println("9. Sair do sistema");
                 System.out.print("Escolha uma opção: ");
                 
                 opcao = leitor.nextInt();
@@ -223,6 +224,20 @@ public class Main {
                         break;
 
                     case 8:
+                        System.out.print("\nQual o Ticker da moeda para consulta rápida (ex: BTC, SOL, LNK)? ");
+                        String tickerBusca = leitor.next().toUpperCase();
+                        leitor.nextLine();
+                        System.out.println("Consultando API (aguarde 2 segundos)...");
+                        double precoBuscado = httpTradutor.consultarPrecoPorTicker(tickerBusca);
+                        if(precoBuscado > 0){
+                            System.out.println("\n=======================================");
+                            System.out.printf("COTAÇÃO ATUAL (%s): $ %.2f\n", tickerBusca, precoBuscado);
+                            System.out.println("=======================================");
+                        }else{
+                            System.out.println("\nNão foi possível obter o preço.");
+                        }
+                        break;
+                    case 9:
                         System.out.println("Saindo...");
                         break;
 
