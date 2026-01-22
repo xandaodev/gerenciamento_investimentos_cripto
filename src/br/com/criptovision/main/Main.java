@@ -31,7 +31,7 @@ public class Main {
         }
 
         int opcao = 0;
-        while (opcao != 7){
+        while (opcao != 8){
             try{
                 System.out.println("\n--- GERENCIAMNETO DE INVESTIMENTOS CRIPTO ---");
                 System.out.println("1. Nova compra");
@@ -40,7 +40,8 @@ public class Main {
                 System.out.println("4. Nova venda");
                 System.out.println("5. Simular lucro");
                 System.out.println("6. Gerar Relatório");
-                System.out.println("7. Sair do sistema");
+                System.out.println("7. Ver lucro total realizado");
+                System.out.println("8. Sair do sistema");
                 System.out.print("Escolha uma opção: ");
                 
                 opcao = leitor.nextInt();
@@ -205,6 +206,23 @@ public class Main {
                         break;
                     
                     case 7:
+                        System.out.println("\n--- total de lucros realizados até hoje ---");
+                        // criamos o repositorio pra conseguirn ler o ficheiro
+                        br.com.criptovision.repository.LucroRepository repoLucro = new br.com.criptovision.repository.LucroRepository();
+                        // chamando a funcção que soma todos os lucros
+                        double totalRealizado = repoLucro.lerLucroTotal();
+                        
+                        if(totalRealizado == 0){
+                            System.out.println("Voce ainda nao realizou nenhum lucro");
+                        }else{
+                            String status = (totalRealizado >= 0) ? "POSITIVO" : "NEGATIVO";
+                            System.out.printf("TOTAL ACUMULADO EM VENDAS: $ %.2f (%s)\n", totalRealizado, status);
+                            System.out.println("valor que representa o lucro real que já realizou ao vender seus ativos.");
+                        }
+                        System.out.println("-----------------------------------------------------");
+                        break;
+
+                    case 8:
                         System.out.println("Saindo...");
                         break;
 
