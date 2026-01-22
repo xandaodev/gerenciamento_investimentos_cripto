@@ -215,6 +215,10 @@ public class Main {
                 System.out.println(" ERRO: Por favor, digite apenas números inteiros para as opções do menu.");
             }catch(Exception e){ 
                 System.out.println(" Ocorreu um erro inesperado: " + e.getMessage());
+
+                if(leitor.hasNextLine()){
+                leitor.nextLine(); // limpa um possivel lixo que pode ter ficado no leitor
+                }
             }
         }
 

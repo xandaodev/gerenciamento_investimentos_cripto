@@ -3,7 +3,11 @@ package br.com.criptovision.service;
 import br.com.criptovision.model.Moeda;
 import br.com.criptovision.model.Transacao;
 
+import br.com.criptovision.repository.LucroRepository;
+
 public class CarteiraService {
+
+    private LucroRepository lucroRepo = new LucroRepository();
 
     public void processarTransacao(Moeda moeda, Transacao transacao){
         if(transacao.getTipo().equals("COMPRA")){
@@ -36,6 +40,8 @@ public class CarteiraService {
             double lucroOperacao = valorRecebidoNaVenda - custoParteVendida;
 
             System.out.printf("PNL dessa venda: $ %.2f\n", lucroOperacao);
+
+            lucroRepo.salvarLucroRealizado(moeda.getTicker(), lucroOperacao);
 
             // atualização do saldo 
             moeda.setSaldo(moeda.getSaldo() - transacao.getQuantidade());
