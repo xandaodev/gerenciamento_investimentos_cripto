@@ -55,7 +55,7 @@ public class HttpService {
         };
     }
 
-    public boolean validarTicker(String idMoeda) {
+    public boolean validarTicker(String idMoeda){
         try {
             Thread.sleep(2000);
 
@@ -76,5 +76,11 @@ public class HttpService {
         } catch(Exception e) {
             return false;
         }
+    }
+
+    public double consultarPrecoPorTicker(String ticker){
+        String idParaAPI = converterTickerParaId(ticker);
+        Moeda moedaTemporaria = new Moeda(ticker, idParaAPI);
+        return buscarPrecoAtual(moedaTemporaria);
     }
 }

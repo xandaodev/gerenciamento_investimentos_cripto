@@ -31,13 +31,13 @@ public class Main {
         }
 
         int opcao = 0;
-        while (opcao != 8){
+        while (opcao != 9){
             try{
                 System.out.println("\n--- GERENCIAMNETO DE INVESTIMENTOS CRIPTO ---");
                 System.out.println("1. Nova compra");
-                System.out.println("2. Ver Saldo e Preço Médio");
+                System.out.println("2. Nova venda");
                 System.out.println("3. Ver Histórico de Transações");
-                System.out.println("4. Nova venda");
+                System.out.println("4. Ver Saldo e Preço Médio");
                 System.out.println("5. Simular lucro");
                 System.out.println("6. Gerar Relatório");
                 System.out.println("7. Ver lucro total realizado");
@@ -83,17 +83,44 @@ public class Main {
                             System.out.println("Erro na compra: " + e.getMessage());
                         }
                         break;
-                        
                     case 2:
-                        System.out.println("\n--- MINHAS MOEDAS ---");
-                        for(Moeda m : minhaCarteira.getMoedas().values()){
-                            if(m.getSaldo() > 0){
-                                System.out.printf("Ativo: %s | Saldo: %.8f | Preço Médio: $ %.2f\n", 
-                                    m.getTicker(), m.getSaldo(), m.getPrecoMedio());
+                        try {
+                            System.out.print("Qual o Ticker da moeda para venda? ");
+                            String tickerVenda = leitor.next().toUpperCase();
+                            leitor.nextLine(); // limpa buffer e evita bug
+
+                            // busca o nome real da moeda que a api usa
+                            String nomeParaApi = httpTradutor.converterTickerParaId(tickerVenda);
+                            Moeda moedaVenda = minhaCarteira.obterMoeda(tickerVenda, nomeParaApi);
+
+                            if(moedaVenda.getSaldo() <= 0){
+                                System.out.println("Não tem saldo de " + tickerVenda + " para vender.");
+                                break;
                             }
+
+                            System.out.printf("Saldo disponível: %.8f\n", moedaVenda.getSaldo());
+                            System.out.print("Quantidade a vender: ");
+                            double qtdVenda = Double.parseDouble(leitor.nextLine().replace(",", "."));
+                            
+                            if (qtdVenda > moedaVenda.getSaldo()) {
+                                System.out.println("Erro: Saldo insuficiente!");
+                                break; 
+                            }
+
+                            System.out.print("Preço unitário de venda: ");
+                            double precoVenda = Double.parseDouble(leitor.nextLine().replace(",", "."));
+                            
+                            Transacao tVenda = new Transacao(tickerVenda, qtdVenda, precoVenda, "VENDA");
+                            carteira.processarTransacao(moedaVenda, tVenda);
+                            historico.add(tVenda); 
+                            repositorio.salvar(tVenda);
+                            
+                            System.out.println("Venda registrada!");
+                        } catch(Exception e) {
+                            System.out.println("Erro na venda: " + e.getMessage());
                         }
                         break;
-
+                        
                     case 3:
                         System.out.println("\n--- DASHBOARD DE PATRIMONIO ---");
                         HttpService serviceHttp = new HttpService();
@@ -142,42 +169,15 @@ public class Main {
                         break;
 
                     case 4:
-                        try {
-                            System.out.print("Qual o Ticker da moeda para venda? ");
-                            String tickerVenda = leitor.next().toUpperCase();
-                            leitor.nextLine(); // limpa buffer e evita bug
-
-                            // busca o nome real da moeda que a api usa
-                            String nomeParaApi = httpTradutor.converterTickerParaId(tickerVenda);
-                            Moeda moedaVenda = minhaCarteira.obterMoeda(tickerVenda, nomeParaApi);
-
-                            if(moedaVenda.getSaldo() <= 0){
-                                System.out.println("Não tem saldo de " + tickerVenda + " para vender.");
-                                break;
+                        System.out.println("\n--- MINHAS MOEDAS ---");
+                        for(Moeda m : minhaCarteira.getMoedas().values()){
+                            if(m.getSaldo() > 0){
+                                System.out.printf("Ativo: %s | Saldo: %.8f | Preço Médio: $ %.2f\n", 
+                                    m.getTicker(), m.getSaldo(), m.getPrecoMedio());
                             }
-
-                            System.out.printf("Saldo disponível: %.8f\n", moedaVenda.getSaldo());
-                            System.out.print("Quantidade a vender: ");
-                            double qtdVenda = Double.parseDouble(leitor.nextLine().replace(",", "."));
-                            
-                            if (qtdVenda > moedaVenda.getSaldo()) {
-                                System.out.println("Erro: Saldo insuficiente!");
-                                break; 
-                            }
-
-                            System.out.print("Preço unitário de venda: ");
-                            double precoVenda = Double.parseDouble(leitor.nextLine().replace(",", "."));
-                            
-                            Transacao tVenda = new Transacao(tickerVenda, qtdVenda, precoVenda, "VENDA");
-                            carteira.processarTransacao(moedaVenda, tVenda);
-                            historico.add(tVenda); 
-                            repositorio.salvar(tVenda);
-                            
-                            System.out.println("Venda registrada!");
-                        } catch(Exception e) {
-                            System.out.println("Erro na venda: " + e.getMessage());
                         }
                         break;
+
                     case 5:
                         System.out.println("\n--- SIMULADOR DE LUCRO ---");
 
