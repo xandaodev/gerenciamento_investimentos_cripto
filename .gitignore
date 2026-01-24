@@ -1,0 +1,13 @@
+# arquivos de dados
+*.csv
+*.txt
+
+# IDEs
+.idea/
+.vscode/
+*.iml
+bin/
+target/
+
+.DS_Store
+Thumbs.db
