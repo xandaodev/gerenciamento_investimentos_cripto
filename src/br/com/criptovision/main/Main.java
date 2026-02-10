@@ -36,7 +36,7 @@ public class Main {
                 System.out.println("\n--- GERENCIAMENTO DE INVESTIMENTOS CRIPTO ---");
                 System.out.println("1. Nova compra");
                 System.out.println("2. Nova venda");
-                System.out.println("3. Ver Histórico de Transações");
+                System.out.println("3. Dashboard de Patrimônio");
                 System.out.println("4. Ver Saldo e Preço Médio");
                 System.out.println("5. Simular lucro");
                 System.out.println("6. Gerar Relatório");
