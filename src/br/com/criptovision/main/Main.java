@@ -36,7 +36,7 @@ public class Main {
                 System.out.println("\n--- GERENCIAMENTO DE INVESTIMENTOS CRIPTO ---");
                 System.out.println("1. Nova compra");
                 System.out.println("2. Nova venda");
-                System.out.println("3. Dashboard de Patrimônio");
+                System.out.println("3. Gerar Dashboard de Patrimônio");
                 System.out.println("4. Ver Saldo e Preço Médio");
                 System.out.println("5. Simular lucro");
                 System.out.println("6. Gerar Relatório");
@@ -184,6 +184,8 @@ public class Main {
 
                         HttpService http = new HttpService();
 
+                        double pnlTotal =0;
+
                         for (Moeda m : minhaCarteira.getMoedas().values()) {
                             if (m.getSaldo() > 0) {
 
@@ -198,8 +200,13 @@ public class Main {
                                 System.out.printf("  Preço atual: %.8f\n", precoMercado);
                                 System.out.printf("  PNL: $ %.2f (%.2f%%)\n", lucro, porcentagem);
                                 System.out.println("---------------------------------------");
+
+                                pnlTotal += lucro;
+                                
                             }
                         }
+
+                        System.out.printf("  PNL TOTAL: $ %.2f \n", pnlTotal);
                         break;
                     case 6:
                         System.out.println("Gerando relatório...");
