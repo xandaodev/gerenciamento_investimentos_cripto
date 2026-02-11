@@ -11,13 +11,12 @@ public class HttpService {
 
     public double buscarPrecoAtual(Moeda moeda) {
         try {
-            // aguarda 2 segundos para não estourar o limite da API gratuita
-            Thread.sleep(2000); 
-
-            String idParaBusca = converterTickerParaId(moeda.getTicker());
-            if (idParaBusca.isEmpty()) idParaBusca = moeda.getNome();
-
-            String url = "https://api.coingecko.com/api/v3/simple/price?ids=" + idParaBusca + "&vs_currencies=usd";
+            //iniciando a troca da api da coingecko para a api da binance
+            // removido o Thread.sleep(2000) pq a Binance permite muitas requisições
+            
+            // a binance usa o par da moeda com o Dólar (USDT)
+            String simboloBinance = moeda.getTicker().toUpperCase() + "USDT";
+            String url = "https://api.binance.com/api/v3/ticker/price?symbol=" + simboloBinance;
 
             HttpClient client = HttpClient.newBuilder()
                     .connectTimeout(Duration.ofSeconds(10))
@@ -35,11 +34,12 @@ public class HttpService {
             String json = response.body();
             if (json.equals("{}")) return 0;
 
-            String valorString = json.split(":")[2].replace("}}", "");
+            // ajustado o split para o formato da binance: {"symbol":"BTCUSDT","price":"43500.00"}
+            String valorString = json.split("\"price\":\"")[1].split("\"")[0];
             return Double.parseDouble(valorString);
 
-        } catch (Exception e) {
-            // se der erro de limite (429) ou interrupção, retorna 0
+        }catch(Exception e){
+            // se der erro de limite ou interrupção, retorna 0
             return 0;
         }
     }
@@ -57,9 +57,8 @@ public class HttpService {
 
     public boolean validarTicker(String idMoeda){
         try {
-            Thread.sleep(2000);
-
-            String url = "https://api.coingecko.com/api/v3/simple/price?ids=" + idMoeda + "&vs_currencies=usd";
+            // removido o sleep e ajustado para validar na binance usando o ticker
+            String url = "https://api.binance.com/api/v3/ticker/price?symbol=" + idMoeda.toUpperCase() + "USDT";
             
             HttpClient client = HttpClient.newBuilder()
                     .connectTimeout(Duration.ofSeconds(5))
