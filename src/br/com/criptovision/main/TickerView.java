@@ -12,8 +12,10 @@ public class TickerView {
 
     public static void main(String[] args){
 
-        System.out.println(" ---   RESUMO RÁPIDO DE MERCADO   ---");
-        System.out.println(" Atualizando preços em tempo real...\n");
+        System.out.println("\n==========================================================");
+        System.out.println("          ---   RESUMO RÁPIDO DE MERCADO   ---          ");
+        System.out.println("==========================================================");
+        System.out.println(" Buscando cotações em tempo real na Binance...\n");
 
         CarteiraService service = new CarteiraService();
         TransacaoRepository repo = new TransacaoRepository();
@@ -29,9 +31,11 @@ public class TickerView {
 
         double pnlTotalGeral = 0;
         double valorTotalPatrimonio = 0;
+        double cotacaoDolarResumo = http.buscarCotacaoDolar();
 
-        System.out.println("----------------------------------------------------------");
-        System.out.println("\n");
+        System.out.printf(" Cotação Atual do Dólar: R$ %.2f\n", cotacaoDolarResumo);
+        System.out.println("----------------------------------------------------------\n");
+
         for(Moeda m : carteira.getMoedas().values()){
             if(m.getSaldo() > 0){
                 double precoAtual = http.buscarPrecoAtual(m);
@@ -44,24 +48,23 @@ public class TickerView {
 
                 String indicador = (lucro >= 0) ? "▲" : "▼";
 
-                System.out.printf("          %s %s: $ %.2f | PNL: $ %.2f (%.2f%%)\n",indicador, m.getTicker(), precoAtual, lucro, porcentagem);
-                System.out.print("\n");
-                System.out.print("          ***********************************************");
-                System.out.println("\n");
+                System.out.printf("  %s %-10s | Preço: $ %-10.2f | PNL: $ %-8.2f (%6.2f%%)\n",
+                        indicador, m.getTicker(), precoAtual, lucro, porcentagem);
+                System.out.println("  --------------------------------------------------------");
             }
         }
-        System.out.println("----------------------------------------------------------");
         
         String statusGeral = (pnlTotalGeral >= 0) ? "LUCRO" : "PREJUÍZO";
         String sinalGeral = (pnlTotalGeral >= 0) ? "[+]" : "[-]";
 
-        double cotacaoDolarResumo = http.buscarCotacaoDolar();
-        
-        System.out.printf("PATRIMÔNIO TOTAL: $ %.2f (R$ %.2f)\n", valorTotalPatrimonio, (valorTotalPatrimonio * cotacaoDolarResumo));
-        System.out.printf("PNL GERAL: %s $ %.2f (R$ .2f) (%s)\n", sinalGeral, pnlTotalGeral,(pnlTotalGeral * cotacaoDolarResumo), statusGeral);
-        System.out.println("----------------------------------------------------------");
+        System.out.println("\n======================= RESUMO GERAL =====================");
+        System.out.printf(" PATRIMÔNIO TOTAL : $ %.2f  (R$ %.2f)\n", 
+                valorTotalPatrimonio, (valorTotalPatrimonio * cotacaoDolarResumo));
+        System.out.printf(" PNL GERAL        : %s $ %.2f  (R$ %.2f) [%s]\n", 
+                sinalGeral, pnlTotalGeral, (pnlTotalGeral * cotacaoDolarResumo), statusGeral);
+        System.out.println("==========================================================");
 
-        System.out.println("\nPressione Enter para fechar");
+        System.out.println("\nPressione Enter para fechar...");
         try{ 
             System.in.read(); 
         }catch(Exception e){}

@@ -9,9 +9,12 @@ import br.com.criptovision.model.Moeda;
 
 public class HttpService {
 
-    public double buscarPrecoAtual(Moeda moeda) {
+    public double buscarPrecoAtual(Moeda moeda){
         try{
             String t = moeda.getTicker().toUpperCase().trim();
+                    if (t.equals("USDT")) {
+                return 1.0;
+            }
             if (t.equals("BITCOIN")) t = "BTC";
             if (t.equals("SOLANA")) t = "SOL";
             if (t.equals("CHAINLINK")) t = "LINK";
@@ -53,6 +56,9 @@ public class HttpService {
     }
 
     public boolean validarTicker(String idMoeda){
+        if(idMoeda.trim().toUpperCase().equals("USDT")){
+            return true;
+        }
         try {
             String tickerParaValidar = idMoeda.trim().toUpperCase();
             String url = "https://api.binance.com/api/v3/ticker/price?symbol=" + tickerParaValidar + "USDT";
