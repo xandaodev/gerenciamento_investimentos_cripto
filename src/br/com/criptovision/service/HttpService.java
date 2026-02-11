@@ -78,4 +78,26 @@ public class HttpService {
         Moeda moedaTemporaria = new Moeda(ticker, ticker);
         return buscarPrecoAtual(moedaTemporaria);
     }
+
+    public double buscarCotacaoDolar(){
+        try{
+            String url = "https://api.binance.com/api/v3/ticker/price?symbol=USDTBRL";
+            
+            HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
+            HttpRequest request = HttpRequest.newBuilder().uri(URI.create(url)).timeout(Duration.ofSeconds(10)).GET().build();
+
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() != 200) return 5.0; 
+
+            String json = response.body();
+            String[] partes = json.split("\"price\":\"");
+            if (partes.length < 2) return 5.0;
+            
+            String valorString = partes[1].split("\"")[0];
+            return Double.parseDouble(valorString);
+        } catch (Exception e) {
+            return 5.50; // valor médio de segurança caso esteja sem internet
+        }
+    }
 }

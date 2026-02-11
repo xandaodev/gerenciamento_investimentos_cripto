@@ -55,8 +55,10 @@ public class TickerView {
         String statusGeral = (pnlTotalGeral >= 0) ? "LUCRO" : "PREJUÍZO";
         String sinalGeral = (pnlTotalGeral >= 0) ? "[+]" : "[-]";
 
-        System.out.printf("     PATRIMÔNIO TOTAL: $ %.2f\n", valorTotalPatrimonio);
-        System.out.printf("     PNL GERAL: %s $ %.2f (%s)\n", sinalGeral, pnlTotalGeral, statusGeral);
+        double cotacaoDolarResumo = http.buscarCotacaoDolar();
+        
+        System.out.printf("PATRIMÔNIO TOTAL: $ %.2f (R$ %.2f)\n", valorTotalPatrimonio, (valorTotalPatrimonio * cotacaoDolarResumo));
+        System.out.printf("PNL GERAL: %s $ %.2f (R$ .2f) (%s)\n", sinalGeral, pnlTotalGeral,(pnlTotalGeral * cotacaoDolarResumo), statusGeral);
         System.out.println("----------------------------------------------------------");
 
         System.out.println("\nPressione Enter para fechar");

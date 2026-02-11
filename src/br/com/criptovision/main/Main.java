@@ -123,16 +123,15 @@ public class Main {
                         java.util.Map<String, Double> valoresPorMoeda = new java.util.HashMap<>();
 
                         System.out.println("Atualizando preços na Binance...");
-                        System.out.print("\n");
+                        
+                        double cotacaoDolar = serviceHttp.buscarCotacaoDolar();
 
                         for(Moeda m : minhaCarteira.getMoedas().values()){
                             if (m.getSaldo() > 0) {
                                 double preco = serviceHttp.buscarPrecoAtual(m); 
                                 double valorNoAtivo = m.getSaldo() * preco;
-
                                 double lucroDestaMoeda = carteira.calcularLucroPotencial(m, preco);
                                 pnlTotalGeral += lucroDestaMoeda;
-                                
                                 valoresPorMoeda.put(m.getTicker(), valorNoAtivo);
                                 totalCalculado += valorNoAtivo;
                             }
@@ -141,19 +140,18 @@ public class Main {
                         if(totalCalculado == 0){
                             System.out.println("Erro: Não foi possível obter preços ou carteira vazia.");
                         }else{
-                            System.out.printf("VALOR TOTAL DO PATRIMONIO: $ %.2f\n", totalCalculado);
+                            System.out.printf("VALOR TOTAL DO PATRIMONIO: $ %.2f (R$ %.2f)\n", totalCalculado, (totalCalculado * cotacaoDolar));
                             String status = (pnlTotalGeral >= 0) ? "LUCRO" : "PREJUIZO";
-                            System.out.printf("PNL GERAL DA CARTEIRA: $ %.2f (%s)\n", pnlTotalGeral, status);
+                            System.out.printf("PNL GERAL DA CARTEIRA: $ %.2f  (R$ %.2f) (%s)\n", pnlTotalGeral,(pnlTotalGeral * cotacaoDolar), status);
                             System.out.println("---------------------------------------");
                             System.out.println("Distribuição por Ativo:");
 
                             for(Moeda m : minhaCarteira.getMoedas().values()){
-                                if (m.getSaldo() > 0) {
+                                if(m.getSaldo() > 0){
                                     double valorAtivo = valoresPorMoeda.get(m.getTicker());
                                     double percentagem = (valorAtivo / totalCalculado) * 100;
 
-                                    System.out.printf("   %s: $ %.2f (%.1f%%)\n", 
-                                        m.getTicker(), valorAtivo, percentagem);
+                                    System.out.printf("   %s: $ %.2f (%.1f%%)\n", m.getTicker(), valorAtivo, percentagem);
                                 }
                             }
                         }
@@ -164,33 +162,39 @@ public class Main {
                         System.out.println("\n--- MINHAS MOEDAS ---");
                         for(Moeda m : minhaCarteira.getMoedas().values()){
                             if(m.getSaldo() > 0){
-                                System.out.printf("Ativo: %s | Saldo: %.8f | Preço Médio: $ %.2f\n", 
-                                    m.getTicker(), m.getSaldo(), m.getPrecoMedio());
+                                System.out.printf("Ativo: %s | Saldo: %.8f | Preço Médio: $ %.2f\n",m.getTicker(), m.getSaldo(), m.getPrecoMedio());
                             }
                         }
                         break;
 
                     case 5:
-                        System.out.println("\n--- SIMULADOR DE LUCRO ---");
-                        HttpService http = new HttpService();
-                        double pnlTotalSimulado = 0;
+                        System.out.println("\n--- SIMULADOR DE VENDA FUTURA ---");
+                        System.out.print("Digite o Ticker da moeda que você possui (ex: BTC): ");
+                        String tickerSim = leitor.next().toUpperCase();
+                        leitor.nextLine();
 
-                        for (Moeda m : minhaCarteira.getMoedas().values()) {
-                            if (m.getSaldo() > 0) {
-                                double precoMercado = http.buscarPrecoAtual(m);
-                                double lucro = carteira.calcularLucroPotencial(m, precoMercado);
-                                double porcentagem = (lucro / (m.getSaldo() * m.getPrecoMedio())) * 100;
+                        if(minhaCarteira.getMoedas().containsKey(tickerSim)){
+                            Moeda mSim = minhaCarteira.getMoedas().get(tickerSim);
+                            
+                            if(mSim.getSaldo() > 0){
+                                System.out.print("Digite o preço fictício de venda ($): ");
+                                double precoFicticio = Double.parseDouble(leitor.nextLine().replace(",", "."));
 
-                                System.out.printf("Resultado para %s:\n", m.getTicker());
-                                System.out.printf("  Saldo atual: %.8f\n", m.getSaldo());
-                                System.out.printf("  Preço atual: %.8f\n", precoMercado);
-                                System.out.printf("  PNL: $ %.2f (%.2f%%)\n", lucro, porcentagem);
+                                double lucroSimulado = carteira.calcularLucroPotencial(mSim, precoFicticio);
+                                double porcSimulada = (lucroSimulado / (mSim.getSaldo() * mSim.getPrecoMedio())) * 100;
+
+                                System.out.println("\n---------------------------------------");
+                                System.out.printf("Simulação para %s:\n", tickerSim);
+                                System.out.printf("  Saldo que você possui: %.8f\n", mSim.getSaldo());
+                                System.out.printf("  Se vender a: $ %.2f\n", precoFicticio);
+                                System.out.printf("  RESULTADO ESTIMADO: $ %.2f (%.2f%%)\n", lucroSimulado, porcSimulada);
                                 System.out.println("---------------------------------------");
-
-                                pnlTotalSimulado += lucro;
+                            }else{
+                                System.out.println("Você não possui saldo desta moeda para simular.");
                             }
+                        }else{
+                            System.out.println("Moeda não encontrada na sua carteira.");
                         }
-                        System.out.printf("  PNL TOTAL: $ %.2f \n", pnlTotalSimulado);
                         break;
 
                     case 6:
