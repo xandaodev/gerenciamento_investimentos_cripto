@@ -1,19 +1,23 @@
-🪙 CryptoPortfolio Manager
-<p align="left"> <img src="https://img.shields.io/badge/Java-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white" alt="Java"> <img src="https://img.shields.io/badge/Status-Em%20Desenvolvimento-yellow?style=for-the-badge" alt="Status"> </p>
+# 🪙 CryptoPortfolio Manager (Binance Edition)
 
-📝
-O CryptoPortfolio Manager é uma aplicação desenvolvida em Java focada na gestão centralizada de ativos digitais. O projeto nasceu da necessidade de consolidar investimentos em criptomoedas e protocolos de DeFi, permitindo que o usuário acompanhe o saldo e a performance da sua carteira de forma eficiente.
+<p align="left"> 
+  <img src="https://img.shields.io/badge/Java-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white" alt="Java"> 
+  <img src="https://img.shields.io/badge/API-Binance-yellow?style=for-the-badge" alt="Binance API">
+  <img src="https://img.shields.io/badge/Status-Versão%20Estável-green?style=for-the-badge" alt="Status"> 
+</p>
 
-✨ Funcionalidades (em desenvolvimento)
-Gestão de Ativos: Cadastro de diferentes criptomoedas e quantidades.
+O **CryptoPortfolio Manager** é uma aplicação Java de alta performance para gestão centralizada de ativos digitais. O sistema permite consolidar investimentos e acompanhar a performance da carteira em tempo real.
 
-Integração com APIs: Busca de preços em tempo real para atualização do valor total do patrimônio.
+## ✨ Evolução e Funcionalidades
 
-Cálculo de Performance: Visualização de lucros e perdas com base no preço médio de compra.
+- **Integração com Binance API:** Migração da CoinGecko para Binance, garantindo consultas instantâneas e maior limite de requisições.
+- **Tratamento Inteligente de Ativos:** Sistema robusto que traduz automaticamente nomes de moedas (ex: "Bitcoin") para Tickers de mercado (ex: "BTC").
+- **Dashboard de Patrimônio:** Cálculo automático de saldo, preço médio e PNL (Profit and Loss) de cada ativo.
+- **Interface de Terminal Moderna:** Resumo executivo com indicadores visuais de performance financeira (▲/▼).
+- **Persistência de Dados:** Histórico de transações e lucros realizados armazenados em arquivos CSV.
 
-🛠️ Tecnologias Utilizadas
-Linguagem: Java.
+## 🛠️ Tecnologias Utilizadas
 
-Conceitos de OO: Encapsulamento, herança e polimorfismo aplicados na modelagem de diferentes tipos de ativos.
-
-Manipulação de Dados: Uso de JSON para integração com APIs externas.
+- **Linguagem:** Java (JDK 17+).
+- **HTTP Client:** Java Native HttpClient para consumo de APIs REST.
+- **Arquitetura:** Organizada em pacotes (Model, Repository, Service, Main) para facilitar a manutenção e escalabilidade.
