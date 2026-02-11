@@ -15,12 +15,15 @@ public class Main {
         Scanner leitor = new Scanner(System.in);
         CarteiraService carteira = new CarteiraService();
         TransacaoRepository repositorio = new TransacaoRepository();
+
+        //chamando funcao pra realizar backup
+        repositorio.realizarBackup();
         
         List<Transacao> historico = repositorio.lerTudo();
         Carteira minhaCarteira = new Carteira();
         HttpService httpTradutor = new HttpService();
 
-        for (Transacao tAntiga : historico) {
+        for(Transacao tAntiga : historico){
             String tickerOriginal = tAntiga.getTicker().toUpperCase();
             Moeda m = minhaCarteira.obterMoeda(tickerOriginal, tickerOriginal);
             carteira.processarTransacao(m, tAntiga);

@@ -47,19 +47,32 @@ public class TransacaoRepository {
     }
 
     public void gerarRelatorio(List<Moeda> moedas){
-    try(PrintWriter writer = new PrintWriter(new FileWriter("relatorio.txt"))){
-        writer.println("--- RELATÓRIO DE INVESTIMENTOS CRIPTO ---");
-        writer.println("Data: " + LocalDateTime.now());
-        writer.println("------------------------------------------");
-        for(Moeda m : moedas){
-            if(m.getSaldo() > 0){
-                writer.printf("Ativo: %s | Saldo: %.8f | Preço Médio: $ %.2f\n",
-                        m.getTicker(), m.getSaldo(), m.getPrecoMedio());
+        try(PrintWriter writer = new PrintWriter(new FileWriter("relatorio.txt"))){
+            writer.println("--- RELATÓRIO DE INVESTIMENTOS CRIPTO ---");
+            writer.println("Data: " + LocalDateTime.now());
+            writer.println("------------------------------------------");
+            for(Moeda m : moedas){
+                if(m.getSaldo() > 0){
+                    writer.printf("Ativo: %s | Saldo: %.8f | Preço Médio: $ %.2f\n",
+                            m.getTicker(), m.getSaldo(), m.getPrecoMedio());
+                }
             }
+            System.out.println("Relatório gerado com sucesso em 'relatorio.txt'!");
+        }catch(IOException e){
+            System.out.println("Erro ao gerar relatório: " + e.getMessage());
         }
-        System.out.println("Relatório gerado com sucesso em 'relatorio.txt'!");
-    }catch(IOException e){
-        System.out.println("Erro ao gerar relatório: " + e.getMessage());
     }
-}
+
+    //nova funcao para fazer um backup do relatorio otdaz as vezes que o programa for iniciado
+    public void realizarBackup(){
+        try{
+            java.io.File pasta = new java.io.File("backups");
+            if(!pasta.exists()) pasta.mkdir();
+            String data = java.time.LocalDateTime.now().format(java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm"));
+            java.nio.file.Files.copy(java.nio.file.Paths.get("transacoes.csv"),java.nio.file.Paths.get("backups/transacoes_backup_" + data + ".csv"),
+            java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            //System.out.println("Backup realizado");
+        }catch(Exception e){
+        }
+    }
 }
