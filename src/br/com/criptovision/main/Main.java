@@ -15,18 +15,14 @@ public class Main {
         Scanner leitor = new Scanner(System.in);
         CarteiraService carteira = new CarteiraService();
         TransacaoRepository repositorio = new TransacaoRepository();
-        //criando um array pro historico
-
+        
         List<Transacao> historico = repositorio.lerTudo();
-
         Carteira minhaCarteira = new Carteira();
-
         HttpService httpTradutor = new HttpService();
+
         for (Transacao tAntiga : historico) {
             String tickerOriginal = tAntiga.getTicker().toUpperCase();
-            String nomeCorretoApi = httpTradutor.converterTickerParaId(tickerOriginal);
-            
-            Moeda m = minhaCarteira.obterMoeda(tickerOriginal, nomeCorretoApi);
+            Moeda m = minhaCarteira.obterMoeda(tickerOriginal, tickerOriginal);
             carteira.processarTransacao(m, tAntiga);
         }
 
@@ -56,21 +52,17 @@ public class Main {
                             
                             HttpService httpService = new HttpService();
                             
-                            // convertendo o ticker para o id que a api entende
-                            String idMoeda = httpService.converterTickerParaId(ticker);
-                            
-                            System.out.println("Validando '" + idMoeda + "' na API...");
-                            
-                            // valida usando o id convertido
-                            if (!httpService.validarTicker(idMoeda)) {
-                                System.out.println("ERRO: A API não reconheceu o ativo '" + ticker + "' (ID: " + idMoeda + ").");
+                            System.out.println("Validando '" + ticker + "' na Binance...");
+            
+                            if (!httpService.validarTicker(ticker)) {
+                                System.out.println("ERRO: Ativo não encontrado na Binance (par " + ticker + "USDT não existe).");
                                 break; 
                             }
 
-                            Moeda moedaSelecionada = minhaCarteira.obterMoeda(ticker, idMoeda); 
+                            Moeda moedaSelecionada = minhaCarteira.obterMoeda(ticker, ticker); 
 
                             System.out.print("Quantidade comprada: ");
-                            double qtd = Double.parseDouble(leitor.nextLine().replace(",", ".")); // lendo linha cheia
+                            double qtd = Double.parseDouble(leitor.nextLine().replace(",", "."));
 
                             System.out.print("Preço unitário pago: ");
                             double preco = Double.parseDouble(leitor.nextLine().replace(",", "."));
@@ -84,15 +76,15 @@ public class Main {
                             System.out.println("Erro na compra: " + e.getMessage());
                         }
                         break;
+
                     case 2:
                         try {
                             System.out.print("Qual o Ticker da moeda para venda? ");
                             String tickerVenda = leitor.next().toUpperCase();
-                            leitor.nextLine(); // limpa buffer e evita bug
+                            leitor.nextLine();
 
-                            // busca o nome real da moeda que a api usa
-                            String nomeParaApi = httpTradutor.converterTickerParaId(tickerVenda);
-                            Moeda moedaVenda = minhaCarteira.obterMoeda(tickerVenda, nomeParaApi);
+                            // na binance, o identificador é o ticker
+                            Moeda moedaVenda = minhaCarteira.obterMoeda(tickerVenda, tickerVenda);
 
                             if(moedaVenda.getSaldo() <= 0){
                                 System.out.println("Não tem saldo de " + tickerVenda + " para vender.");
@@ -128,10 +120,9 @@ public class Main {
                         
                         double totalCalculado = 0;
                         double pnlTotalGeral = 0;
-                        //lista temporaria que evita chamar api dnv
                         java.util.Map<String, Double> valoresPorMoeda = new java.util.HashMap<>();
 
-                        System.out.println("Atualizando preços (aguarde)...");
+                        System.out.println("Atualizando preços na Binance...");
                         System.out.print("\n");
 
                         for(Moeda m : minhaCarteira.getMoedas().values()){
@@ -148,7 +139,7 @@ public class Main {
                         }
 
                         if(totalCalculado == 0){
-                            System.out.println("Erro: Não foi possível obter preços da API ou carteira vazia.");
+                            System.out.println("Erro: Não foi possível obter preços ou carteira vazia.");
                         }else{
                             System.out.printf("VALOR TOTAL DO PATRIMONIO: $ %.2f\n", totalCalculado);
                             String status = (pnlTotalGeral >= 0) ? "LUCRO" : "PREJUIZO";
@@ -181,17 +172,12 @@ public class Main {
 
                     case 5:
                         System.out.println("\n--- SIMULADOR DE LUCRO ---");
-
                         HttpService http = new HttpService();
-
-                        double pnlTotal =0;
+                        double pnlTotalSimulado = 0;
 
                         for (Moeda m : minhaCarteira.getMoedas().values()) {
                             if (m.getSaldo() > 0) {
-
                                 double precoMercado = http.buscarPrecoAtual(m);
-                                //double precoMercado = leitor.nextDouble();
-                                
                                 double lucro = carteira.calcularLucroPotencial(m, precoMercado);
                                 double porcentagem = (lucro / (m.getSaldo() * m.getPrecoMedio())) * 100;
 
@@ -201,13 +187,12 @@ public class Main {
                                 System.out.printf("  PNL: $ %.2f (%.2f%%)\n", lucro, porcentagem);
                                 System.out.println("---------------------------------------");
 
-                                pnlTotal += lucro;
-                                
+                                pnlTotalSimulado += lucro;
                             }
                         }
-
-                        System.out.printf("  PNL TOTAL: $ %.2f \n", pnlTotal);
+                        System.out.printf("  PNL TOTAL: $ %.2f \n", pnlTotalSimulado);
                         break;
+
                     case 6:
                         System.out.println("Gerando relatório...");
                         repositorio.gerarRelatorio(new ArrayList<>(minhaCarteira.getMoedas().values()));
@@ -215,9 +200,7 @@ public class Main {
                     
                     case 7:
                         System.out.println("\n--- total de lucros realizados até hoje ---");
-                        // criamos o repositorio pra conseguirn ler o ficheiro
                         br.com.criptovision.repository.LucroRepository repoLucro = new br.com.criptovision.repository.LucroRepository();
-                        // chamando a funcção que soma todos os lucros
                         double totalRealizado = repoLucro.lerLucroTotal();
                         
                         if(totalRealizado == 0){
@@ -234,7 +217,7 @@ public class Main {
                         System.out.print("\nQual o Ticker da moeda para consulta rápida (ex: BTC, SOL, LNK)? ");
                         String tickerBusca = leitor.next().toUpperCase();
                         leitor.nextLine();
-                        System.out.println("Consultando API (aguarde 2 segundos)...");
+                        System.out.println("Consultando Binance...");
                         double precoBuscado = httpTradutor.consultarPrecoPorTicker(tickerBusca);
                         if(precoBuscado > 0){
                             System.out.println("\n=======================================");
@@ -244,6 +227,7 @@ public class Main {
                             System.out.println("\nNão foi possível obter o preço.");
                         }
                         break;
+
                     case 9:
                         System.out.println("Saindo...");
                         break;
@@ -255,13 +239,11 @@ public class Main {
                 System.out.println(" ERRO: Por favor, digite apenas números inteiros para as opções do menu.");
             }catch(Exception e){ 
                 System.out.println(" Ocorreu um erro inesperado: " + e.getMessage());
-
                 if(leitor.hasNextLine()){
-                leitor.nextLine(); // limpa um possivel lixo que pode ter ficado no leitor
+                    leitor.nextLine();
                 }
             }
         }
-
         leitor.close();
     }
 }

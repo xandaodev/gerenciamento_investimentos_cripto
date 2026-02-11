@@ -59,9 +59,9 @@ public class CarteiraService {
     }
 
     //metodo para calcular lucro total
-    public double calcularValorTotalCarteira(java.util.Map<String, br.com.criptovision.model.Moeda> moedas, HttpService http){
+    public double calcularValorTotalCarteira(java.util.Map<String, Moeda> moedas, HttpService http){
         double valorTotal = 0;
-        for(br.com.criptovision.model.Moeda m : moedas.values()){
+        for(Moeda m : moedas.values()){
             if(m.getSaldo() > 0){
                 double precoAtual = http.buscarPrecoAtual(m);
                 valorTotal += (m.getSaldo() * precoAtual);
