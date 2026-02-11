@@ -10,15 +10,10 @@ import java.util.List;
 
 public class TickerView {
 
-    // adicionando cores pra personalizar os lucros e prejuizos
-    public static final String RESET = "\u001B[0m";
-    public static final String VERDE = "\u001B[32m";
-    public static final String VERMELHO = "\u001B[31m";
-    public static final String AMARELO = "\u001B[33m";
-
     public static void main(String[] args){
 
-        System.out.println(" - RESUMO RÁPIDO DE MERCADO  -");
+        System.out.println(" ---   RESUMO RÁPIDO DE MERCADO   ---");
+        System.out.println(" Atualizando preços em tempo real...\n");
 
         CarteiraService service = new CarteiraService();
         TransacaoRepository repo = new TransacaoRepository();
@@ -35,7 +30,8 @@ public class TickerView {
         double pnlTotalGeral = 0;
         double valorTotalPatrimonio = 0;
 
-        System.out.println("---------------------------------------");
+        System.out.println("----------------------------------------------------------");
+        System.out.println("\n");
         for(Moeda m : carteira.getMoedas().values()){
             if(m.getSaldo() > 0){
                 double precoAtual = http.buscarPrecoAtual(m);
@@ -46,20 +42,22 @@ public class TickerView {
                 pnlTotalGeral += lucro;
                 valorTotalPatrimonio += valorNoAtivo;
 
-                String corPnl = (lucro >= 0) ? VERDE : VERMELHO;
-                
-                System.out.printf("%s: $ %.2f | PNL: %s$ %.2f (%.2f%%)%s\n", 
-                    m.getTicker(), precoAtual, corPnl, lucro, porcentagem, RESET);
+                String indicador = (lucro >= 0) ? "▲" : "▼";
+
+                System.out.printf("          %s %s: $ %.2f | PNL: $ %.2f (%.2f%%)\n",indicador, m.getTicker(), precoAtual, lucro, porcentagem);
+                System.out.print("\n");
+                System.out.print("          ***********************************************");
+                System.out.println("\n");
             }
         }
-        System.out.println("---------------------------------------");
+        System.out.println("----------------------------------------------------------");
         
-        String corStatus = (pnlTotalGeral >= 0) ? VERDE : VERMELHO;
-        String status = (pnlTotalGeral >= 0) ? "LUCRO" : "PREJUÍZO";
+        String statusGeral = (pnlTotalGeral >= 0) ? "LUCRO" : "PREJUÍZO";
+        String sinalGeral = (pnlTotalGeral >= 0) ? "[+]" : "[-]";
 
-        System.out.printf("PATRIMÔNIO TOTAL: $ %.2f\n", valorTotalPatrimonio);
-        System.out.printf("PNL GERAL: %s$ %.2f (%s)%s\n", corStatus, pnlTotalGeral, status, RESET);
-        System.out.println("---------------------------------------");
+        System.out.printf("     PATRIMÔNIO TOTAL: $ %.2f\n", valorTotalPatrimonio);
+        System.out.printf("     PNL GERAL: %s $ %.2f (%s)\n", sinalGeral, pnlTotalGeral, statusGeral);
+        System.out.println("----------------------------------------------------------");
 
         System.out.println("\nPressione Enter para fechar");
         try{ 
