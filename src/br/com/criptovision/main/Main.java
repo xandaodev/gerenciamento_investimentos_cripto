@@ -27,7 +27,7 @@ public class Main {
         }
 
         int opcao = 0;
-        while (opcao != 9){
+        while (opcao != 10){
             try{
                 System.out.println("\n--- GERENCIAMENTO DE INVESTIMENTOS CRIPTO ---");
                 System.out.println("1. Nova compra");
@@ -38,7 +38,8 @@ public class Main {
                 System.out.println("6. Gerar Relatório");
                 System.out.println("7. Ver lucro total realizado");
                 System.out.println("8. Consultar preço em tempo real");
-                System.out.println("9. Sair do sistema");
+                System.out.println("9. Simular aporte (DCA)");
+                System.out.println("10. Sair do sistema");
                 System.out.print("Escolha uma opção: ");
                 
                 opcao = leitor.nextInt();
@@ -233,6 +234,57 @@ public class Main {
                         break;
 
                     case 9:
+                        System.out.println("\n---  SIMULADOR DE APORTE (DCA) ---");
+                        System.out.print("Digite o Ticker da moeda para simular (ex: BTC): ");
+                        String tickerDCA = leitor.next().toUpperCase();
+                        leitor.nextLine();
+
+                        HttpService httpDCA = new HttpService();
+                        // verifica se você já tem a moeda na carteira
+                        Moeda moedaDCA = minhaCarteira.getMoedas().get(tickerDCA);
+                        
+                        // busca o preço atual da binance para a simulação
+                        double precoMercado = httpDCA.consultarPrecoPorTicker(tickerDCA);
+                        
+                        if(precoMercado <= 0){
+                            System.out.println("Erro: Não foi possível obter o preço atual de " + tickerDCA);
+                            break;
+                        }
+
+                        System.out.printf("Preço atual de mercado: $ %.2f\n", precoMercado);
+                        System.out.print("Quanto você pretende investir agora (em USD)? ");
+                        double valorInvestimento = Double.parseDouble(leitor.nextLine().replace(",", "."));
+
+                        double qtdComprada = valorInvestimento / precoMercado;
+                        
+                        if (moedaDCA != null && moedaDCA.getSaldo() > 0) {
+                            double saldoAtual = moedaDCA.getSaldo();
+                            double pmAtual = moedaDCA.getPrecoMedio();
+                            double custoTotalAtual = saldoAtual * pmAtual;
+                            
+                            double novoSaldoTotal = saldoAtual + qtdComprada;
+                            double novoPM = (custoTotalAtual + valorInvestimento) / novoSaldoTotal;
+                            double diferencaPM = ((novoPM - pmAtual) / pmAtual) * 100;
+
+                            System.out.println("\n================ RESULTADO DA SIMULAÇÃO ================");
+                            System.out.printf(" Aporte: $ %.2f  ->  Compraria: %.8f %s\n", valorInvestimento, qtdComprada, tickerDCA);
+                            System.out.printf(" Saldo: %.8f  ->  Novo Saldo: %.8f\n", saldoAtual, novoSaldoTotal);
+                            System.out.printf(" PM Atual: $ %.2f  ->  Novo PM: $ %.2f\n", pmAtual, novoPM);
+                            
+                            if(novoPM < pmAtual){
+                                System.out.printf(" EXCELENTE! Isso reduziria seu Preço Médio em %.2f%%\n", Math.abs(diferencaPM));
+                            }else{
+                                System.out.printf(" ATENÇÃO: Esse aporte aumentaria seu Preço Médio em %.2f%%\n", diferencaPM);
+                            }
+                        }else{
+                            System.out.println("\n================ RESULTADO DA SIMULAÇÃO ================");
+                            System.out.printf(" Com $ %.2f, você iniciaria sua posição com %.8f %s\n", valorInvestimento, qtdComprada, tickerDCA);
+                            System.out.printf(" Seu Preço Médio inicial seria: $ %.2f\n", precoMercado);
+                        }
+                        System.out.println("========================================================");
+                        break;
+
+                    case 10:
                         System.out.println("Saindo...");
                         break;
 
