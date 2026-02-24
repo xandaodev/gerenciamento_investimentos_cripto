@@ -44,15 +44,15 @@ public class HttpService {
     }
 
     public String converterTickerParaId(String ticker){
-    if (ticker == null) return "";
-    String t = ticker.toUpperCase().trim();
-        return switch (t){
-        case "BITCOIN", "BTC" -> "BTC";
-        case "ETHEREUM", "ETH" -> "ETH";
-        case "SOLANA", "SOL" -> "SOL";
-        case "CHAINLINK", "LINK", "LNK" -> "LINK";
-        default -> t; 
-    };
+        if (ticker == null) return "";
+        String t = ticker.toUpperCase().trim();
+            return switch (t){
+            case "BITCOIN", "BTC" -> "BTC";
+            case "ETHEREUM", "ETH" -> "ETH";
+            case "SOLANA", "SOL" -> "SOL";
+            case "CHAINLINK", "LINK", "LNK" -> "LINK";
+            default -> t; 
+        };
     }
 
     public boolean validarTicker(String idMoeda){
@@ -106,12 +106,25 @@ public class HttpService {
 
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
-            if (response.statusCode() == 200) {
+            if(response.statusCode() == 200){
                 return response.body();
             }
             return null;
-        } catch (Exception e) {
+        }catch(Exception e){
             return null;
+        }
+    }
+
+    private double extrairPreco(String json){
+        if (json == null) return 0;
+        try{
+            String[] partes = json.split("\"price\":\"");
+            if (partes.length < 2) return 0;
+            
+            String valorString = partes[1].split("\"")[0];
+            return Double.parseDouble(valorString);
+        }catch(Exception e){
+            return 0;
         }
     }
 }
