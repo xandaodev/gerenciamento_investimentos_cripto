@@ -56,28 +56,13 @@ public class HttpService {
     }
 
     public boolean validarTicker(String idMoeda){
-        if(idMoeda.trim().toUpperCase().equals("USDT")){
-            return true;
-        }
-        try {
-            String tickerParaValidar = idMoeda.trim().toUpperCase();
-            String url = "https://api.binance.com/api/v3/ticker/price?symbol=" + tickerParaValidar + "USDT";
-            
-            HttpClient client = HttpClient.newBuilder()
-                    .connectTimeout(Duration.ofSeconds(5))
-                    .build();
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .timeout(Duration.ofSeconds(5))
-                    .GET()
-                    .build();
-
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-
-            return response.statusCode() == 200;
-        } catch(Exception e) {
-            return false;
-        }
+        String tickerParaValidar = idMoeda.trim().toUpperCase();
+        // USDT é sempre válido no nosso sistema
+        if (tickerParaValidar.equals("USDT")) return true;
+        String url = "https://api.binance.com/api/v3/ticker/price?symbol=" + tickerParaValidar + "USDT";
+        
+        // se o realizarChamada retornar algo diferente de null, é porque o status foi 200
+        return realizarChamada(url) != null;
     }
 
     public double consultarPrecoPorTicker(String ticker){
@@ -103,8 +88,8 @@ public class HttpService {
             return Double.parseDouble(valorString);
         }catch(Exception e){
             return 5.50;
+        }   
     }
-}
 
     // se precisar mudar o timeout ou a biblioteca no futuro, muda só aqui.
     private String realizarChamada(String url) {
