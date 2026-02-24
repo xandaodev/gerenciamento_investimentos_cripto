@@ -10,37 +10,19 @@ import br.com.criptovision.model.Moeda;
 public class HttpService {
 
     public double buscarPrecoAtual(Moeda moeda){
-        try{
-            String t = moeda.getTicker().toUpperCase().trim();
-                    if (t.equals("USDT")) {
-                return 1.0;
-            }
-            if (t.equals("BITCOIN")) t = "BTC";
-            if (t.equals("SOLANA")) t = "SOL";
-            if (t.equals("CHAINLINK")) t = "LINK";
-            if (t.equals("ETHEREUM")) t = "ETH";
+        String t = moeda.getTicker().toUpperCase().trim();
+        
+        if (t.equals("USDT")) return 1.0;
+        if (t.equals("BITCOIN")) t = "BTC";
+        if (t.equals("SOLANA")) t = "SOL";
+        if (t.equals("CHAINLINK")) t = "LINK";
+        if (t.equals("ETHEREUM")) t = "ETH";
 
-            String simboloBinance = t + "USDT";
-            
-            String url = "https://api.binance.com/api/v3/ticker/price?symbol=" + simboloBinance;
-            HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
-            HttpRequest request = HttpRequest.newBuilder().uri(URI.create(url)).timeout(Duration.ofSeconds(10)).GET().build();
-
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-
-            if (response.statusCode() != 200) return 0;
-
-            String json = response.body();
-            
-            String[] partes = json.split("\"price\":\"");
-            if (partes.length < 2) return 0;
-            
-            String valorString = partes[1].split("\"")[0];
-            return Double.parseDouble(valorString);
-
-        }catch(Exception e){
-            return 0;
-        }
+        String url = "https://api.binance.com/api/v3/ticker/price?symbol=" + t + "USDT";
+        
+        // aqui uma linha faz a chamada e a outra extrai o preço
+        String json = realizarChamada(url);
+        return extrairPreco(json);
     }
 
     public String converterTickerParaId(String ticker){
