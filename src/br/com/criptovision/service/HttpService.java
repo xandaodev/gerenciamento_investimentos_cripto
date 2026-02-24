@@ -52,25 +52,12 @@ public class HttpService {
         return buscarPrecoAtual(moedaTemporaria);
     }
 
-    //iniciando refatoraçao do httpservice
-    public double buscarCotacaoDolar() {
+    public double buscarCotacaoDolar(){
         String url = "https://api.binance.com/api/v3/ticker/price?symbol=USDTBRL";
-        
-        //u samos o ajudante para pegar o texto bruto (JSON)
         String json = realizarChamada(url);
+        double preco = extrairPreco(json);
         
-        if (json == null) return 5.50; // valor de segurança caso a rede falhe
-
-        // logica de extração do preço (que vamos limpar no próximo passo)
-        try{
-            String[] partes = json.split("\"price\":\"");
-            if (partes.length < 2) return 5.50;
-            
-            String valorString = partes[1].split("\"")[0];
-            return Double.parseDouble(valorString);
-        }catch(Exception e){
-            return 5.50;
-        }   
+        return (preco > 0) ? preco : 5.50; 
     }
 
     // se precisar mudar o timeout ou a biblioteca no futuro, muda só aqui.
