@@ -86,32 +86,29 @@ public class HttpService {
     }
 
     //iniciando refatoraçao do httpservice
-    public double buscarCotacaoDolar(){
+    public double buscarCotacaoDolar() {
+        String url = "https://api.binance.com/api/v3/ticker/price?symbol=USDTBRL";
+        
+        //u samos o ajudante para pegar o texto bruto (JSON)
+        String json = realizarChamada(url);
+        
+        if (json == null) return 5.50; // valor de segurança caso a rede falhe
+
+        // logica de extração do preço (que vamos limpar no próximo passo)
         try{
-            String url = "https://api.binance.com/api/v3/ticker/price?symbol=USDTBRL";
-            
-            HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
-            HttpRequest request = HttpRequest.newBuilder().uri(URI.create(url)).timeout(Duration.ofSeconds(10)).GET().build();
-
-            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
-
-            if (response.statusCode() != 200) return 5.0; 
-
-            String json = response.body();
             String[] partes = json.split("\"price\":\"");
-            if (partes.length < 2) return 5.0;
+            if (partes.length < 2) return 5.50;
             
             String valorString = partes[1].split("\"")[0];
             return Double.parseDouble(valorString);
-        } catch (Exception e) {
-            return 5.50; // valor médio de segurança caso esteja sem internet
-        }
+        }catch(Exception e){
+            return 5.50;
     }
+}
 
-    // 1. Este método centraliza a lógica de conexão. 
-    // Se precisar mudar o timeout ou a biblioteca no futuro, muda só aqui.
+    // se precisar mudar o timeout ou a biblioteca no futuro, muda só aqui.
     private String realizarChamada(String url) {
-        try {
+        try{
             HttpClient client = HttpClient.newBuilder()
                     .connectTimeout(Duration.ofSeconds(10))
                     .build();
