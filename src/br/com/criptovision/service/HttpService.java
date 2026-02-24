@@ -85,6 +85,7 @@ public class HttpService {
         return buscarPrecoAtual(moedaTemporaria);
     }
 
+    //iniciando refatoraçao do httpservice
     public double buscarCotacaoDolar(){
         try{
             String url = "https://api.binance.com/api/v3/ticker/price?symbol=USDTBRL";
@@ -104,6 +105,31 @@ public class HttpService {
             return Double.parseDouble(valorString);
         } catch (Exception e) {
             return 5.50; // valor médio de segurança caso esteja sem internet
+        }
+    }
+
+    // 1. Este método centraliza a lógica de conexão. 
+    // Se precisar mudar o timeout ou a biblioteca no futuro, muda só aqui.
+    private String realizarChamada(String url) {
+        try {
+            HttpClient client = HttpClient.newBuilder()
+                    .connectTimeout(Duration.ofSeconds(10))
+                    .build();
+            
+            HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .timeout(Duration.ofSeconds(10))
+                    .GET()
+                    .build();
+
+            HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
+
+            if (response.statusCode() == 200) {
+                return response.body();
+            }
+            return null;
+        } catch (Exception e) {
+            return null;
         }
     }
 }
