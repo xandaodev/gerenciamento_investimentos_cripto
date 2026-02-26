@@ -7,17 +7,23 @@ import java.net.http.HttpResponse;
 import java.time.Duration;
 import br.com.criptovision.model.Moeda;
 
+// essa classe gerencia as chamadas externas
+// ela que é a repsonsavael por conectar o java a API  da binance e extrair os preços das criptomoedas em tempo real
+
 public class HttpService {
 
+    // busca o preço de uma moeda da carteira
     public double buscarPrecoAtual(Moeda moeda){
         String t = moeda.getTicker().toUpperCase().trim();
         
-        if (t.equals("USDT")) return 1.0;
+        // conversoes pra facilitar a vida do usuario
+        if (t.equals("USDT")) return 1.0; // usdt é o dolar, ent 1 usdt sempre vale 1 dolar
         if (t.equals("BITCOIN")) t = "BTC";
         if (t.equals("SOLANA")) t = "SOL";
         if (t.equals("CHAINLINK")) t = "LINK";
         if (t.equals("ETHEREUM")) t = "ETH";
 
+        // a binance usa pares de moedas( BTC/USDT ), entao sempre fazamos a consulta contra o dolar (USDT)
         String url = "https://api.binance.com/api/v3/ticker/price?symbol=" + t + "USDT";
         
         // aqui uma linha faz a chamada e a outra extrai o preço
@@ -25,6 +31,7 @@ public class HttpService {
         return extrairPreco(json);
     }
 
+    // metodo pra formatar e normalizar os nomes das criptos no sistema
     public String converterTickerParaId(String ticker){
         if (ticker == null) return "";
         String t = ticker.toUpperCase().trim();
@@ -37,9 +44,10 @@ public class HttpService {
         };
     }
 
+    // esse metodo verifica se a moeda informada pelo usuario realemnte existe na binance antes de registra-la na carteira
     public boolean validarTicker(String idMoeda){
         String tickerParaValidar = idMoeda.trim().toUpperCase();
-        // USDT é sempre válido no nosso sistema
+        // USDT é sempre válido no sistema
         if (tickerParaValidar.equals("USDT")) return true;
         String url = "https://api.binance.com/api/v3/ticker/price?symbol=" + tickerParaValidar + "USDT";
         
@@ -52,27 +60,25 @@ public class HttpService {
         return buscarPrecoAtual(moedaTemporaria);
     }
 
+    // metodo que busca a cotação do dolar em relaçao ao real (USDT/BRL)
     public double buscarCotacaoDolar(){
         String url = "https://api.binance.com/api/v3/ticker/price?symbol=USDTBRL";
         String json = realizarChamada(url);
         double preco = extrairPreco(json);
         
-        return (preco > 0) ? preco : 5.50; 
+        return (preco > 0) ? preco : 5.50;// operador ternario, se ele nao conseguir o preço, assume um valor medio do dolar
     }
 
+    // esse metodo ajuda na burocracia do http, apenas um metodo auxiliar
     // se precisar mudar o timeout ou a biblioteca no futuro, muda só aqui.
     private String realizarChamada(String url) {
         try{
-            HttpClient client = HttpClient.newBuilder()
-                    .connectTimeout(Duration.ofSeconds(10))
-                    .build();
+            // aqui criamos o cliente e a requisição(endereço)
+            HttpClient client = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
             
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .timeout(Duration.ofSeconds(10))
-                    .GET()
-                    .build();
+            HttpRequest request = HttpRequest.newBuilder().uri(URI.create(url)).timeout(Duration.ofSeconds(10)).GET().build();
 
+            // aqui enviamos o pedido e aguardamos a resposta em String
             HttpResponse<String> response = client.send(request, HttpResponse.BodyHandlers.ofString());
 
             if(response.statusCode() == 200){
@@ -84,12 +90,16 @@ public class HttpService {
         }
     }
 
+    // outro metodo auxiliar, ele limpa o texto JSON  e pega apenas o numero, que é o que precisamos
+    // exemplo: {"symbol":"BTCUSDT","price":"95000.00"}
     private double extrairPreco(String json){
         if (json == null) return 0;
         try{
+            // quebra o texto na parte onde diz "price" e pega o que vem depois
             String[] partes = json.split("\"price\":\"");
             if (partes.length < 2) return 0;
             
+            // pega o valor até a proxima "" e converte para numero
             String valorString = partes[1].split("\"")[0];
             return Double.parseDouble(valorString);
         }catch(Exception e){
