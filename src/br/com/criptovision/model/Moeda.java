@@ -1,5 +1,8 @@
 package br.com.criptovision.model;
 
+
+//essa clase representa uma criptomoeda dentro do sistema, ela armazena os dados de todas as compras e vendas
+
 public class Moeda {
     private String nome; // "bitcoin"
     private String ticker;// "BTC"

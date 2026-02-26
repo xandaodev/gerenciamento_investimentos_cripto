@@ -2,8 +2,12 @@ package br.com.criptovision.model;
 
 import java.time.LocalDateTime;
 
+// toda vez que voce executa uma operação no sistema, esse objeto é criado, salvo no arquivo csv e processado pela carteira
+
+//se voce comprar bitcoin 10 vezes, serão 10 objetos transaçao criados, pra somente um objeto Moeda que é o bitcoin
+
 public class Transacao {
-    private String ticker; // moeda (btc, eth...)
+    private String ticker; // moeda (btc, eth, sol ....)
     private double quantidade;
     private double precoUnitario;
     private LocalDateTime data;
@@ -11,7 +15,7 @@ public class Transacao {
     //private double taxa;
 
     //construtor
-public Transacao(String ticker, double quantidade, double precoUnitario, String tipo/*, double taxa*/){
+    public Transacao(String ticker, double quantidade, double precoUnitario, String tipo/*, double taxa*/){
         this.ticker = ticker.toUpperCase();
         this.quantidade = quantidade;
         this.precoUnitario = precoUnitario;
