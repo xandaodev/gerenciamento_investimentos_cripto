@@ -111,6 +111,10 @@ public class Main {
                             carteira.processarTransacao(moedaVenda, tVenda);
                             historico.add(tVenda); 
                             repositorio.salvar(tVenda);
+
+                            double custoParteVendida = tVenda.getQuantidade() * moedaVenda.getPrecoMedio();
+                            double lucroOperacao = (tVenda.getQuantidade() * tVenda.getPrecoUnitario()) - custoParteVendida;
+                            System.out.printf("\n   Venda registrada com sucesso! PNL da operação: $ %.2f\n", lucroOperacao);
                             
                             System.out.println("Venda registrada!");
                         } catch(Exception e) {

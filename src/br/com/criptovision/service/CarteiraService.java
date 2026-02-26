@@ -39,7 +39,7 @@ public class CarteiraService {
             double valorRecebidoNaVenda = transacao.getQuantidade() * transacao.getPrecoUnitario();
             double lucroOperacao = valorRecebidoNaVenda - custoParteVendida;
 
-            System.out.printf("PNL dessa venda: $ %.2f\n", lucroOperacao);
+            //System.out.printf("PNL dessa venda: $ %.2f\n", lucroOperacao);
 
             lucroRepo.salvarLucroRealizado(moeda.getTicker(), lucroOperacao);
 
