@@ -12,23 +12,27 @@ import java.util.List;
 
 public class Main {
     public static void main(String[] args) {
+        // criando os objetos que comandam a logica e os dados
         Scanner leitor = new Scanner(System.in);
         CarteiraService carteira = new CarteiraService();
         TransacaoRepository repositorio = new TransacaoRepository();
 
-        //chamando funcao pra realizar backup
+        // chama funcao pra realizar backup, criando uma copia do arquivo atual
         repositorio.realizarBackup();
         
+        // reconstroi e reprocessa todas as operações para gerar o saldo atual
         List<Transacao> historico = repositorio.lerTudo();
         Carteira minhaCarteira = new Carteira();
         HttpService httpTradutor = new HttpService();
 
         for(Transacao tAntiga : historico){
             String tickerOriginal = tAntiga.getTicker().toUpperCase();
+            // obterMoeda garante que não teremos objetos de moedas duplicados, exemplo : dois objetos para btc
             Moeda m = minhaCarteira.obterMoeda(tickerOriginal, tickerOriginal);
             carteira.processarTransacao(m, tAntiga);
         }
 
+        // o lopp while mantém o programa rodando até voce escolher "10" para sair
         int opcao = 0;
         while (opcao != 10){
             try{
@@ -37,7 +41,7 @@ public class Main {
                 System.out.println("2. Nova venda");
                 System.out.println("3. Gerar Dashboard de Patrimônio");
                 System.out.println("4. Ver Saldo e Preço Médio");
-                System.out.println("5. Simular lucro");
+                System.out.println("5. Simular venda futura");
                 System.out.println("6. Gerar Relatório");
                 System.out.println("7. Ver lucro total realizado");
                 System.out.println("8. Consultar preço em tempo real");
@@ -48,6 +52,7 @@ public class Main {
                 opcao = leitor.nextInt();
 
                 switch (opcao){
+                    // NOVA COMPRA
                     case 1:
                         try {
                             System.out.print("Qual o Ticker da moeda (ex: BTC)? ");
@@ -55,10 +60,10 @@ public class Main {
                             leitor.nextLine(); 
                             
                             HttpService httpService = new HttpService();
-                            
+                            // antes de aceitar, verifica se a binance reconhece esse ticker
                             System.out.println("Validando '" + ticker + "' na Binance...");
             
-                            if (!httpService.validarTicker(ticker)) {
+                            if(!httpService.validarTicker(ticker)){
                                 System.out.println("ERRO: Ativo não encontrado na Binance (par " + ticker + "USDT não existe).");
                                 break; 
                             }
@@ -66,17 +71,19 @@ public class Main {
                             Moeda moedaSelecionada = minhaCarteira.obterMoeda(ticker, ticker); 
 
                             System.out.print("Quantidade comprada: ");
+                            // o replace evita erro se o usuario digitar virgula
                             double qtd = Double.parseDouble(leitor.nextLine().replace(",", "."));
 
                             System.out.print("Preço unitário pago: ");
                             double preco = Double.parseDouble(leitor.nextLine().replace(",", "."));
                             
+                            // cria a transacao, processa o preço medio e salva no historico e no csv
                             Transacao t = new Transacao(ticker, qtd, preco, "COMPRA");
                             carteira.processarTransacao(moedaSelecionada, t);
                             historico.add(t);
                             repositorio.salvar(t);
                             System.out.println("Compra registrada com sucesso!");
-                        } catch (Exception e) {
+                        }catch (Exception e){
                             System.out.println("Erro na compra: " + e.getMessage());
                         }
                         break;
@@ -122,7 +129,8 @@ public class Main {
                         }
                         break;
                         
-                    case 3:
+                    // DASHBOARD DE PATRIMONIO
+                    case 3: 
                         System.out.println("\n--- DASHBOARD DE PATRIMONIO ---");
                         HttpService serviceHttp = new HttpService();
                         
@@ -135,7 +143,8 @@ public class Main {
                         double cotacaoDolar = serviceHttp.buscarCotacaoDolar();
 
                         for(Moeda m : minhaCarteira.getMoedas().values()){
-                            if (m.getSaldo() > 0) {
+                            if(m.getSaldo() > 0){
+                                // busca o preço pra ver quanto vale seu saldo agora
                                 double preco = serviceHttp.buscarPrecoAtual(m); 
                                 double valorNoAtivo = m.getSaldo() * preco;
                                 double lucroDestaMoeda = carteira.calcularLucroPotencial(m, preco);
@@ -166,21 +175,24 @@ public class Main {
                         System.out.println("---------------------------------------");
                         break;
 
+                    // Ver Saldo e Preço Médio
                     case 4:
                         System.out.println("\n--- MINHAS MOEDAS ---");
-                        for(Moeda m : minhaCarteira.getMoedas().values()){
+                        for(Moeda m : minhaCarteira.getMoedas().values()){ // o ".values()" pega todos os objetos Moedas que estao guardados
                             if(m.getSaldo() > 0){
                                 System.out.printf("Ativo: %s | Saldo: %.8f | Preço Médio: $ %.2f\n",m.getTicker(), m.getSaldo(), m.getPrecoMedio());
                             }
                         }
                         break;
 
+                    // Simular venda futura
                     case 5:
                         System.out.println("\n--- SIMULADOR DE VENDA FUTURA ---");
                         System.out.print("Digite o Ticker da moeda que você possui (ex: BTC): ");
                         String tickerSim = leitor.next().toUpperCase();
-                        leitor.nextLine();
+                        leitor.nextLine(); // limpa o buffer do teclado
 
+                        // primeiro verifica se a moeda existe na carteira
                         if(minhaCarteira.getMoedas().containsKey(tickerSim)){
                             Moeda mSim = minhaCarteira.getMoedas().get(tickerSim);
                             
@@ -188,7 +200,9 @@ public class Main {
                                 System.out.print("Digite o preço fictício de venda ($): ");
                                 double precoFicticio = Double.parseDouble(leitor.nextLine().replace(",", "."));
 
+                                // chama o calculo de lucro potencial do carteiraService
                                 double lucroSimulado = carteira.calcularLucroPotencial(mSim, precoFicticio);
+                                // calcula a porcentagem 
                                 double porcSimulada = (lucroSimulado / (mSim.getSaldo() * mSim.getPrecoMedio())) * 100;
 
                                 System.out.println("\n---------------------------------------");
@@ -205,11 +219,13 @@ public class Main {
                         }
                         break;
 
+                    // Gerar Relatório
                     case 6:
                         System.out.println("Gerando relatório...");
                         repositorio.gerarRelatorio(new ArrayList<>(minhaCarteira.getMoedas().values()));
                         break;
                     
+                    // Ver lucro total realizado
                     case 7:
                         System.out.println("\n--- total de lucros realizados até hoje ---");
                         br.com.criptovision.repository.LucroRepository repoLucro = new br.com.criptovision.repository.LucroRepository();
@@ -225,6 +241,7 @@ public class Main {
                         System.out.println("-----------------------------------------------------");
                         break;
 
+                    // Consultar preço em tempo real
                     case 8:
                         System.out.print("\nQual o Ticker da moeda para consulta rápida (ex: BTC, SOL, LNK)? ");
                         String tickerBusca = leitor.next().toUpperCase();
@@ -240,6 +257,7 @@ public class Main {
                         }
                         break;
 
+                    // Simular aporte (DCA)
                     case 9:
                         System.out.println("\n---  SIMULADOR DE APORTE (DCA) ---");
                         System.out.print("Digite o Ticker da moeda para simular (ex: BTC): ");
@@ -291,6 +309,7 @@ public class Main {
                         System.out.println("========================================================");
                         break;
 
+                    // Sair do sistema
                     case 10:
                         System.out.println("Saindo...");
                         break;
