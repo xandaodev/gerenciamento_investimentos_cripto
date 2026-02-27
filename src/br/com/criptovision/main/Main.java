@@ -205,12 +205,25 @@ public class Main {
                                 // calcula a porcentagem 
                                 double porcSimulada = (lucroSimulado / (mSim.getSaldo() * mSim.getPrecoMedio())) * 100;
 
-                                System.out.println("\n---------------------------------------");
-                                System.out.printf("Simulação para %s:\n", tickerSim);
+                                // variavel pra armazenar o valor total do usuario em uma cripto se ela chegasse a aquele preço
+                                double valorTotalFicticio = mSim.getSaldo() * precoFicticio;
+
+                                // calcula o valor total atual da carteira nesse ativo
+                                double precoAtual = httpTradutor.consultarPrecoPorTicker(tickerSim);
+                                double valorTotalAtual = mSim.getSaldo() * precoAtual;
+
+                                double precoDolar = httpTradutor.buscarCotacaoDolar();//busca o preço do dolar
+
+
+                                System.out.println("\n------------------------------------------------------");
+                                System.out.printf("  Simulação para %s:\n \n", tickerSim);
                                 System.out.printf("  Saldo que você possui: %.8f\n", mSim.getSaldo());
-                                System.out.printf("  Se vender a: $ %.2f\n", precoFicticio);
-                                System.out.printf("  RESULTADO ESTIMADO: $ %.2f (%.2f%%)\n", lucroSimulado, porcSimulada);
-                                System.out.println("---------------------------------------");
+                                System.out.printf("  Valor que você possui em " + tickerSim + ": $ %.2f (R$ %.2f)\n \n", valorTotalAtual, valorTotalAtual * precoDolar);
+                                System.out.printf("******************************************************* \n");
+                                System.out.printf("  Se vender a: $ %.2f\n \n", precoFicticio);
+                                System.out.printf("  LUCRO ESTIMADO: $ %.2f (R$ %.2f) -> [%.2f%%]\n \n", lucroSimulado,lucroSimulado * precoDolar, porcSimulada);
+                                System.out.printf("  SALDO TOTAL ESTIMADO: $ %.2f (R$ %.2f)\n", valorTotalFicticio, valorTotalFicticio*precoDolar);
+                                System.out.println("------------------------------------------------------");
                             }else{
                                 System.out.println("Você não possui saldo desta moeda para simular.");
                             }
@@ -294,7 +307,7 @@ public class Main {
                             System.out.println("\n================ RESULTADO DA SIMULAÇÃO ================");
                             System.out.printf(" Aporte: $ %.2f  ->  Compraria: %.8f %s\n", valorInvestimento, qtdComprada, tickerDCA);
                             System.out.printf(" Saldo: %.8f  ->  Novo Saldo: %.8f\n", saldoAtual, novoSaldoTotal);
-                            System.out.printf(" PM Atual: $ %.2f  ->  Novo PM: $ %.2f\n", pmAtual, novoPM);
+                            System.out.printf(" Preço Médio Atual: $ %.2f  ->  Novo Preço Médio: $ %.2f\n", pmAtual, novoPM);
                             
                             if(novoPM < pmAtual){
                                 System.out.printf(" EXCELENTE! Isso reduziria seu Preço Médio em %.2f%%\n", Math.abs(diferencaPM));
@@ -318,7 +331,7 @@ public class Main {
                         System.out.println("Opção inválida!");
                 }
             }catch(NumberFormatException e){ 
-                System.out.println(" ERRO: Por favor, digite apenas números inteiros para as opções do menu.");
+                System.out.println(" ERRO: Digite apenas números inteiros para as opções do menu.");
             }catch(Exception e){ 
                 System.out.println(" Ocorreu um erro inesperado: " + e.getMessage());
                 if(leitor.hasNextLine()){
