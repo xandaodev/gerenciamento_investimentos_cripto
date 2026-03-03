@@ -6,14 +6,13 @@ import br.com.criptovision.model.Transacao;
 import br.com.criptovision.service.CarteiraService;
 import br.com.criptovision.service.HttpService;
 import br.com.criptovision.repository.TransacaoRepository;
-import java.util.Scanner;
+import br.com.criptovision.util.InputUtils;
 import java.util.ArrayList;
 import java.util.List;
 
 public class Main {
     public static void main(String[] args) {
         // criando os objetos que comandam a logica e os dados
-        Scanner leitor = new Scanner(System.in);
         CarteiraService carteira = new CarteiraService();
         TransacaoRepository repositorio = new TransacaoRepository();
 
@@ -47,17 +46,14 @@ public class Main {
                 System.out.println("8. Consultar preço em tempo real");
                 System.out.println("9. Simular aporte (DCA)");
                 System.out.println("10. Sair do sistema");
-                System.out.print("Escolha uma opção: ");
                 
-                opcao = leitor.nextInt();
+                opcao = InputUtils.lerInt("Escolha uma opção: ");
 
                 switch (opcao){
                     // NOVA COMPRA
                     case 1:
                         try {
-                            System.out.print("Qual o Ticker da moeda (ex: BTC)? ");
-                            String ticker = leitor.next().toUpperCase();
-                            leitor.nextLine(); 
+                            String ticker = InputUtils.lerString("Qual o Ticker da moeda (ex: BTC)? ");
                             
                             HttpService httpService = new HttpService();
                             // antes de aceitar, verifica se a binance reconhece esse ticker
@@ -70,12 +66,9 @@ public class Main {
 
                             Moeda moedaSelecionada = minhaCarteira.obterMoeda(ticker, ticker); 
 
-                            System.out.print("Quantidade comprada: ");
-                            // o replace evita erro se o usuario digitar virgula
-                            double qtd = Double.parseDouble(leitor.nextLine().replace(",", "."));
+                            double qtd = InputUtils.lerDouble("Quantidade comprada: ");
 
-                            System.out.print("Preço unitário pago: ");
-                            double preco = Double.parseDouble(leitor.nextLine().replace(",", "."));
+                            double preco = InputUtils.lerDouble("Preço unitário pago: ");
                             
                             // cria a transacao, processa o preço medio e salva no historico e no csv
                             Transacao t = new Transacao(ticker, qtd, preco, "COMPRA");
@@ -83,16 +76,14 @@ public class Main {
                             historico.add(t);
                             repositorio.salvar(t);
                             System.out.println("Compra registrada com sucesso!");
-                        }catch (Exception e){
+                        }catch(Exception e){
                             System.out.println("Erro na compra: " + e.getMessage());
                         }
                         break;
 
                     case 2:
-                        try {
-                            System.out.print("Qual o Ticker da moeda para venda? ");
-                            String tickerVenda = leitor.next().toUpperCase();
-                            leitor.nextLine();
+                        try{
+                            String tickerVenda = InputUtils.lerString("Qual o Ticker da moeda para venda? ");
 
                             // na binance, o identificador é o ticker
                             Moeda moedaVenda = minhaCarteira.obterMoeda(tickerVenda, tickerVenda);
@@ -103,16 +94,14 @@ public class Main {
                             }
 
                             System.out.printf("Saldo disponível: %.8f\n", moedaVenda.getSaldo());
-                            System.out.print("Quantidade a vender: ");
-                            double qtdVenda = Double.parseDouble(leitor.nextLine().replace(",", "."));
+                            double qtdVenda = InputUtils.lerDouble("Quantidade a vender: ");
                             
                             if (qtdVenda > moedaVenda.getSaldo()) {
                                 System.out.println("Erro: Saldo insuficiente!");
                                 break; 
                             }
 
-                            System.out.print("Preço unitário de venda: ");
-                            double precoVenda = Double.parseDouble(leitor.nextLine().replace(",", "."));
+                            double precoVenda = InputUtils.lerDouble("Preço unitário de venda: ");
                             
                             Transacao tVenda = new Transacao(tickerVenda, qtdVenda, precoVenda, "VENDA");
                             carteira.processarTransacao(moedaVenda, tVenda);
@@ -188,17 +177,14 @@ public class Main {
                     // Simular venda futura
                     case 5:
                         System.out.println("\n--- SIMULADOR DE VENDA FUTURA ---");
-                        System.out.print("Digite o Ticker da moeda que você possui (ex: BTC): ");
-                        String tickerSim = leitor.next().toUpperCase();
-                        leitor.nextLine(); // limpa o buffer do teclado
+                        String tickerSim = InputUtils.lerString("Digite o Ticker da moeda que você possui (ex: BTC): ");
 
                         // primeiro verifica se a moeda existe na carteira
                         if(minhaCarteira.getMoedas().containsKey(tickerSim)){
                             Moeda mSim = minhaCarteira.getMoedas().get(tickerSim);
                             
                             if(mSim.getSaldo() > 0){
-                                System.out.print("Digite o preço fictício de venda ($): ");
-                                double precoFicticio = Double.parseDouble(leitor.nextLine().replace(",", "."));
+                                double precoFicticio = InputUtils.lerDouble("Digite o preço fictício de venda ($): ");
 
                                 // chama o calculo de lucro potencial do carteiraService
                                 double lucroSimulado = carteira.calcularLucroPotencial(mSim, precoFicticio);
@@ -256,9 +242,7 @@ public class Main {
 
                     // Consultar preço em tempo real
                     case 8:
-                        System.out.print("\nQual o Ticker da moeda para consulta rápida (ex: BTC, SOL, LNK)? ");
-                        String tickerBusca = leitor.next().toUpperCase();
-                        leitor.nextLine();
+                        String tickerBusca = InputUtils.lerString("\nQual o Ticker da moeda para consulta rápida (ex: BTC, SOL, LNK)? ");
                         System.out.println("Consultando Binance...");
                         double precoBuscado = httpTradutor.consultarPrecoPorTicker(tickerBusca);
                         if(precoBuscado > 0){
@@ -273,9 +257,7 @@ public class Main {
                     // Simular aporte (DCA)
                     case 9:
                         System.out.println("\n--- SIMULADOR DE APORTE (DCA) ---");
-                        System.out.print("Digite o Ticker da moeda para simular (ex: BTC): ");
-                        String tickerDCA = leitor.next().toUpperCase();
-                        leitor.nextLine();
+                        String tickerDCA = InputUtils.lerString("Digite o Ticker da moeda para simular (ex: BTC): ");
 
                         // busca a moeda na carteira
                         Moeda moedaDCA = minhaCarteira.getMoedas().get(tickerDCA);
@@ -290,8 +272,7 @@ public class Main {
 
                         if (precoMercado > 0){
                             System.out.printf("Preço atual de mercado: $ %.2f\n", precoMercado);
-                            System.out.print("Quanto pretende investir agora (USD)? ");
-                            double valorAporte = Double.parseDouble(leitor.nextLine().replace(",", "."));
+                            double valorAporte = InputUtils.lerDouble("Quanto pretende investir agora (USD)? ");
 
                             //novo metodo que ta em carteiraService:
                             carteira.simularDCA(moedaDCA, valorAporte, precoMercado);
@@ -308,15 +289,9 @@ public class Main {
                     default:
                         System.out.println("Opção inválida!");
                 }
-            }catch(NumberFormatException e){ 
-                System.out.println(" ERRO: Digite apenas números inteiros para as opções do menu.");
             }catch(Exception e){ 
                 System.out.println(" Ocorreu um erro inesperado: " + e.getMessage());
-                if(leitor.hasNextLine()){
-                    leitor.nextLine();
-                }
             }
         }
-        leitor.close();
     }
 }
