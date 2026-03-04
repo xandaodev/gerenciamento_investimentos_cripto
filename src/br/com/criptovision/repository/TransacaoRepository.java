@@ -55,22 +55,46 @@ public class TransacaoRepository {
         return transacoes;
     }
 
+    // metodo antigo estava muito basico, removi e construi esse com mais dados e melhor formatado
     // metodo que cria um relatorio em txt, organizado e legivel
     public void gerarRelatorio(List<Moeda> moedas){
-        try(PrintWriter writer = new PrintWriter(new FileWriter("relatorio.txt"))){
-            writer.println("--- RELATÓRIO DE INVESTIMENTOS CRIPTO ---");
-            writer.println("Data: " + LocalDateTime.now());
-            writer.println("------------------------------------------");
-            for(Moeda m : moedas){
-                if(m.getSaldo() > 0){
-                    writer.printf("Ativo: %s | Saldo: %.8f | Preço Médio: $ %.2f\n", m.getTicker(), m.getSaldo(), m.getPrecoMedio());
-                }
+    // nome do arquivo
+    String nomeArquivo = "relatorio_investimentos.txt";
+    
+    //  java.time para pegar a data e hora exata da geração do relatorio
+    java.time.LocalDateTime agora = java.time.LocalDateTime.now();
+    java.time.format.DateTimeFormatter formatador = java.time.format.DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm:ss");
+
+    try(PrintWriter writer = new PrintWriter(new FileWriter(nomeArquivo))){
+        writer.println("===========================================================");
+        writer.println("              CRIPTOVISION - EXTRATO DE ATIVOS            ");
+        writer.println("===========================================================");
+        writer.println("Gerado em: " + agora.format(formatador));
+        writer.println("-----------------------------------------------------------");
+        
+        // cabeçalho da tabela
+        //  %-10s alinha à esquerda com 10 espaços, o %15s alinha à direita
+        writer.printf("%-10s | %-18s | %-15s\n", "ATIVO", "SALDO TOTAL", "PREÇO MÉDIO");
+        writer.println("-----------|--------------------|-----------------------------");
+
+        double custoTotalCarteira = 0;
+        for(Moeda m : moedas){
+            if(m.getSaldo() > 0){
+                writer.printf("%-10s | %-18.8f | $ %-14.2f\n", m.getTicker(), m.getSaldo(), m.getPrecoMedio());
+                custoTotalCarteira += (m.getSaldo() * m.getPrecoMedio());
             }
-            System.out.println("Relatório gerado com sucesso em 'relatorio.txt'");
-        }catch(IOException e){
-            System.out.println("Erro ao gerar relatório: " + e.getMessage());
         }
+
+        // resumo no rodapé:
+        writer.println("--------------------------------------------------------------");
+        writer.printf("INVESTIMENTO TOTAL ACUMULADO (CUSTO): $ %.2f\n", custoTotalCarteira);
+        writer.println("==============================================================");
+        System.out.println("Relatório gerado com sucesso em: " + nomeArquivo);
+        
+    }catch(IOException e){
+        System.out.println("Erro ao gerar relatório: " + e.getMessage());
     }
+}
 
     //nova funcao para fazer um backup do relatorio todas as vezes que o programa for iniciado
     public void realizarBackup(){
