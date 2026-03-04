@@ -2,6 +2,8 @@ package br.com.criptovision.repository;
 
 import br.com.criptovision.model.Moeda;
 import br.com.criptovision.model.Transacao;
+import br.com.criptovision.service.HttpService;
+
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -60,6 +62,8 @@ public class TransacaoRepository {
     public void gerarRelatorio(List<Moeda> moedas){
     // nome do arquivo
     String nomeArquivo = "relatorio_investimentos.txt";
+
+    HttpService httpTradutor = new HttpService();// pra buscra o preço do dolar
     
     //  java.time para pegar a data e hora exata da geração do relatorio
     java.time.LocalDateTime agora = java.time.LocalDateTime.now();
@@ -86,8 +90,11 @@ public class TransacaoRepository {
         }
 
         // resumo no rodapé:
+        double precoDolar = httpTradutor.buscarCotacaoDolar(); 
+        double custoTotalCarteiraReais = custoTotalCarteira * precoDolar;        
+        
         writer.println("--------------------------------------------------------------");
-        writer.printf("INVESTIMENTO TOTAL ACUMULADO (CUSTO): $ %.2f\n", custoTotalCarteira);
+        writer.printf("INVESTIMENTO TOTAL ACUMULADO (CUSTO): $ %.2f (R$ %.2f)\n", custoTotalCarteira, custoTotalCarteiraReais);
         writer.println("==============================================================");
         System.out.println("\n Relatório gerado com sucesso em: " + nomeArquivo);
         
