@@ -89,10 +89,10 @@ public class TransacaoRepository {
         writer.println("--------------------------------------------------------------");
         writer.printf("INVESTIMENTO TOTAL ACUMULADO (CUSTO): $ %.2f\n", custoTotalCarteira);
         writer.println("==============================================================");
-        System.out.println("Relatório gerado com sucesso em: " + nomeArquivo);
+        System.out.println("\n Relatório gerado com sucesso em: " + nomeArquivo);
         
     }catch(IOException e){
-        System.out.println("Erro ao gerar relatório: " + e.getMessage());
+        System.out.println("\n Erro ao gerar relatório: " + e.getMessage());
     }
 }
 

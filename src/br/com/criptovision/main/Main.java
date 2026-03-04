@@ -220,7 +220,7 @@ public class Main {
 
                     // Gerar Relatório
                     case 6:
-                        System.out.println("Gerando relatório...");
+                        System.out.println("\n Gerando relatório...");
                         repositorio.gerarRelatorio(new ArrayList<>(minhaCarteira.getMoedas().values()));
                         break;
                     
