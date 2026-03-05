@@ -94,7 +94,7 @@ public class TransacaoRepository {
         double custoTotalCarteiraReais = custoTotalCarteira * precoDolar;        
         
         writer.println("--------------------------------------------------------------");
-        writer.printf("INVESTIMENTO TOTAL ACUMULADO (CUSTO): $ %.2f (R$ %.2f)\n", custoTotalCarteira, custoTotalCarteiraReais);
+        writer.printf("INVESTIMENTO TOTAL (CUSTO): $ %.2f (R$ %.2f)\n", custoTotalCarteira, custoTotalCarteiraReais);
         writer.println("==============================================================");
         System.out.println("\n Relatório gerado com sucesso em: " + nomeArquivo);
         
