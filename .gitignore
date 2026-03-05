@@ -1,13 +1,25 @@
-# arquivos de dados
+# --- DADOS E PRIVACIDADE ---
+# ignora dados financeiros reais
 *.csv
 *.txt
+backups/
 
-# IDEs
-.idea/
-.vscode/
-*.iml
+# --- JAVA E COMPILAÇÃO ---
+# ignora arquivos compilados e o executável
+*.class
+*.jar
+*.war
 bin/
 target/
 
+# --- IDEs (VS CODE / INTELLIJ) ---
+.vscode/
+.idea/
+*.iml
+*.settings/
+.project
+.classpath
+
+# --- SISTEMA OPERACIONAL ---
 .DS_Store
 Thumbs.db
