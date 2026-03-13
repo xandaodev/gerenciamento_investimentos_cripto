@@ -1,23 +1,48 @@
-# 🪙 CryptoPortfolio Manager (Binance Edition)
+# 🪙 Gerenciador de Investimentos Cripto
 
 <p align="left"> 
   <img src="https://img.shields.io/badge/Java-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white" alt="Java"> 
-  <img src="https://img.shields.io/badge/API-Binance-yellow?style=for-the-badge" alt="Binance API">
-  <img src="https://img.shields.io/badge/Status-Versão%20Estável-green?style=for-the-badge" alt="Status"> 
+  <img src="https://img.shields.io/badge/API-Binance-F3BA2F?style=for-the-badge&logo=binance&logoColor=white" alt="Binance API">
+  <img src="https://img.shields.io/badge/Status-Em%20Desenvolvimento-green?style=for-the-badge" alt="Status"> 
 </p>
 
-O **CryptoPortfolio Manager** é uma aplicação Java de alta performance para gestão centralizada de ativos digitais. O sistema permite consolidar investimentos e acompanhar a performance da carteira em tempo real.
+O **Gerenciador de Investimentos Cripto** é uma solução robusta desenvolvida em **Java** para investidores que desejam centralizar a gestão de seus ativos digitais. O sistema automatiza o rastreamento de rentabilidade e fornece dados em tempo real através da integração direta com a API da Binance.
 
-## ✨ Evolução e Funcionalidades
+## 🚀 Funcionalidades Principais
 
-- **Integração com Binance API:** Migração da CoinGecko para Binance, garantindo consultas instantâneas e maior limite de requisições.
-- **Tratamento Inteligente de Ativos:** Sistema robusto que traduz automaticamente nomes de moedas (ex: "Bitcoin") para Tickers de mercado (ex: "BTC").
-- **Dashboard de Patrimônio:** Cálculo automático de saldo, preço médio e PNL (Profit and Loss) de cada ativo.
-- **Interface de Terminal Moderna:** Resumo executivo com indicadores visuais de performance financeira (▲/▼).
-- **Persistência de Dados:** Histórico de transações e lucros realizados armazenados em arquivos CSV.
+O projeto oferece um conjunto de ferramentas essenciais para o monitoramento financeiro de precisão:
 
-## 🛠️ Tecnologias Utilizadas
+* **📈 Cotações em Tempo Real:** Integração com a API da Binance para buscar preços atualizados de qualquer par de moedas disponível no mercado.
+* **📊 Dashboard de Patrimônio:** Visão consolidada do saldo por ativo, preço médio de compra e valor total da carteira em dólares (USD) e reais (BRL).
+* **💰 Cálculo de PNL Automático:** Monitoramento de Lucro e Prejuízo (*Profit and Loss*) por moeda e global, permitindo visualizar a performance histórica da carteira.
+* **⚖️ Simulador de DCA (Dollar Cost Averaging):** Ferramenta para simular novos aportes e prever o impacto no preço médio atual e no ponto de equilíbrio (*break-even*).
+* **📂 Relatórios Profissionais:** Geração automática de extratos em formato `.txt` com formatação tabular e data/hora de emissão.
+* **🔄 Normalização de Ativos:** Tradutor inteligente que reconhece nomes comuns (ex: "Bitcoin", "Ethereum") e os converte automaticamente para tickers de mercado ("BTC", "ETH").
+* **🧪 Qualidade Garantida:** Suite de testes unitários desenvolvida com **JUnit** para validar a integridade dos cálculos matemáticos do sistema.
 
-- **Linguagem:** Java (JDK 17+).
-- **HTTP Client:** Java Native HttpClient para consumo de APIs REST.
-- **Arquitetura:** Organizada em pacotes (Model, Repository, Service, Main) para facilitar a manutenção e escalabilidade.
+## 🛠️ Tecnologias e Conceitos de Engenharia
+
+Este projeto demonstra a aplicação de práticas sólidas de desenvolvimento de software:
+
+* **Arquitetura em Camadas:** Organização lógica dividida em `Model`, `Repository`, `Service`, `Main`, `Util` e `Test`.
+* **Consumo de APIs REST:** Utilização do `HttpClient` nativo do Java para requisições assíncronas e tratamento de respostas JSON.
+* **Persistência Local:** Gerenciamento de dados via arquivos CSV, garantindo histórico de transações e backups automáticos ao iniciar o sistema.
+* **Testes de Unidade:** Cobertura de lógica de negócio crítica (cálculo de PM e PNL) utilizando JUnit 4.
+
+## 📋 Como Executar
+
+1.  **Pré-requisitos:** Certifique-se de possuir o JDK 17 ou superior instalado.
+2.  **Configuração:** O sistema utiliza os arquivos `transacoes.csv` e `lucros.csv` para armazenar os dados.
+3.  **Execução:**
+    ```bash
+    java -jar CriptoResumo.jar
+    ```
+
+## 🔐 Segurança e Privacidade
+
+A privacidade dos dados financeiros é um pilar fundamental deste projeto:
+* **Armazenamento Local:** Nenhuma informação de investimento sai do seu computador; os dados são gravados apenas em arquivos locais.
+* **API Pública:** O sistema utiliza apenas a API pública de preços da Binance, não exigindo chaves privadas ou senhas de corretoras para funcionar.
+
+---
+⭐ *Desenvolvido por **Alexandre (Xandão)** - Aluno de Ciência da Computação na UFSJ.*
