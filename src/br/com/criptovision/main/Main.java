@@ -38,7 +38,7 @@ public class Main {
                 System.out.println("\n--- GERENCIAMENTO DE INVESTIMENTOS CRIPTO ---");
                 System.out.println("1. Nova compra");
                 System.out.println("2. Nova venda");
-                System.out.println("3. Gerar Dashboard de Patrimônio");
+                System.out.println("3. Gerar Resumo da Carteira");
                 System.out.println("4. Ver Saldo e Preço Médio");
                 System.out.println("5. Simular venda futura");
                 System.out.println("6. Gerar Relatório");
@@ -118,9 +118,9 @@ public class Main {
                         }
                         break;
                         
-                    // DASHBOARD DE PATRIMONIO
+                    // RESUMO DA CARTEIRA
                     case 3: 
-                        System.out.println("\n--- DASHBOARD DE PATRIMONIO ---");
+                        System.out.println("\n--- RESUMO DA CARTEIRA ---");
                         HttpService serviceHttp = new HttpService();
                         
                         double totalCalculado = 0;
@@ -146,7 +146,7 @@ public class Main {
                         if(totalCalculado == 0){
                             System.out.println("Erro: Não foi possível obter preços ou carteira vazia.");
                         }else{
-                            System.out.printf("VALOR TOTAL DO PATRIMONIO: $ %.2f (R$ %.2f)\n", totalCalculado, (totalCalculado * cotacaoDolar));
+                            System.out.printf("VALOR TOTAL DA CARTEIRA: $ %.2f (R$ %.2f)\n", totalCalculado, (totalCalculado * cotacaoDolar));
                             String status = (pnlTotalGeral >= 0) ? "LUCRO" : "PREJUIZO";
                             System.out.printf("PNL GERAL DA CARTEIRA: $ %.2f  (R$ %.2f) (%s)\n", pnlTotalGeral,(pnlTotalGeral * cotacaoDolar), status);
                             System.out.println("---------------------------------------");
