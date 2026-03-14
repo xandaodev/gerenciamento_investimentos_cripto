@@ -111,7 +111,7 @@ public class Main {
                             double custoParteVendida = tVenda.getQuantidade() * moedaVenda.getPrecoMedio();
                             double lucroOperacao = (tVenda.getQuantidade() * tVenda.getPrecoUnitario()) - custoParteVendida;
                             System.out.printf("\n   Venda registrada com sucesso! PNL da operação: $ %.2f\n", lucroOperacao);
-                            
+
                             System.out.println("Venda registrada!");
                         } catch(Exception e) {
                             System.out.println("Erro na venda: " + e.getMessage());
