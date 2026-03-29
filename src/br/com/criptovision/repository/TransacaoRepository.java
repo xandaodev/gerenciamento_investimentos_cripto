@@ -1,5 +1,6 @@
 package br.com.criptovision.repository;
 
+import br.com.criptovision.exception.ArquivoNaoEncontradoException;
 import br.com.criptovision.model.Moeda;
 import br.com.criptovision.model.Transacao;
 import br.com.criptovision.service.HttpService;
@@ -53,6 +54,7 @@ public class TransacaoRepository {
                 transacoes.add(t);
             }
         }catch(IOException e){
+            throw new ArquivoNaoEncontradoException("Erro fatal: Não foi possível ler o arquivo " + nomeArquivo);
         }
         return transacoes;
     }
