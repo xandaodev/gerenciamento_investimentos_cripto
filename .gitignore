@@ -23,3 +23,6 @@ target/
 # --- SISTEMA OPERACIONAL ---
 .DS_Store
 Thumbs.db
+
+
+config.properties
