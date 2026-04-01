@@ -6,6 +6,7 @@ import br.com.criptovision.model.Transacao;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
@@ -43,6 +44,37 @@ public class TransacaoDAOMySQL implements TransacaoDAO {
 
     @Override
     public List<Transacao> lerTudo() {
-        return new ArrayList<>(); 
+        List<Transacao> transacoes = new ArrayList<>();
+        String sql = "SELECT * FROM transacoes";
+        // preparando o comando
+        try(Connection conn = ConexaoDB.getConexao();
+             
+            PreparedStatement stmt = conn.prepareStatement(sql);
+            //ResultSet = tabela virtual que guarda os resultados que vem do mysql
+            ResultSet rs = stmt.executeQuery()) {
+
+            while (rs.next()){
+                // lê os dados da linha atual
+                Long id = rs.getLong("id");
+                String ticker = rs.getString("ticker");
+                double quantidade = rs.getDouble("quantidade");
+                double precoUnitario = rs.getDouble("preco_unitario");
+                String tipo = rs.getString("tipo");
+                Timestamp dataBanco = rs.getTimestamp("data_transacao");
+
+                // recria o objeto Transacao
+                Transacao t = new Transacao(ticker, quantidade, precoUnitario, tipo);
+                t.setId(id); // injeta o id do banco
+                
+                // converte o timestamp do mysql de volta para localdatetime do java
+                if(dataBanco != null){
+                    t.setData(dataBanco.toLocalDateTime());
+                }
+                transacoes.add(t);
+            }
+        }catch(SQLException e){
+            throw new BancoDeDadosException("Erro ao ler transações da base de dados: " + e.getMessage(), e);
+        }
+        return transacoes;
     }
 }
