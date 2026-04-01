@@ -3,7 +3,7 @@ package br.com.criptovision.database;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.SQLException;
-import br.com.criptovision.database.ConexaoDB; // Ajuste se necessário
+import br.com.criptovision.database.ConexaoDB; 
 import br.com.criptovision.util.ConfigLoader;
 import br.com.criptovision.exception.BancoDeDadosException;
 

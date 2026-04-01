@@ -14,6 +14,8 @@ public class Transacao {
     private String tipo;  // se vai ser compra ou venda
     //private double taxa;
 
+    private Long id; // chave primaria para a base de dados
+
     //construtor
     public Transacao(String ticker, double quantidade, double precoUnitario, String tipo/*, double taxa*/){
         this.ticker = ticker.toUpperCase();
@@ -31,5 +33,8 @@ public class Transacao {
     public String getTipo(){ return tipo; }
     public LocalDateTime getData(){ return data; }
     //public double getTaxa(){ return taxa; }
+
+    public Long getId() { return id; }
+    public void setId(Long id) { this.id = id; }
 
 }
