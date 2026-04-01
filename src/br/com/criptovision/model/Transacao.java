@@ -32,6 +32,9 @@ public class Transacao {
     public double getPrecoUnitario(){ return precoUnitario; }
     public String getTipo(){ return tipo; }
     public LocalDateTime getData(){ return data; }
+
+    public void setData(LocalDateTime data){ this.data = data; }
+    
     //public double getTaxa(){ return taxa; }
 
     public Long getId() { return id; }
