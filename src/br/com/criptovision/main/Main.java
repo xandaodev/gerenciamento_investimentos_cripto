@@ -5,6 +5,9 @@ import br.com.criptovision.model.Moeda;
 import br.com.criptovision.model.Transacao;
 import br.com.criptovision.service.CarteiraService;
 import br.com.criptovision.service.HttpService;
+import br.com.criptovision.service.RelatorioService;
+import br.com.criptovision.repository.TransacaoDAO;
+import br.com.criptovision.repository.TransacaoDAOMySQL;
 import br.com.criptovision.repository.TransacaoRepository;
 import br.com.criptovision.util.InputUtils;
 import java.util.ArrayList;
@@ -14,10 +17,11 @@ public class Main {
     public static void main(String[] args) {
         // criando os objetos que comandam a logica e os dados
         CarteiraService carteira = new CarteiraService();
-        TransacaoRepository repositorio = new TransacaoRepository();
+        TransacaoDAO repositorio = new TransacaoDAOMySQL();
 
-        // chama funcao pra realizar backup, criando uma copia do arquivo atual
-        repositorio.realizarBackup();
+        RelatorioService relatorioService = new RelatorioService();
+
+        //repositorio.realizarBackup(); // retirando pois o backup nao é de responsabilidade da aplicação, agr que temos o banco de dados isso nao faz mais sentido
         
         // reconstroi e reprocessa todas as operações para gerar o saldo atual
         List<Transacao> historico = repositorio.lerTudo();
@@ -221,7 +225,7 @@ public class Main {
                     // Gerar Relatório
                     case 6:
                         System.out.println("\n Gerando relatório...");
-                        repositorio.gerarRelatorio(new ArrayList<>(minhaCarteira.getMoedas().values()));
+                        relatorioService.gerarRelatorio(new ArrayList<>(minhaCarteira.getMoedas().values()));
                         break;
                     
                     // Ver lucro total realizado
