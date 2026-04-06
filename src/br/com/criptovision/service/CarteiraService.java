@@ -142,5 +142,10 @@ public class CarteiraService {
         }
         System.out.println("===================================================================");
     }
+
+    // método criado para permitir a injeção de um DAO falso durante os testes
+    public void setLucroRepo(br.com.criptovision.repository.LucroDAO lucroRepo){
+        this.lucroRepo = lucroRepo;
+    }
     
 }
