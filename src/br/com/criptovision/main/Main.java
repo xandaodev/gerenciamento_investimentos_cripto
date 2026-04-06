@@ -92,32 +92,32 @@ public class Main {
                             Moeda moedaVenda = minhaCarteira.obterMoeda(tickerVenda, tickerVenda);
 
                             if(moedaVenda.getSaldo() <= 0){
-                                System.out.println("Não tem saldo de " + tickerVenda + " para vender.");
+                                System.out.println("Você não tem saldo de " + tickerVenda + " para vender.");
                                 break;
                             }
 
                             System.out.printf("Saldo disponível: %.8f\n", moedaVenda.getSaldo());
                             double qtdVenda = InputUtils.lerDouble("Quantidade a vender: ");
                             
-                            if (qtdVenda > moedaVenda.getSaldo()) {
-                                System.out.println("Erro: Saldo insuficiente!");
-                                break; 
-                            }
-
                             double precoVenda = InputUtils.lerDouble("Preço unitário de venda: ");
                             
                             Transacao tVenda = new Transacao(tickerVenda, qtdVenda, precoVenda, "VENDA");
+                            
                             carteira.processarTransacao(moedaVenda, tVenda);
+                            
                             historico.add(tVenda); 
                             repositorio.salvar(tVenda);
 
-                            double custoParteVendida = tVenda.getQuantidade() * moedaVenda.getPrecoMedio();
-                            double lucroOperacao = (tVenda.getQuantidade() * tVenda.getPrecoUnitario()) - custoParteVendida;
-                            System.out.printf("\n   Venda registrada com sucesso! PNL da operação: $ %.2f\n", lucroOperacao);
+                            System.out.println("\nVenda registrada com sucesso no banco de dados!");
 
-                            System.out.println("Venda registrada!");
-                        } catch(Exception e) {
-                            System.out.println("Erro na venda: " + e.getMessage());
+                        }catch(br.com.criptovision.exception.SaldoInsuficienteException e){
+                            System.out.println("\nERRO DE OPERAÇÃO: " + e.getMessage());
+
+                        }catch(IllegalArgumentException e){
+                            System.out.println("\nERRO DE VALOR: " + e.getMessage());
+
+                        }catch(Exception e){
+                            System.out.println("\nERRO GERAL: " + e.getMessage());
                         }
                         break;
                         
