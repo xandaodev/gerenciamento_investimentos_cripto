@@ -231,7 +231,7 @@ public class Main {
                     // Ver lucro total realizado
                     case 7:
                         System.out.println("\n--- total de lucros realizados até hoje ---");
-                        br.com.criptovision.repository.LucroRepository repoLucro = new br.com.criptovision.repository.LucroRepository();
+                        br.com.criptovision.repository.LucroDAO repoLucro = new br.com.criptovision.repository.LucroDAOMySQL();
                         double totalRealizado = repoLucro.lerLucroTotal();
                         
                         if(totalRealizado == 0){
