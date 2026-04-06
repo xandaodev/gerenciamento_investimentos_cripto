@@ -17,7 +17,7 @@ public class CarteiraService {
 
     // nesse metodo é atualizado o estado de uma moeda baseado numa transacao
     // ele é chamado e rechamado varias vezes quando o programa é iniciado para reconstruir seu saldo
-    public void processarTransacao(Moeda moeda, Transacao transacao){
+    public void processarTransacao(Moeda moeda, Transacao transacao) throws br.com.criptovision.exception.SaldoInsuficienteException{
 
         // LOGICA DA COMPRA:
         if(transacao.getTipo().equals("COMPRA")){
@@ -38,32 +38,27 @@ public class CarteiraService {
 
         // LOGICA DA VENDA:
         }else if(transacao.getTipo().equals("VENDA")){
-            // verificação de segurança: a quantidade deve ser positiva
+            
             if (transacao.getQuantidade() <= 0){
-                System.out.println("Erro: A quantidade de venda deve ser maior que zero.");
-                return;
+                throw new IllegalArgumentException("A quantidade de venda deve ser maior que zero.");
             }
 
-            // verifica saldo
             if (transacao.getQuantidade() > moeda.getSaldo()){
-                System.out.println("Erro: Saldo insuficiente para realizar a venda.");
-                return;
+                throw new br.com.criptovision.exception.SaldoInsuficienteException(
+                    "Saldo insuficiente para a venda! Você tentou vender " + transacao.getQuantidade() + 
+                    ", mas possui apenas " + moeda.getSaldo() + " de " + moeda.getTicker()
+                );
             }
 
             // CALCULO DE PNL (profit and loss):
+            double custoParteVendida = transacao.getQuantidade() * moeda.getPrecoMedio();
+            double valorRecebidoNaVenda = transacao.getQuantidade() * transacao.getPrecoUnitario();
+            double lucroOperacao = valorRecebidoNaVenda - custoParteVendida;
 
-            
-            double custoParteVendida = transacao.getQuantidade() * moeda.getPrecoMedio();// quanto custou a parte que esta sendo vendida agora
-            double valorRecebidoNaVenda = transacao.getQuantidade() * transacao.getPrecoUnitario();// quanto estou recebendo por ela
-            double lucroOperacao = valorRecebidoNaVenda - custoParteVendida;// lucro = recebido - gasto
-
-            //System.out.printf("PNL dessa venda: $ %.2f\n", lucroOperacao);
-
-            lucroRepo.salvarLucroRealizado(moeda.getTicker(), lucroOperacao);// salvamos esse lucro no lucroRepo
+            lucroRepo.salvarLucroRealizado(moeda.getTicker(), lucroOperacao);
 
             // atualização do saldo 
             moeda.setSaldo(moeda.getSaldo() - transacao.getQuantidade());
-            
         }
     }
     
