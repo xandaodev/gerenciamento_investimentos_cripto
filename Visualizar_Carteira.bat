@@ -1,7 +1,7 @@
 @echo off
-echo Compilando o sistema mais recente na versao atualizada..
-javac -d bin -cp "lib/*" -sourcepath src src/br/com/criptovision/main/Main.java
+echo Compilando o Ticker View...
+javac -d bin -cp "lib/*" -sourcepath src src/br/com/criptovision/main/TickerView.java
 
-echo Abrindo Menu Principal...
-java -cp "bin;lib/*" br.com.criptovision.main.Main
+echo Abrindo Resumo da Carteira...
+java -cp "bin;lib/*" br.com.criptovision.main.TickerView
 pause
