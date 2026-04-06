@@ -8,7 +8,6 @@ import br.com.criptovision.service.HttpService;
 import br.com.criptovision.service.RelatorioService;
 import br.com.criptovision.repository.TransacaoDAO;
 import br.com.criptovision.repository.TransacaoDAOMySQL;
-import br.com.criptovision.repository.TransacaoRepository;
 import br.com.criptovision.util.InputUtils;
 import java.util.ArrayList;
 import java.util.List;

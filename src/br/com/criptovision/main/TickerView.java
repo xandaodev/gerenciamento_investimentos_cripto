@@ -5,8 +5,9 @@ import br.com.criptovision.model.Moeda;
 import br.com.criptovision.model.Transacao;
 import br.com.criptovision.service.CarteiraService;
 import br.com.criptovision.service.HttpService;
-import br.com.criptovision.repository.TransacaoRepository;
 import java.util.List;
+import br.com.criptovision.repository.TransacaoDAO;
+import br.com.criptovision.repository.TransacaoDAOMySQL;
 
 public class TickerView {
 
@@ -17,7 +18,7 @@ public class TickerView {
         System.out.println("==================================================================================");
 
         CarteiraService service = new CarteiraService();
-        TransacaoRepository repo = new TransacaoRepository();
+        TransacaoDAO repo = new TransacaoDAOMySQL();
         HttpService http = new HttpService();
         Carteira carteira = new Carteira();
 

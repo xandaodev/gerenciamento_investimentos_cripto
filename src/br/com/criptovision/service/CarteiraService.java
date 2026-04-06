@@ -4,7 +4,6 @@ import br.com.criptovision.model.Moeda;
 import br.com.criptovision.model.Transacao;
 import br.com.criptovision.repository.LucroDAO;
 import br.com.criptovision.repository.LucroDAOMySQL;
-import br.com.criptovision.repository.LucroRepository;
 
 // uma das classes mais importantes, aqui são feitos todos os calculos usando os dados que as outras classes fornecem
 
