@@ -2,7 +2,8 @@ package br.com.criptovision.service;
 
 import br.com.criptovision.model.Moeda;
 import br.com.criptovision.model.Transacao;
-
+import br.com.criptovision.repository.LucroDAO;
+import br.com.criptovision.repository.LucroDAOMySQL;
 import br.com.criptovision.repository.LucroRepository;
 
 // uma das classes mais importantes, aqui são feitos todos os calculos usando os dados que as outras classes fornecem
@@ -10,7 +11,9 @@ import br.com.criptovision.repository.LucroRepository;
 public class CarteiraService {
 
     // repositorio pra gravar os lucros toda vez que uma venda ocorre
-    private LucroRepository lucroRepo = new LucroRepository();
+    //private LucroRepository lucroRepo = new LucroRepository();
+
+    private LucroDAO lucroRepo = new LucroDAOMySQL();// agr usando a interface apontando para o MySQL
 
 
     // nesse metodo é atualizado o estado de uma moeda baseado numa transacao
