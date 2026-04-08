@@ -27,12 +27,7 @@ public class Main {
         Carteira minhaCarteira = new Carteira();
         HttpService httpTradutor = new HttpService();
 
-        for(Transacao tAntiga : historico){
-            String tickerOriginal = tAntiga.getTicker().toUpperCase();
-            // obterMoeda garante que não teremos objetos de moedas duplicados, exemplo : dois objetos para btc
-            Moeda m = minhaCarteira.obterMoeda(tickerOriginal, tickerOriginal);
-            carteira.processarTransacao(m, tAntiga);
-        }
+        carteira.reconstruirCarteira(minhaCarteira, historico);
 
         // o lopp while mantém o programa rodando até voce escolher "10" para sair
         int opcao = 0;
@@ -209,8 +204,7 @@ public class Main {
                     // Ver lucro total realizado
                     case 7:
                         System.out.println("\n--- total de lucros realizados até hoje ---");
-                        br.com.criptovision.repository.LucroDAO repoLucro = new br.com.criptovision.repository.LucroDAOMySQL();
-                        double totalRealizado = repoLucro.lerLucroTotal();
+                        double totalRealizado = carteira.obterLucroTotalRealizado();
                         
                         if(totalRealizado == 0){
                             System.out.println("Voce ainda nao realizou nenhum lucro");
