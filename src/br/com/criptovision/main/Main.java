@@ -6,30 +6,21 @@ import br.com.criptovision.model.Transacao;
 import br.com.criptovision.service.CarteiraService;
 import br.com.criptovision.service.HttpService;
 import br.com.criptovision.service.RelatorioService;
-import br.com.criptovision.repository.TransacaoDAO;
-import br.com.criptovision.repository.TransacaoDAOMySQL;
 import br.com.criptovision.util.InputUtils;
 import java.util.ArrayList;
 import java.util.List;
 
 public class Main {
     public static void main(String[] args) {
-        // criando os objetos que comandam a logica e os dados
-        CarteiraService carteira = new CarteiraService();
-        TransacaoDAO repositorio = new TransacaoDAOMySQL();
-
-        RelatorioService relatorioService = new RelatorioService();
-
-        //repositorio.realizarBackup(); // retirando pois o backup nao é de responsabilidade da aplicação, agr que temos o banco de dados isso nao faz mais sentido
         
-        // reconstroi e reprocessa todas as operações para gerar o saldo atual
-        List<Transacao> historico = repositorio.lerTudo();
-        Carteira minhaCarteira = new Carteira();
+        CarteiraService carteira = new CarteiraService();
+        RelatorioService relatorioService = new RelatorioService();
         HttpService httpTradutor = new HttpService();
+        Carteira minhaCarteira = new Carteira();
 
+        List<Transacao> historico = carteira.carregarHistoricoDeTransacoes();
         carteira.reconstruirCarteira(minhaCarteira, historico);
 
-        // o lopp while mantém o programa rodando até voce escolher "10" para sair
         int opcao = 0;
         while (opcao != 10){
             try{
@@ -48,32 +39,26 @@ public class Main {
                 opcao = InputUtils.lerInt("Escolha uma opção: ");
 
                 switch (opcao){
-                    // NOVA COMPRA
                     case 1:
                         try {
                             String ticker = InputUtils.lerString("Qual o Ticker da moeda (ex: BTC)? ");
                             
-                            HttpService httpService = new HttpService();
-                            // antes de aceitar, verifica se a binance reconhece esse ticker
                             System.out.println("Validando '" + ticker + "' na Binance...");
             
-                            if(!httpService.validarTicker(ticker)){
+                            if(!httpTradutor.validarTicker(ticker)){
                                 System.out.println("ERRO: Ativo não encontrado na Binance (par " + ticker + "USDT não existe).");
                                 break; 
                             }
 
                             Moeda moedaSelecionada = minhaCarteira.obterMoeda(ticker, ticker); 
-
                             double qtd = InputUtils.lerDouble("Quantidade comprada: ");
-
                             double preco = InputUtils.lerDouble("Preço unitário pago: ");
                             
-                            // cria a transacao, processa o preço medio e salva no historico e no csv
                             Transacao t = new Transacao(ticker, qtd, preco, "COMPRA");
+                            
                             carteira.processarTransacao(moedaSelecionada, t);
-                            historico.add(t);
-                            repositorio.salvar(t);
-                            System.out.println("Compra registrada com sucesso!");
+                            
+                            System.out.println("Compra registrada com sucesso no banco de dados!");
                         }catch(Exception e){
                             System.out.println("Erro na compra: " + e.getMessage());
                         }
@@ -82,8 +67,6 @@ public class Main {
                     case 2:
                         try{
                             String tickerVenda = InputUtils.lerString("Qual o Ticker da moeda para venda? ");
-
-                            // na binance, o identificador é o ticker
                             Moeda moedaVenda = minhaCarteira.obterMoeda(tickerVenda, tickerVenda);
 
                             if(moedaVenda.getSaldo() <= 0){
@@ -93,38 +76,29 @@ public class Main {
 
                             System.out.printf("Saldo disponível: %.8f\n", moedaVenda.getSaldo());
                             double qtdVenda = InputUtils.lerDouble("Quantidade a vender: ");
-                            
                             double precoVenda = InputUtils.lerDouble("Preço unitário de venda: ");
                             
                             Transacao tVenda = new Transacao(tickerVenda, qtdVenda, precoVenda, "VENDA");
                             
                             carteira.processarTransacao(moedaVenda, tVenda);
-                            
-                            historico.add(tVenda); 
-                            repositorio.salvar(tVenda);
 
                             System.out.println("\nVenda registrada com sucesso no banco de dados!");
 
                         }catch(br.com.criptovision.exception.SaldoInsuficienteException e){
                             System.out.println("\nERRO DE OPERAÇÃO: " + e.getMessage());
-
                         }catch(IllegalArgumentException e){
                             System.out.println("\nERRO DE VALOR: " + e.getMessage());
-
                         }catch(Exception e){
                             System.out.println("\nERRO GERAL: " + e.getMessage());
                         }
                         break;
                         
-                    // RESUMO DA CARTEIRA REATORADO
                     case 3: 
                         System.out.println("\n--- RESUMO DA CARTEIRA ---");
-                        HttpService serviceHttp = new HttpService();
-                        System.out.println("conectando a binance e fazando os calculos...");
+                        System.out.println("Conectando à Binance e fazendo os cálculos...");
                         
-                        double cotacaoDolar = serviceHttp.buscarCotacaoDolar();
-
-                        br.com.criptovision.dto.ResumoCarteiraDTO resumo = carteira.gerarResumoCompleto(minhaCarteira, serviceHttp);
+                        double cotacaoDolar = httpTradutor.buscarCotacaoDolar();
+                        br.com.criptovision.dto.ResumoCarteiraDTO resumo = carteira.gerarResumoCompleto(minhaCarteira, httpTradutor);
 
                         if(resumo.getValorTotalCarteira() == 0){
                             System.out.println("Erro: Não foi possível obter preços ou a carteira está vazia.");
@@ -149,31 +123,26 @@ public class Main {
                         System.out.println("---------------------------------------");
                         break;
 
-                    // Ver Saldo e Preço Médio
                     case 4:
                         System.out.println("\n--- MINHAS MOEDAS ---");
-                        for(Moeda m : minhaCarteira.getMoedas().values()){ // o ".values()" pega todos os objetos Moedas que estao guardados
+                        for(Moeda m : minhaCarteira.getMoedas().values()){ 
                             if(m.getSaldo() > 0){
                                 System.out.printf("Ativo: %s | Saldo: %.8f | Preço Médio: $ %.2f\n",m.getTicker(), m.getSaldo(), m.getPrecoMedio());
                             }
                         }
                         break;
 
-                    // Simular venda futura
-                    // Simular venda futura
                     case 5:
                         System.out.println("\n--- SIMULADOR DE VENDA FUTURA ---");
                         String tickerSim = InputUtils.lerString("Digite o Ticker da moeda que você possui (ex: BTC): ");
 
-                        // primeiro verifica se a moeda existe na carteira
                         if(minhaCarteira.getMoedas().containsKey(tickerSim)){
                             Moeda mSim = minhaCarteira.getMoedas().get(tickerSim);
                             
                             if(mSim.getSaldo() > 0){
                                 double precoFicticio = InputUtils.lerDouble("Digite o preço fictício de venda ($): ");
-
                                 double precoAtualMercado = httpTradutor.consultarPrecoPorTicker(tickerSim);
-                                double precoDolar = httpTradutor.buscarCotacaoDolar();
+                                double precoDolarCotacao = httpTradutor.buscarCotacaoDolar();
 
                                 br.com.criptovision.dto.SimulacaoVendaDTO simulacao = carteira.simularVendaFutura(mSim, precoFicticio, precoAtualMercado);
 
@@ -181,11 +150,11 @@ public class Main {
                                 System.out.printf("  Simulação para %s:\n \n", tickerSim);
                                 System.out.printf("  Saldo que você possui: %.8f\n", mSim.getSaldo());
                                 
-                                System.out.printf("  Valor que você possui em " + tickerSim + ": $ %.2f (R$ %.2f)\n \n", simulacao.getValorTotalAtual(), simulacao.getValorTotalAtual() * precoDolar);
+                                System.out.printf("  Valor que você possui em " + tickerSim + ": $ %.2f (R$ %.2f)\n \n", simulacao.getValorTotalAtual(), simulacao.getValorTotalAtual() * precoDolarCotacao);
                                 System.out.printf("******************************************************* \n");
                                 System.out.printf("  Se vender a: $ %.2f\n \n", precoFicticio);
-                                System.out.printf("  LUCRO ESTIMADO: $ %.2f (R$ %.2f) -> [%.2f%%]\n \n", simulacao.getLucroEstimado(), simulacao.getLucroEstimado() * precoDolar, simulacao.getPorcentagemLucro());
-                                System.out.printf("  SALDO TOTAL ESTIMADO: $ %.2f (R$ %.2f)\n", simulacao.getValorTotalFicticio(), simulacao.getValorTotalFicticio() * precoDolar);
+                                System.out.printf("  LUCRO ESTIMADO: $ %.2f (R$ %.2f) -> [%.2f%%]\n \n", simulacao.getLucroEstimado(), simulacao.getLucroEstimado() * precoDolarCotacao, simulacao.getPorcentagemLucro());
+                                System.out.printf("  SALDO TOTAL ESTIMADO: $ %.2f (R$ %.2f)\n", simulacao.getValorTotalFicticio(), simulacao.getValorTotalFicticio() * precoDolarCotacao);
                                 System.out.println("------------------------------------------------------");
                             }else{
                                 System.out.println("Você não possui saldo desta moeda para simular.");
@@ -195,13 +164,11 @@ public class Main {
                         }
                         break;
 
-                    // Gerar Relatório
                     case 6:
                         System.out.println("\n Gerando relatório...");
                         relatorioService.gerarRelatorio(new ArrayList<>(minhaCarteira.getMoedas().values()));
                         break;
                     
-                    // Ver lucro total realizado
                     case 7:
                         System.out.println("\n--- total de lucros realizados até hoje ---");
                         double totalRealizado = carteira.obterLucroTotalRealizado();
@@ -216,7 +183,6 @@ public class Main {
                         System.out.println("-----------------------------------------------------");
                         break;
 
-                    // Consultar preço em tempo real
                     case 8:
                         String tickerBusca = InputUtils.lerString("\nQual o Ticker da moeda para consulta rápida (ex: BTC, SOL, LNK)? ");
                         System.out.println("Consultando Binance...");
@@ -230,12 +196,10 @@ public class Main {
                         }
                         break;
 
-                    // Simular aporte (DCA)
                     case 9:
                         System.out.println("\n--- SIMULADOR DE APORTE (DCA) ---");
                         String tickerDCA = InputUtils.lerString("Digite o Ticker da moeda para simular (ex: BTC): ");
 
-                        // busca a moeda na carteira
                         Moeda moedaDCA = minhaCarteira.getMoedas().get(tickerDCA);
                         
                         if(moedaDCA == null || moedaDCA.getSaldo() <= 0){
@@ -275,7 +239,6 @@ public class Main {
                         }
                         break;
 
-                    // Sair do sistema
                     case 10:
                         System.out.println("Saindo...");
                         break;

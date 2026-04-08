@@ -14,35 +14,32 @@ public class CarteiraService {
 
     private LucroDAO lucroRepo = new LucroDAOMySQL();// agr usando a interface apontando para o MySQL
 
+    private br.com.criptovision.repository.TransacaoDAO transacaoRepo = new br.com.criptovision.repository.TransacaoDAOMySQL();
 
     // nesse metodo é atualizado o estado de uma moeda baseado numa transacao
     // ele é chamado e rechamado varias vezes quando o programa é iniciado para reconstruir seu saldo
-    public void processarTransacao(Moeda moeda, Transacao transacao) throws br.com.criptovision.exception.SaldoInsuficienteException{
 
-        // LOGICA DA COMPRA:
+    // metodo 1 que é usado na main
+    public void processarTransacao(br.com.criptovision.model.Moeda moeda, br.com.criptovision.model.Transacao transacao) throws br.com.criptovision.exception.SaldoInsuficienteException {
+        processarTransacao(moeda, transacao, true); // redireciona para o método de baixo
+    }
+
+    // metodo 2, o motor
+    public void processarTransacao(br.com.criptovision.model.Moeda moeda, br.com.criptovision.model.Transacao transacao, boolean salvarNoBanco) throws br.com.criptovision.exception.SaldoInsuficienteException {
+        
         if(transacao.getTipo().equals("COMPRA")){
-
-            // CALCULA O QUANTO SE TINHA INVESTIDO ANTES:
             double custoTotalAntigo = moeda.getSaldo() * moeda.getPrecoMedio();
-            // CALCULA O CUSTO DA NOVA COMPRA:
             double custoNovaCompra = transacao.getQuantidade() * transacao.getPrecoUnitario();
-            // O NOVO SALDO É A SOMA DAS QUANTIDADES:
             double novoSaldo = moeda.getSaldo() + transacao.getQuantidade();
-
-            // CALCULO DO PREÇO MEDIO:
             double novoPrecoMedio = (custoTotalAntigo + custoNovaCompra) / novoSaldo;
 
-            //atualizando os valores de saldo e preco medio:
             moeda.setSaldo(novoSaldo);
             moeda.setPrecoMedio(novoPrecoMedio);
 
-        // LOGICA DA VENDA:
         }else if(transacao.getTipo().equals("VENDA")){
-            
             if (transacao.getQuantidade() <= 0){
                 throw new IllegalArgumentException("A quantidade de venda deve ser maior que zero.");
             }
-
             if (transacao.getQuantidade() > moeda.getSaldo()){
                 throw new br.com.criptovision.exception.SaldoInsuficienteException(
                     "Saldo insuficiente para a venda! Você tentou vender " + transacao.getQuantidade() + 
@@ -50,16 +47,23 @@ public class CarteiraService {
                 );
             }
 
-            // CALCULO DE PNL (profit and loss):
             double custoParteVendida = transacao.getQuantidade() * moeda.getPrecoMedio();
             double valorRecebidoNaVenda = transacao.getQuantidade() * transacao.getPrecoUnitario();
             double lucroOperacao = valorRecebidoNaVenda - custoParteVendida;
 
+            if(this.lucroRepo == null) this.lucroRepo = new br.com.criptovision.repository.LucroDAOMySQL();
             lucroRepo.salvarLucroRealizado(moeda.getTicker(), lucroOperacao);
 
-            // atualização do saldo 
             moeda.setSaldo(moeda.getSaldo() - transacao.getQuantidade());
         }
+
+        if (salvarNoBanco){
+            this.transacaoRepo.salvar(transacao);
+        }
+    }
+
+    public java.util.List<br.com.criptovision.model.Transacao> carregarHistoricoDeTransacoes(){
+        return this.transacaoRepo.lerTudo();
     }
     
     // metodo muito importante e funcional, ele calcula quanto voce ganharia se vendesse tudo agora
@@ -129,11 +133,14 @@ public class CarteiraService {
     }
 
     // agora a reconstrução da carteira nao fica mais na main, fica aqui no service
-    public void reconstruirCarteira(br.com.criptovision.model.Carteira carteira, java.util.List<br.com.criptovision.model.Transacao> historico){
+    public void reconstruirCarteira(br.com.criptovision.model.Carteira carteira, java.util.List<br.com.criptovision.model.Transacao> historico) {
         for(br.com.criptovision.model.Transacao tAntiga : historico){
             String tickerOriginal = tAntiga.getTicker().toUpperCase();
             br.com.criptovision.model.Moeda m = carteira.obterMoeda(tickerOriginal, tickerOriginal);
-            processarTransacao(m, tAntiga);
+            try{
+                processarTransacao(m, tAntiga, false);
+            }catch(Exception e){
+            }
         }
     }
 
