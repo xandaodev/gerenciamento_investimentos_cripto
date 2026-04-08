@@ -128,6 +128,23 @@ public class CarteiraService {
         this.lucroRepo = lucroRepo;
     }
 
+    // agora a reconstrução da carteira nao fica mais na main, fica aqui no service
+    public void reconstruirCarteira(br.com.criptovision.model.Carteira carteira, java.util.List<br.com.criptovision.model.Transacao> historico){
+        for(br.com.criptovision.model.Transacao tAntiga : historico){
+            String tickerOriginal = tAntiga.getTicker().toUpperCase();
+            br.com.criptovision.model.Moeda m = carteira.obterMoeda(tickerOriginal, tickerOriginal);
+            processarTransacao(m, tAntiga);
+        }
+    }
+
+    // antes a propria main se conectava com o banco de dados, isso tava errado, agr temos esse metodo que faz esse trabalho pra ela
+    public double obterLucroTotalRealizado(){
+        if(this.lucroRepo == null){
+            this.lucroRepo = new br.com.criptovision.repository.LucroDAOMySQL();
+        }
+        return this.lucroRepo.lerLucroTotal();
+    }
+
     // METODOS DTO
 
     public br.com.criptovision.dto.SimulacaoVendaDTO simularVendaFutura(br.com.criptovision.model.Moeda moeda, double precoFicticio, double precoAtualMercado){
