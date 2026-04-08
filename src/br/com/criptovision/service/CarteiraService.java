@@ -142,5 +142,24 @@ public class CarteiraService {
     public void setLucroRepo(br.com.criptovision.repository.LucroDAO lucroRepo){
         this.lucroRepo = lucroRepo;
     }
+
+    public br.com.criptovision.dto.SimulacaoVendaDTO simularVendaFutura(br.com.criptovision.model.Moeda moeda, double precoFicticio, double precoAtualMercado){
+        
+        // calcula o lucro e a porcentagem
+        double lucroSimulado = calcularLucroPotencial(moeda, precoFicticio);
+        double porcSimulada = (lucroSimulado / (moeda.getSaldo() * moeda.getPrecoMedio())) * 100;
+
+        // calcula os totais
+        double valorTotalFicticio = moeda.getSaldo() * precoFicticio;
+        double valorTotalAtual = moeda.getSaldo() * precoAtualMercado;
+
+        //empacota tudo na caixa (DTO) e devolve para quem chamou
+        return new br.com.criptovision.dto.SimulacaoVendaDTO(
+            lucroSimulado, 
+            porcSimulada, 
+            valorTotalFicticio, 
+            valorTotalAtual
+        );
+    }
     
 }
