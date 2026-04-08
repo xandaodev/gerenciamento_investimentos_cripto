@@ -143,6 +143,8 @@ public class CarteiraService {
         this.lucroRepo = lucroRepo;
     }
 
+    // METODOS DTO
+
     public br.com.criptovision.dto.SimulacaoVendaDTO simularVendaFutura(br.com.criptovision.model.Moeda moeda, double precoFicticio, double precoAtualMercado){
         
         // calcula o lucro e a porcentagem
@@ -161,5 +163,38 @@ public class CarteiraService {
             valorTotalAtual
         );
     }
-    
+
+    // gera o resumo completo da carteira e empacota tudo num DTO
+    public br.com.criptovision.dto.ResumoCarteiraDTO gerarResumoCompleto(br.com.criptovision.model.Carteira carteira, br.com.criptovision.service.HttpService httpService){
+        
+        double totalCalculado = 0;
+        double pnlTotalGeral = 0;
+        double totalPatrimonioOntem = 0;
+        java.util.List<br.com.criptovision.dto.ResumoAtivoDTO> listaAtivos = new java.util.ArrayList<>();
+
+        for(br.com.criptovision.model.Moeda m : carteira.getMoedas().values()){
+            if(m.getSaldo() > 0){
+                double[] dadosApi = httpService.buscarPrecoEVariacao(m); 
+                double preco = dadosApi[0];
+                double variacao24h = dadosApi[1];
+
+                double valorNoAtivo = m.getSaldo() * preco;
+                double lucroDestaMoeda = calcularLucroPotencial(m, preco);
+                double porcentagemLucro = (lucroDestaMoeda / (m.getSaldo() * m.getPrecoMedio())) * 100;
+                
+                pnlTotalGeral += lucroDestaMoeda;
+                totalCalculado += valorNoAtivo;
+                totalPatrimonioOntem += valorNoAtivo / (1 + (variacao24h / 100)); 
+
+                listaAtivos.add(new br.com.criptovision.dto.ResumoAtivoDTO(
+                    m.getTicker(), m.getSaldo(), preco, valorNoAtivo, porcentagemLucro, variacao24h
+                ));
+            }
+        }
+        double varTotalCarteira = (totalPatrimonioOntem > 0) ? ((totalCalculado - totalPatrimonioOntem) / totalPatrimonioOntem) * 100 : 0;
+
+        return new br.com.criptovision.dto.ResumoCarteiraDTO(totalCalculado, pnlTotalGeral, varTotalCarteira, listaAtivos);
+    }
+
+
 }
