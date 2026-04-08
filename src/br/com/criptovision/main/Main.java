@@ -256,8 +256,26 @@ public class Main {
                             System.out.printf("Preço atual de mercado: $ %.2f\n", precoMercado);
                             double valorAporte = InputUtils.lerDouble("Quanto pretende investir agora (USD)? ");
 
-                            //novo metodo que ta em carteiraService:
-                            carteira.simularDCA(moedaDCA, valorAporte, precoMercado);
+                            br.com.criptovision.dto.SimulacaoDCADTO simulacaoDCA = carteira.simularDCA(moedaDCA, valorAporte, precoMercado);
+
+                            System.out.println("\n================ RESULTADO DA SIMULAÇÃO ================");
+                            System.out.printf(" Se você investir: $ %.2f com %s a $ %.2f\n", valorAporte, tickerDCA, precoMercado);
+                            System.out.printf(" Você irá comprar:    %.8f %s\n", simulacaoDCA.getQtdComprada(), tickerDCA);
+                            System.out.println("--------------------------------------------------------");
+                            System.out.printf(" Saldo:   %.8f  ->  Novo Saldo: %.8f\n", simulacaoDCA.getSaldoAtual(), simulacaoDCA.getNovoSaldoTotal());
+                            System.out.printf(" Preço Médio:      $ %.2f      ->  Novo Preço Médio:    $ %.2f\n", simulacaoDCA.getPmAtual(), simulacaoDCA.getNovoPM());
+
+                            if (simulacaoDCA.getNovoPM() < simulacaoDCA.getPmAtual()){
+                                System.out.printf(" Seu Preço Médio cairia %.2f%%!\n", Math.abs(simulacaoDCA.getDiferencaPM()));
+                            }else{
+                                System.out.printf(" Seu Preço Médio subiria %.2f%%.\n", simulacaoDCA.getDiferencaPM());
+                            }
+                            
+                            if(simulacaoDCA.getValorizacaoNecessaria() > 0){
+                                System.out.printf(" A moeda precisa subir %.2f%% para atingir o novo Preço Médio.\n", simulacaoDCA.getValorizacaoNecessaria());
+                            }
+                            System.out.println("===================================================================");
+
                         }else{
                             System.out.println("Erro ao buscar preço. Tente novamente.");
                         }
