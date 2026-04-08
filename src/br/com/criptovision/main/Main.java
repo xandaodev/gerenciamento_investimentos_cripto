@@ -193,6 +193,7 @@ public class Main {
                         break;
 
                     // Simular venda futura
+                    // Simular venda futura
                     case 5:
                         System.out.println("\n--- SIMULADOR DE VENDA FUTURA ---");
                         String tickerSim = InputUtils.lerString("Digite o Ticker da moeda que você possui (ex: BTC): ");
@@ -204,29 +205,20 @@ public class Main {
                             if(mSim.getSaldo() > 0){
                                 double precoFicticio = InputUtils.lerDouble("Digite o preço fictício de venda ($): ");
 
-                                // chama o calculo de lucro potencial do carteiraService
-                                double lucroSimulado = carteira.calcularLucroPotencial(mSim, precoFicticio);
-                                // calcula a porcentagem 
-                                double porcSimulada = (lucroSimulado / (mSim.getSaldo() * mSim.getPrecoMedio())) * 100;
+                                double precoAtualMercado = httpTradutor.consultarPrecoPorTicker(tickerSim);
+                                double precoDolar = httpTradutor.buscarCotacaoDolar();
 
-                                // variavel pra armazenar o valor total do usuario em uma cripto se ela chegasse a aquele preço
-                                double valorTotalFicticio = mSim.getSaldo() * precoFicticio;
-
-                                // calcula o valor total atual da carteira nesse ativo
-                                double precoAtual = httpTradutor.consultarPrecoPorTicker(tickerSim);
-                                double valorTotalAtual = mSim.getSaldo() * precoAtual;
-
-                                double precoDolar = httpTradutor.buscarCotacaoDolar();//busca o preço do dolar
-
+                                br.com.criptovision.dto.SimulacaoVendaDTO simulacao = carteira.simularVendaFutura(mSim, precoFicticio, precoAtualMercado);
 
                                 System.out.println("\n------------------------------------------------------");
                                 System.out.printf("  Simulação para %s:\n \n", tickerSim);
                                 System.out.printf("  Saldo que você possui: %.8f\n", mSim.getSaldo());
-                                System.out.printf("  Valor que você possui em " + tickerSim + ": $ %.2f (R$ %.2f)\n \n", valorTotalAtual, valorTotalAtual * precoDolar);
+                                
+                                System.out.printf("  Valor que você possui em " + tickerSim + ": $ %.2f (R$ %.2f)\n \n", simulacao.getValorTotalAtual(), simulacao.getValorTotalAtual() * precoDolar);
                                 System.out.printf("******************************************************* \n");
                                 System.out.printf("  Se vender a: $ %.2f\n \n", precoFicticio);
-                                System.out.printf("  LUCRO ESTIMADO: $ %.2f (R$ %.2f) -> [%.2f%%]\n \n", lucroSimulado,lucroSimulado * precoDolar, porcSimulada);
-                                System.out.printf("  SALDO TOTAL ESTIMADO: $ %.2f (R$ %.2f)\n", valorTotalFicticio, valorTotalFicticio*precoDolar);
+                                System.out.printf("  LUCRO ESTIMADO: $ %.2f (R$ %.2f) -> [%.2f%%]\n \n", simulacao.getLucroEstimado(), simulacao.getLucroEstimado() * precoDolar, simulacao.getPorcentagemLucro());
+                                System.out.printf("  SALDO TOTAL ESTIMADO: $ %.2f (R$ %.2f)\n", simulacao.getValorTotalFicticio(), simulacao.getValorTotalFicticio() * precoDolar);
                                 System.out.println("------------------------------------------------------");
                             }else{
                                 System.out.println("Você não possui saldo desta moeda para simular.");
