@@ -121,62 +121,34 @@ public class Main {
                         }
                         break;
                         
-                    // RESUMO DA CARTEIRA
+                    // RESUMO DA CARTEIRA REATORADO
                     case 3: 
                         System.out.println("\n--- RESUMO DA CARTEIRA ---");
                         HttpService serviceHttp = new HttpService();
-                        
-                        double totalCalculado = 0;
-                        double pnlTotalGeral = 0;
-                        double totalPatrimonioOntem = 0;
-                        java.util.Map<String, Double> valoresPorMoeda = new java.util.HashMap<>();
-                        java.util.Map<String, Double> variacoesPorMoeda = new java.util.HashMap<>();
-
-                        System.out.println("Atualizando preços na Binance...");
+                        System.out.println("conectando a binance e fazando os calculos...");
                         
                         double cotacaoDolar = serviceHttp.buscarCotacaoDolar();
 
-                        for(Moeda m : minhaCarteira.getMoedas().values()){
-                            if(m.getSaldo() > 0){
-                                double[] dadosApi = serviceHttp.buscarPrecoEVariacao(m); 
-                                double preco = dadosApi[0];
-                                double variacao24h = dadosApi[1];
+                        br.com.criptovision.dto.ResumoCarteiraDTO resumo = carteira.gerarResumoCompleto(minhaCarteira, serviceHttp);
 
-                                double valorNoAtivo = m.getSaldo() * preco;
-                                double lucroDestaMoeda = carteira.calcularLucroPotencial(m, preco);
-                                
-                                pnlTotalGeral += lucroDestaMoeda;
-                                valoresPorMoeda.put(m.getTicker(), valorNoAtivo);
-                                variacoesPorMoeda.put(m.getTicker(), variacao24h);
-                                totalCalculado += valorNoAtivo;
-                                totalPatrimonioOntem += valorNoAtivo / (1 + (variacao24h / 100));
-                            }
-                        }
-
-                        if(totalCalculado == 0){
-                            System.out.println("Erro: Não foi possível obter preços ou carteira vazia.");
+                        if(resumo.getValorTotalCarteira() == 0){
+                            System.out.println("Erro: Não foi possível obter preços ou a carteira está vazia.");
                         }else{
-                            System.out.printf("VALOR TOTAL DA CARTEIRA: $ %.2f (R$ %.2f)\n", totalCalculado, (totalCalculado * cotacaoDolar));
+                            System.out.printf("VALOR TOTAL DA CARTEIRA: $ %.2f (R$ %.2f)\n", resumo.getValorTotalCarteira(), (resumo.getValorTotalCarteira() * cotacaoDolar));
                             
-                            double varTotalCarteira = (totalPatrimonioOntem > 0) ? ((totalCalculado - totalPatrimonioOntem) / totalPatrimonioOntem) * 100 : 0;
-                            String iconeCarteira = (varTotalCarteira >= 0) ? "[+]" : "[-]";
-                            System.out.printf("VARIAÇÃO 24H DA CARTEIRA: %s %+.2f%%\n", iconeCarteira, varTotalCarteira);
+                            String iconeCarteira = (resumo.getVariacao24hCarteira() >= 0) ? "[+]" : "[-]";
+                            System.out.printf("VARIAÇÃO 24H DA CARTEIRA: %s %+.2f%%\n", iconeCarteira, resumo.getVariacao24hCarteira());
 
-                            String status = (pnlTotalGeral >= 0) ? "LUCRO" : "PREJUIZO";
-                            System.out.printf("PNL GERAL DA CARTEIRA: $ %.2f  (R$ %.2f) (%s)\n", pnlTotalGeral,(pnlTotalGeral * cotacaoDolar), status);
+                            String status = (resumo.getPnlGeral() >= 0) ? "LUCRO" : "PREJUÍZO";
+                            System.out.printf("PNL GERAL DA CARTEIRA: $ %.2f  (R$ %.2f) (%s)\n", resumo.getPnlGeral(),(resumo.getPnlGeral() * cotacaoDolar), status);
                             System.out.println("---------------------------------------");
                             System.out.println("Distribuição por Ativo:");
 
-                            for(Moeda m : minhaCarteira.getMoedas().values()){
-                                if(m.getSaldo() > 0){
-                                    double valorAtivo = valoresPorMoeda.get(m.getTicker());
-                                    double percentagem = (valorAtivo / totalCalculado) * 100;
+                            for(br.com.criptovision.dto.ResumoAtivoDTO ativo : resumo.getAtivos()){
+                                double percentagem = (ativo.getValorTotalUSD() / resumo.getValorTotalCarteira()) * 100;
+                                String icone24h = (ativo.getVariacao24h() >= 0) ? "[+]" : "[-]";
 
-                                    double var24h = variacoesPorMoeda.get(m.getTicker());
-                                    String icone24h = (var24h >= 0) ? "[+]" : "[-]";
-
-                                    System.out.printf("   %s: $ %.2f (%.1f%%) | VAR 24H: %s %+.2f%%\n", m.getTicker(), valorAtivo, percentagem, icone24h, var24h);
-                                }
+                                System.out.printf("   %s: $ %.2f (%.1f%%) | VAR 24H: %s %+.2f%%\n", ativo.getTicker(), ativo.getValorTotalUSD(), percentagem, icone24h, ativo.getVariacao24h());
                             }
                         }
                         System.out.println("---------------------------------------");
