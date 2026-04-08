@@ -97,9 +97,8 @@ public class CarteiraService {
         return pnlTotal;
     }
 
-    //novo metodo para calcular, antes era feito na propria main
-    public void simularDCA(Moeda moeda, double valorAporteUSD, double precoMercado){
-
+    // agr o metodo puro, sem prints, apenas regra de negócio
+    public br.com.criptovision.dto.SimulacaoDCADTO simularDCA(br.com.criptovision.model.Moeda moeda, double valorAporteUSD, double precoMercado){
         double saldoAtual = moeda.getSaldo();
         double pmAtual = moeda.getPrecoMedio();
         double custoTotalAtual = saldoAtual * pmAtual;
@@ -115,27 +114,13 @@ public class CarteiraService {
         // diferenças em porcentagem do preço medio
         double diferencaPM = ((novoPM - pmAtual) / pmAtual) * 100;
 
-        // exibião e formatação no terminal
-        System.out.println("\n================ RESULTADO DA SIMULAÇÃO ================");
-        System.out.printf(" Se você investir: $ %.2f com %s a $ %.2f\n", valorAporteUSD, moeda.getTicker(), precoMercado);
-        System.out.printf(" Você irá comprar:    %.8f %s\n", qtdComprada, moeda.getTicker());
-        System.out.println("--------------------------------------------------------");
-        System.out.printf(" Saldo:   %.8f  ->  Novo Saldo: %.8f\n", saldoAtual, novoSaldoTotal);
-        System.out.printf(" Preço Médio:      $ %.2f      ->  Novo Preço Médio:    $ %.2f\n", pmAtual, novoPM);
-
-        if (novoPM < pmAtual){
-            System.out.printf(" Seu Preço Médio cairia %.2f%%!\n", Math.abs(diferencaPM));
-        }else{
-            System.out.printf(" Seu Preço Médio subiria %.2f%%.\n", diferencaPM);
-        }
-        
-        // PONTO DE EQUILIBRIO
-        // Mostra quanto a moeda precisa valorizar para você começar a ter lucro após esse aporte
+        //mostra quanto a moeda precisa valorizar para começar a ter lucro
         double valorizacaoNecessaria = ((novoPM / precoMercado) - 1) * 100;
-        if(valorizacaoNecessaria > 0){
-            System.out.printf(" A moeda precisa subir %.2f%% para atingir o novo Preço Médio.\n", valorizacaoNecessaria);
-        }
-        System.out.println("===================================================================");
+
+        // empacota tudo na caixa e devolve
+        return new br.com.criptovision.dto.SimulacaoDCADTO(
+            qtdComprada, saldoAtual, novoSaldoTotal, pmAtual, novoPM, diferencaPM, valorizacaoNecessaria
+        );
     }
 
     // método criado para permitir a injeção de um DAO falso durante os testes
