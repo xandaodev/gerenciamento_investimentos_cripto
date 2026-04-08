@@ -12,6 +12,28 @@ import br.com.criptovision.model.Moeda;
 
 public class HttpService {
 
+    // novo metodo que busca o preço e a variação nas ultimas 24h
+    public double[] buscarPrecoEVariacao(Moeda moeda) {
+        String t = moeda.getTicker().toUpperCase().trim();
+        
+        if (t.equals("USDT")) return new double[]{1.0, 0.0}; 
+        if (t.equals("BITCOIN")) t = "BTC";
+        if (t.equals("SOLANA")) t = "SOL";
+        if (t.equals("CHAINLINK")) t = "LINK";
+        if (t.equals("ETHEREUM")) t = "ETH";
+
+        String url = "https://api.binance.com/api/v3/ticker/24hr?symbol=" + t + "USDT";
+        String json = realizarChamada(url);
+        
+        if (json == null) return new double[]{0.0, 0.0};
+
+        // extrai usando o novo metodo auxiliar generico
+        double preco = extrairValorJsonGenerico(json, "\"lastPrice\":\"");
+        double variacao = extrairValorJsonGenerico(json, "\"priceChangePercent\":\"");
+
+        return new double[]{preco, variacao};
+    }
+
     // busca o preço de uma moeda da carteira
     public double buscarPrecoAtual(Moeda moeda){
         String t = moeda.getTicker().toUpperCase().trim();
@@ -87,6 +109,20 @@ public class HttpService {
             return null;
         }catch(Exception e){
             return null;
+        }
+    }
+
+    // extrai qualquer valor da binance passando a chave
+    private double extrairValorJsonGenerico(String json, String chaveDeBusca){
+        if (json == null) return 0;
+        try{
+            String[] partes = json.split(chaveDeBusca);
+            if (partes.length < 2) return 0;
+            
+            String valorString = partes[1].split("\"")[0];
+            return Double.parseDouble(valorString);
+        }catch(Exception e){
+            return 0;
         }
     }
 
