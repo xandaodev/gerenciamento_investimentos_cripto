@@ -128,7 +128,9 @@ public class Main {
                         
                         double totalCalculado = 0;
                         double pnlTotalGeral = 0;
+                        double totalPatrimonioOntem = 0;
                         java.util.Map<String, Double> valoresPorMoeda = new java.util.HashMap<>();
+                        java.util.Map<String, Double> variacoesPorMoeda = new java.util.HashMap<>();
 
                         System.out.println("Atualizando preços na Binance...");
                         
@@ -136,13 +138,18 @@ public class Main {
 
                         for(Moeda m : minhaCarteira.getMoedas().values()){
                             if(m.getSaldo() > 0){
-                                // busca o preço pra ver quanto vale seu saldo agora
-                                double preco = serviceHttp.buscarPrecoAtual(m); 
+                                double[] dadosApi = serviceHttp.buscarPrecoEVariacao(m); 
+                                double preco = dadosApi[0];
+                                double variacao24h = dadosApi[1];
+
                                 double valorNoAtivo = m.getSaldo() * preco;
                                 double lucroDestaMoeda = carteira.calcularLucroPotencial(m, preco);
+                                
                                 pnlTotalGeral += lucroDestaMoeda;
                                 valoresPorMoeda.put(m.getTicker(), valorNoAtivo);
+                                variacoesPorMoeda.put(m.getTicker(), variacao24h);
                                 totalCalculado += valorNoAtivo;
+                                totalPatrimonioOntem += valorNoAtivo / (1 + (variacao24h / 100));
                             }
                         }
 
@@ -150,6 +157,11 @@ public class Main {
                             System.out.println("Erro: Não foi possível obter preços ou carteira vazia.");
                         }else{
                             System.out.printf("VALOR TOTAL DA CARTEIRA: $ %.2f (R$ %.2f)\n", totalCalculado, (totalCalculado * cotacaoDolar));
+                            
+                            double varTotalCarteira = (totalPatrimonioOntem > 0) ? ((totalCalculado - totalPatrimonioOntem) / totalPatrimonioOntem) * 100 : 0;
+                            String iconeCarteira = (varTotalCarteira >= 0) ? "[+]" : "[-]";
+                            System.out.printf("VARIAÇÃO 24H DA CARTEIRA: %s %+.2f%%\n", iconeCarteira, varTotalCarteira);
+
                             String status = (pnlTotalGeral >= 0) ? "LUCRO" : "PREJUIZO";
                             System.out.printf("PNL GERAL DA CARTEIRA: $ %.2f  (R$ %.2f) (%s)\n", pnlTotalGeral,(pnlTotalGeral * cotacaoDolar), status);
                             System.out.println("---------------------------------------");
@@ -160,7 +172,10 @@ public class Main {
                                     double valorAtivo = valoresPorMoeda.get(m.getTicker());
                                     double percentagem = (valorAtivo / totalCalculado) * 100;
 
-                                    System.out.printf("   %s: $ %.2f (%.1f%%)\n", m.getTicker(), valorAtivo, percentagem);
+                                    double var24h = variacoesPorMoeda.get(m.getTicker());
+                                    String icone24h = (var24h >= 0) ? "[+]" : "[-]";
+
+                                    System.out.printf("   %s: $ %.2f (%.1f%%) | VAR 24H: %s %+.2f%%\n", m.getTicker(), valorAtivo, percentagem, icone24h, var24h);
                                 }
                             }
                         }
