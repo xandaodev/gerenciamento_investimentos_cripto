@@ -9,6 +9,8 @@ public class Moeda {
     private double saldo;
     private double precoMedio;
 
+    private double variacao24h;
+
     public Moeda(String nome, String ticker){
         this.nome = nome.toLowerCase();
         this.ticker = ticker.toUpperCase();
@@ -24,4 +26,7 @@ public class Moeda {
     public void setSaldo(double saldo) { this.saldo = saldo; }
     public double getPrecoMedio() { return precoMedio; }
     public void setPrecoMedio(double precoMedio) { this.precoMedio = precoMedio; }
+
+    public double getVariacao24h(){ return variacao24h; }
+    public void setVariacao24h(double variacao24h){ this.variacao24h = variacao24h; }
 }
