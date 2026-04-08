@@ -31,25 +31,34 @@ public class TickerView {
 
         double pnlTotalGeral = 0;
         double valorTotalPatrimonio = 0;
+        double valorPatrimonioOntem = 0; // calcula a variação da carteira toda
         double cotacaoDolarResumo = http.buscarCotacaoDolar();
 
         System.out.printf("  Cotação do Dólar: R$ %.2f\n", cotacaoDolarResumo);
-        System.out.println("----------------------------------------------------------------------------------");
+        System.out.println("---------------------------------------------------------------------------------------------");
         
-        System.out.println("  ATIVO      QUANTIDADE          PREÇO ATUAL      VALOR (USD)      PNL (%)");
-        System.out.println("  ----------------------------------------------------------------------------------");
+        System.out.println("  ATIVO      QUANTIDADE          PREÇO ATUAL      VALOR (USD)      PNL (%)      VAR 24H");
+        System.out.println("  ---------------------------------------------------------------------------------------------");
 
         for(Moeda m : carteira.getMoedas().values()){
             if(m.getSaldo() > 0){
-                double precoAtual = http.buscarPrecoAtual(m);
+                double[] dadosApi = http.buscarPrecoEVariacao(m);
+                double precoAtual = dadosApi[0];
+                double variacao24h = dadosApi[1];
+
                 double lucro = service.calcularLucroPotencial(m, precoAtual);
                 double valorNoAtivo = m.getSaldo() * precoAtual;
                 double porcentagem = (lucro / (m.getSaldo() * m.getPrecoMedio())) * 100;
                 
                 pnlTotalGeral += lucro;
                 valorTotalPatrimonio += valorNoAtivo;
+                
+                // regra de 3 para descobrir quanto essa moeda valia ontem na sua carteira
+                valorPatrimonioOntem += valorNoAtivo / (1 + (variacao24h / 100));
 
-                System.out.printf("  %-10s %-18.8f $ %-12.2f $ %-14.2f %+.2f%%\n",m.getTicker(), m.getSaldo(), precoAtual, valorNoAtivo, porcentagem);
+                String icone24h = (variacao24h >= 0) ? "[+]" : "[-]";
+
+                System.out.printf("  %-10s %-18.8f $ %-12.2f $ %-14.2f %-11.2f%% %s %+.2f%%\n",m.getTicker(), m.getSaldo(), precoAtual, valorNoAtivo, porcentagem, icone24h, variacao24h);
                 System.out.print("\n");
             }
         }
@@ -57,10 +66,16 @@ public class TickerView {
         String statusGeral = (pnlTotalGeral >= 0) ? "LUCRO" : "PREJUÍZO";
         String sinalGeral = (pnlTotalGeral >= 0) ? "[+]" : "[-]";
 
-        System.out.println("----------------------------------------------------------------------------------");
+        System.out.println("---------------------------------------------------------------------------------------------");
         System.out.println("\n  >>> RESUMO GERAL");
         System.out.printf("  PATRIMÔNIO TOTAL : $ %.2f  |  (R$ %.2f)\n", 
                 valorTotalPatrimonio, (valorTotalPatrimonio * cotacaoDolarResumo));
+        
+        double variacaoTotalCarteira = (valorPatrimonioOntem > 0) ? ((valorTotalPatrimonio - valorPatrimonioOntem) / valorPatrimonioOntem) * 100 : 0;
+        
+        String iconeCarteira = (variacaoTotalCarteira >= 0) ? "[+]" : "[-]";
+        System.out.printf("  VARIAÇÃO 24H     : %s %+.2f%%\n", iconeCarteira, variacaoTotalCarteira);
+
         System.out.printf("  PNL GERAL        : %s $ %.2f  |  (R$ %.2f) [%s]\n", 
                 sinalGeral, pnlTotalGeral, (pnlTotalGeral * cotacaoDolarResumo), statusGeral);
         System.out.println("==================================================================================");
