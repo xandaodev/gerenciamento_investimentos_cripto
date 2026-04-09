@@ -6,9 +6,16 @@ import br.com.criptovision.model.Transacao;
 import br.com.criptovision.service.CarteiraService;
 import br.com.criptovision.service.HttpService;
 import br.com.criptovision.service.RelatorioService;
+import br.com.criptovision.exception.*;
 import br.com.criptovision.util.InputUtils;
 import java.util.ArrayList;
 import java.util.List;
+
+import br.com.criptovision.dto.ResumoCarteiraDTO;
+import br.com.criptovision.dto.ResumoAtivoDTO;
+import br.com.criptovision.dto.SimulacaoVendaDTO;
+import br.com.criptovision.dto.SimulacaoDCADTO;
+
 
 public class Main {
     public static void main(String[] args) {
@@ -84,7 +91,7 @@ public class Main {
 
                             System.out.println("\nVenda registrada com sucesso no banco de dados!");
 
-                        }catch(br.com.criptovision.exception.SaldoInsuficienteException e){
+                        }catch(SaldoInsuficienteException e){
                             System.out.println("\nERRO DE OPERAÇÃO: " + e.getMessage());
                         }catch(IllegalArgumentException e){
                             System.out.println("\nERRO DE VALOR: " + e.getMessage());
@@ -98,7 +105,7 @@ public class Main {
                         System.out.println("Conectando à Binance e fazendo os cálculos...");
                         
                         double cotacaoDolar = httpTradutor.buscarCotacaoDolar();
-                        br.com.criptovision.dto.ResumoCarteiraDTO resumo = carteira.gerarResumoCompleto(minhaCarteira, httpTradutor);
+                        ResumoCarteiraDTO resumo = carteira.gerarResumoCompleto(minhaCarteira, httpTradutor);
 
                         if(resumo.getValorTotalCarteira() == 0){
                             System.out.println("Erro: Não foi possível obter preços ou a carteira está vazia.");
@@ -113,7 +120,7 @@ public class Main {
                             System.out.println("---------------------------------------");
                             System.out.println("Distribuição por Ativo:");
 
-                            for(br.com.criptovision.dto.ResumoAtivoDTO ativo : resumo.getAtivos()){
+                            for(ResumoAtivoDTO ativo : resumo.getAtivos()){
                                 double percentagem = (ativo.getValorTotalUSD() / resumo.getValorTotalCarteira()) * 100;
                                 String icone24h = (ativo.getVariacao24h() >= 0) ? "[+]" : "[-]";
 
@@ -144,7 +151,7 @@ public class Main {
                                 double precoAtualMercado = httpTradutor.consultarPrecoPorTicker(tickerSim);
                                 double precoDolarCotacao = httpTradutor.buscarCotacaoDolar();
 
-                                br.com.criptovision.dto.SimulacaoVendaDTO simulacao = carteira.simularVendaFutura(mSim, precoFicticio, precoAtualMercado);
+                                SimulacaoVendaDTO simulacao = carteira.simularVendaFutura(mSim, precoFicticio, precoAtualMercado);
 
                                 System.out.println("\n------------------------------------------------------");
                                 System.out.printf("  Simulação para %s:\n \n", tickerSim);
@@ -214,7 +221,7 @@ public class Main {
                             System.out.printf("Preço atual de mercado: $ %.2f\n", precoMercado);
                             double valorAporte = InputUtils.lerDouble("Quanto pretende investir agora (USD)? ");
 
-                            br.com.criptovision.dto.SimulacaoDCADTO simulacaoDCA = carteira.simularDCA(moedaDCA, valorAporte, precoMercado);
+                            SimulacaoDCADTO simulacaoDCA = carteira.simularDCA(moedaDCA, valorAporte, precoMercado);
 
                             System.out.println("\n================ RESULTADO DA SIMULAÇÃO ================");
                             System.out.printf(" Se você investir: $ %.2f com %s a $ %.2f\n", valorAporte, tickerDCA, precoMercado);

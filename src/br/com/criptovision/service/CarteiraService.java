@@ -2,8 +2,19 @@ package br.com.criptovision.service;
 
 import br.com.criptovision.model.Moeda;
 import br.com.criptovision.model.Transacao;
+import br.com.criptovision.model.Carteira;
 import br.com.criptovision.repository.LucroDAO;
 import br.com.criptovision.repository.LucroDAOMySQL;
+import br.com.criptovision.repository.TransacaoDAO;
+import br.com.criptovision.repository.TransacaoDAOMySQL;
+import br.com.criptovision.exception.SaldoInsuficienteException;
+import br.com.criptovision.dto.ResumoCarteiraDTO;
+import br.com.criptovision.dto.ResumoAtivoDTO;
+import br.com.criptovision.dto.SimulacaoVendaDTO;
+import br.com.criptovision.dto.SimulacaoDCADTO;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Map;
 
 // uma das classes mais importantes, aqui são feitos todos os calculos usando os dados que as outras classes fornecem
 
@@ -14,18 +25,18 @@ public class CarteiraService {
 
     private LucroDAO lucroRepo = new LucroDAOMySQL();// agr usando a interface apontando para o MySQL
 
-    private br.com.criptovision.repository.TransacaoDAO transacaoRepo = new br.com.criptovision.repository.TransacaoDAOMySQL();
+    private TransacaoDAO transacaoRepo = new TransacaoDAOMySQL();
 
     // nesse metodo é atualizado o estado de uma moeda baseado numa transacao
     // ele é chamado e rechamado varias vezes quando o programa é iniciado para reconstruir seu saldo
 
     // metodo 1 que é usado na main
-    public void processarTransacao(br.com.criptovision.model.Moeda moeda, br.com.criptovision.model.Transacao transacao) throws br.com.criptovision.exception.SaldoInsuficienteException {
+    public void processarTransacao(Moeda moeda, Transacao transacao) throws SaldoInsuficienteException {
         processarTransacao(moeda, transacao, true); // redireciona para o método de baixo
     }
 
     // metodo 2, o motor
-    public void processarTransacao(br.com.criptovision.model.Moeda moeda, br.com.criptovision.model.Transacao transacao, boolean salvarNoBanco) throws br.com.criptovision.exception.SaldoInsuficienteException {
+    public void processarTransacao(Moeda moeda, Transacao transacao, boolean salvarNoBanco) throws SaldoInsuficienteException {
         
         if(transacao.getTipo().equals("COMPRA")){
             double custoTotalAntigo = moeda.getSaldo() * moeda.getPrecoMedio();
@@ -41,7 +52,7 @@ public class CarteiraService {
                 throw new IllegalArgumentException("A quantidade de venda deve ser maior que zero.");
             }
             if (transacao.getQuantidade() > moeda.getSaldo()){
-                throw new br.com.criptovision.exception.SaldoInsuficienteException(
+                throw new SaldoInsuficienteException(
                     "Saldo insuficiente para a venda! Você tentou vender " + transacao.getQuantidade() + 
                     ", mas possui apenas " + moeda.getSaldo() + " de " + moeda.getTicker()
                 );
@@ -51,7 +62,7 @@ public class CarteiraService {
             double valorRecebidoNaVenda = transacao.getQuantidade() * transacao.getPrecoUnitario();
             double lucroOperacao = valorRecebidoNaVenda - custoParteVendida;
 
-            if(this.lucroRepo == null) this.lucroRepo = new br.com.criptovision.repository.LucroDAOMySQL();
+            if(this.lucroRepo == null) this.lucroRepo = new LucroDAOMySQL();
             lucroRepo.salvarLucroRealizado(moeda.getTicker(), lucroOperacao);
 
             moeda.setSaldo(moeda.getSaldo() - transacao.getQuantidade());
@@ -62,7 +73,7 @@ public class CarteiraService {
         }
     }
 
-    public java.util.List<br.com.criptovision.model.Transacao> carregarHistoricoDeTransacoes(){
+    public List<Transacao> carregarHistoricoDeTransacoes(){
         return this.transacaoRepo.lerTudo();
     }
     
@@ -78,7 +89,7 @@ public class CarteiraService {
     }
 
     //metodo para calcular valor total da carteira, ele soma o valor de todas as suas moedas da carteira a preço atual de mercado
-    public double calcularValorTotalCarteira(java.util.Map<String, Moeda> moedas, HttpService http){
+    public double calcularValorTotalCarteira(Map<String, Moeda> moedas, HttpService http){
         double valorTotal = 0;
         for(Moeda m : moedas.values()){
             if(m.getSaldo() > 0){
@@ -90,7 +101,7 @@ public class CarteiraService {
     }
 
     //esse metodo soma o lucro/prejuizo individual de cada moeda que voce tem na carteira e calcula o pnl total dela
-    public double calcularPnlTotal(java.util.Map<String, Moeda> moedas, HttpService http){
+    public double calcularPnlTotal(Map<String, Moeda> moedas, HttpService http){
         double pnlTotal = 0;
         for(Moeda m : moedas.values()){
             if(m.getSaldo() > 0){
@@ -102,7 +113,7 @@ public class CarteiraService {
     }
 
     // agr o metodo puro, sem prints, apenas regra de negócio
-    public br.com.criptovision.dto.SimulacaoDCADTO simularDCA(br.com.criptovision.model.Moeda moeda, double valorAporteUSD, double precoMercado){
+    public SimulacaoDCADTO simularDCA(Moeda moeda, double valorAporteUSD, double precoMercado){
         double saldoAtual = moeda.getSaldo();
         double pmAtual = moeda.getPrecoMedio();
         double custoTotalAtual = saldoAtual * pmAtual;
@@ -122,21 +133,21 @@ public class CarteiraService {
         double valorizacaoNecessaria = ((novoPM / precoMercado) - 1) * 100;
 
         // empacota tudo na caixa e devolve
-        return new br.com.criptovision.dto.SimulacaoDCADTO(
+        return new SimulacaoDCADTO(
             qtdComprada, saldoAtual, novoSaldoTotal, pmAtual, novoPM, diferencaPM, valorizacaoNecessaria
         );
     }
 
     // método criado para permitir a injeção de um DAO falso durante os testes
-    public void setLucroRepo(br.com.criptovision.repository.LucroDAO lucroRepo){
+    public void setLucroRepo(LucroDAO lucroRepo){
         this.lucroRepo = lucroRepo;
     }
 
     // agora a reconstrução da carteira nao fica mais na main, fica aqui no service
-    public void reconstruirCarteira(br.com.criptovision.model.Carteira carteira, java.util.List<br.com.criptovision.model.Transacao> historico) {
-        for(br.com.criptovision.model.Transacao tAntiga : historico){
+    public void reconstruirCarteira(Carteira carteira, List<Transacao> historico) {
+        for(Transacao tAntiga : historico){
             String tickerOriginal = tAntiga.getTicker().toUpperCase();
-            br.com.criptovision.model.Moeda m = carteira.obterMoeda(tickerOriginal, tickerOriginal);
+            Moeda m = carteira.obterMoeda(tickerOriginal, tickerOriginal);
             try{
                 processarTransacao(m, tAntiga, false);
             }catch(Exception e){
@@ -147,14 +158,14 @@ public class CarteiraService {
     // antes a propria main se conectava com o banco de dados, isso tava errado, agr temos esse metodo que faz esse trabalho pra ela
     public double obterLucroTotalRealizado(){
         if(this.lucroRepo == null){
-            this.lucroRepo = new br.com.criptovision.repository.LucroDAOMySQL();
+            this.lucroRepo = new LucroDAOMySQL();
         }
         return this.lucroRepo.lerLucroTotal();
     }
 
     // METODOS DTO
 
-    public br.com.criptovision.dto.SimulacaoVendaDTO simularVendaFutura(br.com.criptovision.model.Moeda moeda, double precoFicticio, double precoAtualMercado){
+    public SimulacaoVendaDTO simularVendaFutura(Moeda moeda, double precoFicticio, double precoAtualMercado){
         
         // calcula o lucro e a porcentagem
         double lucroSimulado = calcularLucroPotencial(moeda, precoFicticio);
@@ -165,7 +176,7 @@ public class CarteiraService {
         double valorTotalAtual = moeda.getSaldo() * precoAtualMercado;
 
         //empacota tudo na caixa (DTO) e devolve para quem chamou
-        return new br.com.criptovision.dto.SimulacaoVendaDTO(
+        return new SimulacaoVendaDTO(
             lucroSimulado, 
             porcSimulada, 
             valorTotalFicticio, 
@@ -174,14 +185,14 @@ public class CarteiraService {
     }
 
     // gera o resumo completo da carteira e empacota tudo num DTO
-    public br.com.criptovision.dto.ResumoCarteiraDTO gerarResumoCompleto(br.com.criptovision.model.Carteira carteira, br.com.criptovision.service.HttpService httpService){
+    public ResumoCarteiraDTO gerarResumoCompleto(Carteira carteira, HttpService httpService){
         
         double totalCalculado = 0;
         double pnlTotalGeral = 0;
         double totalPatrimonioOntem = 0;
-        java.util.List<br.com.criptovision.dto.ResumoAtivoDTO> listaAtivos = new java.util.ArrayList<>();
+        List<ResumoAtivoDTO> listaAtivos = new ArrayList<>();
 
-        for(br.com.criptovision.model.Moeda m : carteira.getMoedas().values()){
+        for(Moeda m : carteira.getMoedas().values()){
             if(m.getSaldo() > 0){
                 double[] dadosApi = httpService.buscarPrecoEVariacao(m); 
                 double preco = dadosApi[0];
@@ -195,15 +206,14 @@ public class CarteiraService {
                 totalCalculado += valorNoAtivo;
                 totalPatrimonioOntem += valorNoAtivo / (1 + (variacao24h / 100)); 
 
-                listaAtivos.add(new br.com.criptovision.dto.ResumoAtivoDTO(
+                listaAtivos.add(new ResumoAtivoDTO(
                     m.getTicker(), m.getSaldo(), preco, valorNoAtivo, porcentagemLucro, variacao24h
                 ));
             }
         }
         double varTotalCarteira = (totalPatrimonioOntem > 0) ? ((totalCalculado - totalPatrimonioOntem) / totalPatrimonioOntem) * 100 : 0;
 
-        return new br.com.criptovision.dto.ResumoCarteiraDTO(totalCalculado, pnlTotalGeral, varTotalCarteira, listaAtivos);
+        return new ResumoCarteiraDTO(totalCalculado, pnlTotalGeral, varTotalCarteira, listaAtivos);
     }
-
 
 }
