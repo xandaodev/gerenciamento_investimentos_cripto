@@ -16,7 +16,6 @@ import br.com.criptovision.dto.ResumoAtivoDTO;
 import br.com.criptovision.dto.SimulacaoVendaDTO;
 import br.com.criptovision.dto.SimulacaoDCADTO;
 
-//teste
 
 
 public class Main {
