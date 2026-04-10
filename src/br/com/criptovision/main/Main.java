@@ -159,7 +159,7 @@ public class Main {
                                 System.out.printf("  Saldo que você possui: %.8f\n", mSim.getSaldo());
                                 
                                 System.out.printf("  Valor que você possui em " + tickerSim + ": $ %.2f (R$ %.2f)\n \n", simulacao.getValorTotalAtual(), simulacao.getValorTotalAtual() * precoDolarCotacao);
-                                System.out.printf("******************************************************* \n");
+                                System.out.print("******************************************************* \n");
                                 System.out.printf("  Se vender a: $ %.2f\n \n", precoFicticio);
                                 System.out.printf("  LUCRO ESTIMADO: $ %.2f (R$ %.2f) -> [%.2f%%]\n \n", simulacao.getLucroEstimado(), simulacao.getLucroEstimado() * precoDolarCotacao, simulacao.getPorcentagemLucro());
                                 System.out.printf("  SALDO TOTAL ESTIMADO: $ %.2f (R$ %.2f)\n", simulacao.getValorTotalFicticio(), simulacao.getValorTotalFicticio() * precoDolarCotacao);
@@ -260,5 +260,3 @@ public class Main {
         }
     }
 }
-
-//testantejbsefkjhbgreg
