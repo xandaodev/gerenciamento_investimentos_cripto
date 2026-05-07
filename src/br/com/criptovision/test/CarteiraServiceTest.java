@@ -6,6 +6,8 @@ import br.com.criptovision.model.Moeda;
 import br.com.criptovision.model.Transacao;
 import br.com.criptovision.service.CarteiraService;
 import br.com.criptovision.repository.LucroDAO;
+import br.com.criptovision.exception.SaldoInsuficienteException;
+import br.com.criptovision.dto.SimulacaoDCADTO;
 
 public class CarteiraServiceTest {
 
@@ -51,5 +53,19 @@ public class CarteiraServiceTest {
         
         service.processarTransacao(link, venda);
         assertEquals(5.0, link.getSaldo(), 0.001);
+    }
+
+    @Test(expected = SaldoInsuficienteException.class)
+    public void naoDevePermitirVendaMaiorQueSaldo() throws SaldoInsuficienteException{
+        CarteiraService service = new CarteiraService();
+        Moeda sol = new Moeda("SOL", "Solana");
+
+        // simula compra de 10 solanas
+        service.processarTransacao(sol, new Transacao("SOL", 10.0, 100.0, "COMPRA"), false);
+
+        // o usuário tenta vender 15 SOL.
+        // o teste vai passar se o sistema estourar o SaldoInsuficienteException e parar tudo.
+        Transacao vendaInvalida = new Transacao("SOL", 15.0, 150.0, "VENDA");
+        service.processarTransacao(sol, vendaInvalida, false);
     }
 }
