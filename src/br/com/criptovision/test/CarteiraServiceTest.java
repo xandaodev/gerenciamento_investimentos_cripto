@@ -68,4 +68,27 @@ public class CarteiraServiceTest {
         Transacao vendaInvalida = new Transacao("SOL", 15.0, 150.0, "VENDA");
         service.processarTransacao(sol, vendaInvalida, false);
     }
+
+    @Test
+    public void deveCalcularSimulacaoDCACorretamente(){
+        CarteiraService service = new CarteiraService();
+        Moeda eth = new Moeda("ETH", "Ethereum");
+
+        // contexto: já tem 2 ETH comprados a $ 3000 (custo total = $ 6000)
+        eth.setSaldo(2.0);
+        eth.setPrecoMedio(3000.0);
+
+        // ação: o mercado caiu para $ 1500, você resolve aportar mais $ 3000
+        SimulacaoDCADTO simulacao = service.simularDCA(eth, 3000.0, 1500.0);
+
+        // $ 3000 a $ 1500 compram exatamente 2 ETH
+        assertEquals(2.0, simulacao.getQtdComprada(), 0.001);
+
+        // o novo saldo deve ser 4 ETH (2 de antes + 2 de agora)
+        assertEquals(4.0, simulacao.getNovoSaldoTotal(), 0.001);
+
+        // custo total novo = $ 6000 (antigo) + $ 3000 (novo) = $ 9000
+        // novo preço médio = 9000 / 4 = $ 2250
+        assertEquals(2250.0, simulacao.getNovoPM(), 0.001);
+    }
 }
