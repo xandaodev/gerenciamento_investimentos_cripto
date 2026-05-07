@@ -17,10 +17,10 @@ public class CarteiraServiceTest {
         Moeda btc = new Moeda("BTC", "Bitcoin");
 
         Transacao t1 = new Transacao("BTC", 1.0, 50000.0, "COMPRA");
-        service.processarTransacao(btc, t1);
+        service.processarTransacao(btc, t1, false);
 
         Transacao t2 = new Transacao("BTC", 1.0, 60000.0, "COMPRA");
-        service.processarTransacao(btc, t2);
+        service.processarTransacao(btc, t2, false);
 
         assertEquals(55000.0, btc.getPrecoMedio(), 0.001);
         assertEquals(2.0, btc.getSaldo(), 0.001);
@@ -29,8 +29,8 @@ public class CarteiraServiceTest {
     @Test
     public void deveCalcularLucroCorretamenteAposVendaParcial(){
         CarteiraService service = new CarteiraService();
-        
-        // INJEÇÃO DE DEPENDÊNCIA: aqui tem um DAO Falso só para esswe teste, assim ele nao grava no banco de dados
+
+        // DAO falso só para esse teste
         service.setLucroRepo(new LucroDAO(){
             @Override
             public void salvarLucroRealizado(String ticker, double valorLucro){
@@ -42,29 +42,35 @@ public class CarteiraServiceTest {
 
         Moeda link = new Moeda("LINK", "Chainlink");
 
-        service.processarTransacao(link, new Transacao("LINK", 10.0, 10.0, "COMPRA"));
+        service.processarTransacao(link, new Transacao("LINK", 10.0, 10.0, "COMPRA"), false);
 
         Transacao venda = new Transacao("LINK", 5.0, 20.0, "VENDA");
-        
+
         double custoParteVendida = 5.0 * link.getPrecoMedio();
         double lucroEsperado = (5.0 * 20.0) - custoParteVendida;
 
         assertEquals(50.0, lucroEsperado, 0.001);
-        
-        service.processarTransacao(link, venda);
+
+        // correção: adicionado o 'false' para não tentar salvar a venda no MySQL
+        service.processarTransacao(link, venda, false);
         assertEquals(5.0, link.getSaldo(), 0.001);
     }
 
     @Test(expected = SaldoInsuficienteException.class)
     public void naoDevePermitirVendaMaiorQueSaldo() throws SaldoInsuficienteException{
         CarteiraService service = new CarteiraService();
+
+        service.setLucroRepo(new LucroDAO(){
+            @Override public void salvarLucroRealizado(String ticker, double valor) {}
+            @Override public double lerLucroTotal() { return 0; }
+        });
+
         Moeda sol = new Moeda("SOL", "Solana");
 
         // simula compra de 10 solanas
         service.processarTransacao(sol, new Transacao("SOL", 10.0, 100.0, "COMPRA"), false);
 
         // o usuário tenta vender 15 SOL.
-        // o teste vai passar se o sistema estourar o SaldoInsuficienteException e parar tudo.
         Transacao vendaInvalida = new Transacao("SOL", 15.0, 150.0, "VENDA");
         service.processarTransacao(sol, vendaInvalida, false);
     }
@@ -90,5 +96,21 @@ public class CarteiraServiceTest {
         // custo total novo = $ 6000 (antigo) + $ 3000 (novo) = $ 9000
         // novo preço médio = 9000 / 4 = $ 2250
         assertEquals(2250.0, simulacao.getNovoPM(), 0.001);
+    }
+
+    @Test
+    public void deveCalcularLucroPotencialCorretamente(){
+        CarteiraService service = new CarteiraService();
+        Moeda btc = new Moeda("BTC", "Bitcoin");
+
+        // contexto comprou meio Bitcoin a 50k (investiu $ 25.000)
+        btc.setSaldo(0.5);
+        btc.setPrecoMedio(50000.0);
+
+        // ação: bitcoin subiu para 70k, o patrimônio agora vale $ 35.000 (0.5 * 70k)
+        double lucroPotencial = service.calcularLucroPotencial(btc, 70000.0);
+
+        // 35.000 - 25.000 = 10.000 de lucro
+        assertEquals(10000.0, lucroPotencial, 0.001);
     }
 }
