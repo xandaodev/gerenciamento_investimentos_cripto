@@ -5,19 +5,22 @@ import br.com.criptovision.model.Transacao;
 import br.com.criptovision.model.Carteira;
 import br.com.criptovision.repository.LucroDAO;
 import br.com.criptovision.repository.LucroDAOMySQL;
-import br.com.criptovision.repository.TransacaoDAO;
-import br.com.criptovision.repository.TransacaoDAOMySQL;
+import br.com.criptovision.repository.TransacaoRepository;
 import br.com.criptovision.exception.SaldoInsuficienteException;
 import br.com.criptovision.dto.ResumoCarteiraDTO;
 import br.com.criptovision.dto.ResumoAtivoDTO;
 import br.com.criptovision.dto.SimulacaoVendaDTO;
 import br.com.criptovision.dto.SimulacaoDCADTO;
+import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
+
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
 
 // uma das classes mais importantes, aqui são feitos todos os calculos usando os dados que as outras classes fornecem
 
+@Service
 public class CarteiraService {
 
     // repositorio pra gravar os lucros toda vez que uma venda ocorre
@@ -25,7 +28,8 @@ public class CarteiraService {
 
     private LucroDAO lucroRepo = new LucroDAOMySQL();// agr usando a interface apontando para o MySQL
 
-    private TransacaoDAO transacaoRepo = new TransacaoDAOMySQL();
+    @Autowired
+    private TransacaoRepository transacaoRepo;
 
     // nesse metodo é atualizado o estado de uma moeda baseado numa transacao
     // ele é chamado e rechamado varias vezes quando o programa é iniciado para reconstruir seu saldo
@@ -37,7 +41,7 @@ public class CarteiraService {
 
     // metodo 2, o motor
     public void processarTransacao(Moeda moeda, Transacao transacao, boolean salvarNoBanco) throws SaldoInsuficienteException {
-        
+
         if(transacao.getTipo().equals("COMPRA")){
             double custoTotalAntigo = moeda.getSaldo() * moeda.getPrecoMedio();
             double custoNovaCompra = transacao.getQuantidade() * transacao.getPrecoUnitario();
@@ -53,8 +57,8 @@ public class CarteiraService {
             }
             if (transacao.getQuantidade() > moeda.getSaldo()){
                 throw new SaldoInsuficienteException(
-                    "Saldo insuficiente para a venda! Você tentou vender " + transacao.getQuantidade() + 
-                    ", mas possui apenas " + moeda.getSaldo() + " de " + moeda.getTicker()
+                        "Saldo insuficiente para a venda! Você tentou vender " + transacao.getQuantidade() +
+                                ", mas possui apenas " + moeda.getSaldo() + " de " + moeda.getTicker()
                 );
             }
 
@@ -69,14 +73,14 @@ public class CarteiraService {
         }
 
         if (salvarNoBanco){
-            this.transacaoRepo.salvar(transacao);
+            this.transacaoRepo.save(transacao);
         }
     }
 
     public List<Transacao> carregarHistoricoDeTransacoes(){
-        return this.transacaoRepo.lerTudo();
+        return this.transacaoRepo.findAll();
     }
-    
+
     // metodo muito importante e funcional, ele calcula quanto voce ganharia se vendesse tudo agora
     // "Lucro nao realizado"
     public double calcularLucroPotencial(Moeda moeda, double precoAtual){
@@ -134,7 +138,7 @@ public class CarteiraService {
 
         // empacota tudo na caixa e devolve
         return new SimulacaoDCADTO(
-            qtdComprada, saldoAtual, novoSaldoTotal, pmAtual, novoPM, diferencaPM, valorizacaoNecessaria
+                qtdComprada, saldoAtual, novoSaldoTotal, pmAtual, novoPM, diferencaPM, valorizacaoNecessaria
         );
     }
 
@@ -166,7 +170,7 @@ public class CarteiraService {
     // METODOS DTO
 
     public SimulacaoVendaDTO simularVendaFutura(Moeda moeda, double precoFicticio, double precoAtualMercado){
-        
+
         // calcula o lucro e a porcentagem
         double lucroSimulado = calcularLucroPotencial(moeda, precoFicticio);
         double porcSimulada = (lucroSimulado / (moeda.getSaldo() * moeda.getPrecoMedio())) * 100;
@@ -176,17 +180,12 @@ public class CarteiraService {
         double valorTotalAtual = moeda.getSaldo() * precoAtualMercado;
 
         //empacota tudo na caixa (DTO) e devolve para quem chamou
-        return new SimulacaoVendaDTO(
-            lucroSimulado, 
-            porcSimulada, 
-            valorTotalFicticio, 
-            valorTotalAtual
-        );
+        return new SimulacaoVendaDTO(lucroSimulado, porcSimulada, valorTotalFicticio, valorTotalAtual);
     }
 
     // gera o resumo completo da carteira e empacota tudo num DTO
     public ResumoCarteiraDTO gerarResumoCompleto(Carteira carteira, HttpService httpService){
-        
+
         double totalCalculado = 0;
         double pnlTotalGeral = 0;
         double totalPatrimonioOntem = 0;
@@ -194,20 +193,20 @@ public class CarteiraService {
 
         for(Moeda m : carteira.getMoedas().values()){
             if(m.getSaldo() > 0){
-                double[] dadosApi = httpService.buscarPrecoEVariacao(m); 
+                double[] dadosApi = httpService.buscarPrecoEVariacao(m);
                 double preco = dadosApi[0];
                 double variacao24h = dadosApi[1];
 
                 double valorNoAtivo = m.getSaldo() * preco;
                 double lucroDestaMoeda = calcularLucroPotencial(m, preco);
                 double porcentagemLucro = (lucroDestaMoeda / (m.getSaldo() * m.getPrecoMedio())) * 100;
-                
+
                 pnlTotalGeral += lucroDestaMoeda;
                 totalCalculado += valorNoAtivo;
-                totalPatrimonioOntem += valorNoAtivo / (1 + (variacao24h / 100)); 
+                totalPatrimonioOntem += valorNoAtivo / (1 + (variacao24h / 100));
 
                 listaAtivos.add(new ResumoAtivoDTO(
-                    m.getTicker(), m.getSaldo(), preco, valorNoAtivo, porcentagemLucro, variacao24h
+                        m.getTicker(), m.getSaldo(), preco, valorNoAtivo, porcentagemLucro, variacao24h
                 ));
             }
         }
