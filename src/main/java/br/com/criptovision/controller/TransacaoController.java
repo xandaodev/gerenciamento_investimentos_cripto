@@ -3,9 +3,7 @@ package br.com.criptovision.controller;
 import br.com.criptovision.model.Transacao;
 import br.com.criptovision.repository.TransacaoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
@@ -18,7 +16,12 @@ public class TransacaoController {
 
     @GetMapping
     public List<Transacao> listarTodas() {
-        // vai no banco de dados, faz um select *, transforma tudo em lista e devolve
         return repository.findAll();
+    }
+
+    @PostMapping
+    public Transacao salvar(@RequestBody Transacao novaTransacao) {
+
+        return repository.save(novaTransacao);
     }
 }
