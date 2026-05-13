@@ -52,4 +52,19 @@ public class Transacao {
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
+    public void setTicker(String ticker) {
+        this.ticker = ticker;
+    }
+
+    public void setQuantidade(double quantidade) {
+        this.quantidade = quantidade;
+    }
+
+    public void setPrecoUnitario(double precoUnitario) {
+        this.precoUnitario = precoUnitario;
+    }
+
+    public void setTipo(String tipo) {
+        this.tipo = tipo;
+    }
 }
