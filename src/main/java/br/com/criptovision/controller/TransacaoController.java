@@ -46,4 +46,25 @@ public class TransacaoController {
         }
         return ResponseEntity.notFound().build();
     }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<Transacao> atualizar(@PathVariable Long id, @RequestBody Transacao transacaoAtualizada) {
+        Optional<Transacao> transacaoExistente = repository.findById(id);
+
+        if (transacaoExistente.isPresent()) {
+            Transacao transacaoSalva = transacaoExistente.get();
+
+            transacaoSalva.setTicker(transacaoAtualizada.getTicker());
+            transacaoSalva.setQuantidade(transacaoAtualizada.getQuantidade());
+            transacaoSalva.setPrecoUnitario(transacaoAtualizada.getPrecoUnitario());
+            transacaoSalva.setTipo(transacaoAtualizada.getTipo());
+
+
+            repository.save(transacaoSalva);
+
+            return ResponseEntity.ok(transacaoSalva);
+        }
+
+        return ResponseEntity.notFound().build();
+    }
 }
