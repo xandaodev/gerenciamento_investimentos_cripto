@@ -1,7 +1,9 @@
 package br.com.criptovision.test;
 
-import static org.junit.Assert.assertEquals;
-import org.junit.Test;
+import org.junit.jupiter.api.Test;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+
 import br.com.criptovision.model.Moeda;
 import br.com.criptovision.model.Transacao;
 import br.com.criptovision.service.CarteiraService;
@@ -56,8 +58,8 @@ public class CarteiraServiceTest {
         assertEquals(5.0, link.getSaldo(), 0.001);
     }
 
-    @Test(expected = SaldoInsuficienteException.class)
-    public void naoDevePermitirVendaMaiorQueSaldo() throws SaldoInsuficienteException{
+    @Test
+    public void naoDevePermitirVendaMaiorQueSaldo() {
         CarteiraService service = new CarteiraService();
 
         service.setLucroRepo(new LucroDAO(){
@@ -72,7 +74,10 @@ public class CarteiraServiceTest {
 
         // o usuário tenta vender 15 SOL.
         Transacao vendaInvalida = new Transacao("SOL", 15.0, 150.0, "VENDA");
-        service.processarTransacao(sol, vendaInvalida, false);
+
+        assertThrows(SaldoInsuficienteException.class, () -> {
+            service.processarTransacao(sol, vendaInvalida, false);
+        });
     }
 
     @Test
