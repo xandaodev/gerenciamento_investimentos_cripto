@@ -215,4 +215,18 @@ public class CarteiraService {
         return new ResumoCarteiraDTO(totalCalculado, pnlTotalGeral, varTotalCarteira, listaAtivos);
     }
 
+    public double calcularPatrimonioTotal() {
+        List<Transacao> todasAsTransacoes = this.transacaoRepo.findAll();
+
+        double total = 0;
+        for (Transacao t : todasAsTransacoes) {
+            if (t.getTipo().equals("COMPRA")) {
+                total += t.getQuantidade() * t.getPrecoUnitario();
+            } else if (t.getTipo().equals("VENDA")) {
+                total -= t.getQuantidade() * t.getPrecoUnitario();
+            }
+        }
+        return total;
+    }
+
 }
