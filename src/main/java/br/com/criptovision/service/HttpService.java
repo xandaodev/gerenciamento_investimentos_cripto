@@ -6,10 +6,12 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import br.com.criptovision.model.Moeda;
+import org.springframework.stereotype.Service;
 
 // essa classe gerencia as chamadas externas
 // ela que é a repsonsavael por conectar o java a API  da binance e extrair os preços das criptomoedas em tempo real
 
+@Service
 public class HttpService {
 
     // novo metodo que busca o preço e a variação nas ultimas 24h

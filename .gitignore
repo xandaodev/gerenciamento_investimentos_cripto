@@ -1,28 +1,36 @@
-# --- DADOS E PRIVACIDADE ---
-# ignora dados financeiros reais
-*.csv
-*.txt
-backups/
-
-# --- JAVA E COMPILAÇÃO ---
-# ignora arquivos compilados e o executável
-*.class
-*.jar
-*.war
-bin/
+HELP.md
 target/
+.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**/target/
+!**/src/test/**/target/
 
-# --- IDEs (VS CODE / INTELLIJ) ---
-.vscode/
-.idea/
-*.iml
-*.settings/
-.project
+### STS ###
+.apt_generated
 .classpath
+.factorypath
+.project
+.settings
+.springBeans
+.sts4-cache
 
-# --- SISTEMA OPERACIONAL ---
-.DS_Store
-Thumbs.db
+### IntelliJ IDEA ###
+.idea
+*.iws
+*.iml
+*.ipr
+
+### NetBeans ###
+/nbproject/private/
+/nbbuild/
+/dist/
+/nbdist/
+/.nb-gradle/
+build/
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+### VS Code ###
+.vscode/
 
 
-config.properties
+/bin/

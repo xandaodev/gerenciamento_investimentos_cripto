@@ -1,20 +1,32 @@
 package br.com.criptovision.model;
 
+import jakarta.persistence.*;
+import org.hibernate.annotations.CreationTimestamp;
+
 import java.time.LocalDateTime;
 
 // toda vez que voce executa uma operação no sistema, esse objeto é criado, salvo no arquivo csv e processado pela carteira
 
 //se voce comprar bitcoin 10 vezes, serão 10 objetos transaçao criados, pra somente um objeto Moeda que é o bitcoin
 
+@Entity
+@Table(name = "transacoes")
 public class Transacao {
+
     private String ticker; // moeda (btc, eth, sol ....)
     private double quantidade;
     private double precoUnitario;
+    @CreationTimestamp
     private LocalDateTime data;
     private String tipo;  // se vai ser compra ou venda
     //private double taxa;
 
-    private Long id; // chave primaria para a base de dados
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY) // AUTO_INCREMENT
+    private Long id; // chave primaria
+
+    public Transacao() {
+    }
 
     //construtor
     public Transacao(String ticker, double quantidade, double precoUnitario, String tipo/*, double taxa*/){
@@ -40,4 +52,19 @@ public class Transacao {
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
 
+    public void setTicker(String ticker) {
+        this.ticker = ticker;
+    }
+
+    public void setQuantidade(double quantidade) {
+        this.quantidade = quantidade;
+    }
+
+    public void setPrecoUnitario(double precoUnitario) {
+        this.precoUnitario = precoUnitario;
+    }
+
+    public void setTipo(String tipo) {
+        this.tipo = tipo;
+    }
 }
