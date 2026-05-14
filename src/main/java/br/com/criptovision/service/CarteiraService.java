@@ -229,4 +229,17 @@ public class CarteiraService {
         return total;
     }
 
+    @Autowired
+    private HttpService httpService;
+
+    public ResumoCarteiraDTO obterResumoGeral(){
+        Carteira carteira = new Carteira();//carteira vazia
+
+        List<Transacao> historico = transacaoRepo.findAll();
+
+        reconstruirCarteira(carteira, historico);//reconstroi a carteira
+
+        return gerarResumoCompleto(carteira, this.httpService);
+    }
+
 }
