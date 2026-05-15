@@ -32,7 +32,7 @@ public class TransacaoController {
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<Transacao> buscarPorId(@PathVariable Long id) {
+    public ResponseEntity<Transacao> buscarPorId(@PathVariable("id") Long id) {
 
         Optional<Transacao> transacao = repository.findById(id);
 
@@ -43,7 +43,7 @@ public class TransacaoController {
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deletar(@PathVariable Long id) {
+    public ResponseEntity<Void> deletar(@PathVariable("id") Long id) {
         if (repository.existsById(id)) {
             repository.deleteById(id);
             return ResponseEntity.noContent().build();
@@ -52,7 +52,7 @@ public class TransacaoController {
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<Transacao> atualizar(@PathVariable Long id, @RequestBody Transacao transacaoAtualizada) {
+    public ResponseEntity<Transacao> atualizar(@PathVariable("id") Long id, @RequestBody Transacao transacaoAtualizada) {
         Optional<Transacao> transacaoExistente = repository.findById(id);
 
         if (transacaoExistente.isPresent()) {
