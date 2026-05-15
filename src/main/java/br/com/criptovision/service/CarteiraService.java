@@ -3,8 +3,6 @@ package br.com.criptovision.service;
 import br.com.criptovision.model.Moeda;
 import br.com.criptovision.model.Transacao;
 import br.com.criptovision.model.Carteira;
-import br.com.criptovision.repository.LucroDAO;
-import br.com.criptovision.repository.LucroDAOMySQL;
 import br.com.criptovision.repository.TransacaoRepository;
 import br.com.criptovision.exception.SaldoInsuficienteException;
 import br.com.criptovision.dto.ResumoCarteiraDTO;
@@ -90,11 +88,11 @@ public class CarteiraService {
     // metodo muito importante e funcional, ele calcula quanto voce ganharia se vendesse tudo agora
     // "Lucro nao realizado"
     public double calcularLucroPotencial(Moeda moeda, double precoAtual){
-        if(moeda.getSaldo() <= 0){
+        if(moeda.getSaldo().compareTo(BigDecimal.ZERO) <= 0){
             return 0;
         }
-        double valorInvestido = moeda.getSaldo() * moeda.getPrecoMedio();
-        double valorAtual = moeda.getSaldo() * precoAtual;
+        double valorInvestido = moeda.getSaldo().multiply(moeda.getPrecoMedio()).doubleValue();
+        double valorAtual = moeda.getSaldo().multiply(BigDecimal.valueOf(precoAtual)).doubleValue();
         return valorAtual - valorInvestido;
     }
 
@@ -102,9 +100,10 @@ public class CarteiraService {
     public double calcularValorTotalCarteira(Map<String, Moeda> moedas, HttpService http){
         double valorTotal = 0;
         for(Moeda m : moedas.values()){
-            if(m.getSaldo() > 0){
+            if(m.getSaldo().compareTo(BigDecimal.ZERO) > 0){
                 double precoAtual = http.buscarPrecoAtual(m);// aqui ele pede ao HttpService o preço atual da Binance
-                valorTotal += (m.getSaldo() * precoAtual);
+                double saldoDaMoeda = m.getSaldo().doubleValue();
+                valorTotal += (saldoDaMoeda * precoAtual);
             }
         }
         return valorTotal;
@@ -114,7 +113,7 @@ public class CarteiraService {
     public double calcularPnlTotal(Map<String, Moeda> moedas, HttpService http){
         double pnlTotal = 0;
         for(Moeda m : moedas.values()){
-            if(m.getSaldo() > 0){
+            if(m.getSaldo().compareTo(BigDecimal.ZERO) > 0){
                 double precoAtual = http.buscarPrecoAtual(m);
                 pnlTotal += calcularLucroPotencial(m, precoAtual);
             }
@@ -124,8 +123,8 @@ public class CarteiraService {
 
     // agr o metodo puro, sem prints, apenas regra de negócio
     public SimulacaoDCADTO simularDCA(Moeda moeda, double valorAporteUSD, double precoMercado){
-        double saldoAtual = moeda.getSaldo();
-        double pmAtual = moeda.getPrecoMedio();
+        double saldoAtual = moeda.getSaldo().doubleValue();
+        double pmAtual = moeda.getPrecoMedio().doubleValue();
         double custoTotalAtual = saldoAtual * pmAtual;
 
         // quantidade que o novo aporte compraria
@@ -181,11 +180,12 @@ public class CarteiraService {
 
         // calcula o lucro e a porcentagem
         double lucroSimulado = calcularLucroPotencial(moeda, precoFicticio);
-        double porcSimulada = (lucroSimulado / (moeda.getSaldo() * moeda.getPrecoMedio())) * 100;
+        double custoBase = moeda.getSaldo().multiply(moeda.getPrecoMedio()).doubleValue();
+        double porcSimulada = (lucroSimulado / custoBase) * 100;
 
         // calcula os totais
-        double valorTotalFicticio = moeda.getSaldo() * precoFicticio;
-        double valorTotalAtual = moeda.getSaldo() * precoAtualMercado;
+        double valorTotalFicticio = moeda.getSaldo().doubleValue() * precoFicticio;
+        double valorTotalAtual = moeda.getSaldo().doubleValue() * precoAtualMercado;
 
         //empacota tudo na caixa (DTO) e devolve para quem chamou
         return new SimulacaoVendaDTO(lucroSimulado, porcSimulada, valorTotalFicticio, valorTotalAtual);
@@ -200,21 +200,23 @@ public class CarteiraService {
         List<ResumoAtivoDTO> listaAtivos = new ArrayList<>();
 
         for(Moeda m : carteira.getMoedas().values()){
-            if(m.getSaldo() > 0){
+            if(m.getSaldo().compareTo(BigDecimal.ZERO) > 0){
                 double[] dadosApi = httpService.buscarPrecoEVariacao(m);
                 double preco = dadosApi[0];
                 double variacao24h = dadosApi[1];
 
-                double valorNoAtivo = m.getSaldo() * preco;
+                double valorNoAtivo = m.getSaldo().doubleValue() * preco;
                 double lucroDestaMoeda = calcularLucroPotencial(m, preco);
-                double porcentagemLucro = (lucroDestaMoeda / (m.getSaldo() * m.getPrecoMedio())) * 100;
+                double custoBase = m.getSaldo().multiply(m.getPrecoMedio()).doubleValue();
+
+                double porcentagemLucro = custoBase == 0 ? 0 : (lucroDestaMoeda / custoBase) * 100;
 
                 pnlTotalGeral += lucroDestaMoeda;
                 totalCalculado += valorNoAtivo;
                 totalPatrimonioOntem += valorNoAtivo / (1 + (variacao24h / 100));
 
                 listaAtivos.add(new ResumoAtivoDTO(
-                        m.getTicker(), m.getSaldo(), preco, valorNoAtivo, porcentagemLucro, variacao24h
+                        m.getTicker(), m.getSaldo().doubleValue(), preco, valorNoAtivo, porcentagemLucro, variacao24h
                 ));
             }
         }
@@ -228,10 +230,11 @@ public class CarteiraService {
 
         double total = 0;
         for (Transacao t : todasAsTransacoes) {
-            if (t.getTipo().equals("COMPRA")) {
-                total += t.getQuantidade() * t.getPrecoUnitario();
-            } else if (t.getTipo().equals("VENDA")) {
-                total -= t.getQuantidade() * t.getPrecoUnitario();
+            double valorTrans = t.getQuantidade().multiply(t.getPrecoUnitario()).doubleValue();
+            if(t.getTipo().equals("COMPRA")){
+                total += valorTrans;
+            }else if(t.getTipo().equals("VENDA")){
+                total -= valorTrans;
             }
         }
         return total;
