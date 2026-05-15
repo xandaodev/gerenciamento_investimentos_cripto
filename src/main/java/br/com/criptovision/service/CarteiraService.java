@@ -253,4 +253,17 @@ public class CarteiraService {
         return gerarResumoCompleto(carteira, this.httpService);
     }
 
+    public Transacao registrarNovaTransacao(Transacao novaTransacao){
+        Carteira carteiraTemporaria = new Carteira();
+        List<Transacao> historico = transacaoRepo.findAll();
+        reconstruirCarteira(carteiraTemporaria, historico);
+
+        String ticker = novaTransacao.getTicker().toUpperCase();
+        Moeda moedaDaOperacao = carteiraTemporaria.obterMoeda(ticker, ticker);
+
+        processarTransacao(moedaDaOperacao, novaTransacao, true);
+
+        return novaTransacao;
+    }
+
 }

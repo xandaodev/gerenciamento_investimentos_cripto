@@ -2,6 +2,7 @@ package br.com.criptovision.controller;
 
 import br.com.criptovision.model.Transacao;
 import br.com.criptovision.repository.TransacaoRepository;
+import br.com.criptovision.service.CarteiraService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -16,6 +17,9 @@ public class TransacaoController {
     @Autowired
     private TransacaoRepository repository;
 
+    @Autowired
+    private CarteiraService carteiraService;
+
     @GetMapping
     public List<Transacao> listarTodas() {
         return repository.findAll();
@@ -24,7 +28,7 @@ public class TransacaoController {
     @PostMapping
     public Transacao salvar(@RequestBody Transacao novaTransacao) {
 
-        return repository.save(novaTransacao);
+        return carteiraService.registrarNovaTransacao(novaTransacao);
     }
 
     @GetMapping("/{id}")
