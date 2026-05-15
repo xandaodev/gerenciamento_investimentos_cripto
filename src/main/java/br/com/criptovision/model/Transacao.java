@@ -3,6 +3,7 @@ package br.com.criptovision.model;
 import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 
 // toda vez que voce executa uma operação no sistema, esse objeto é criado, salvo no arquivo csv e processado pela carteira
@@ -14,8 +15,8 @@ import java.time.LocalDateTime;
 public class Transacao {
 
     private String ticker; // moeda (btc, eth, sol ....)
-    private double quantidade;
-    private double precoUnitario;
+    private BigDecimal quantidade;
+    private BigDecimal precoUnitario;
     @CreationTimestamp
     private LocalDateTime data;
     private String tipo;  // se vai ser compra ou venda
@@ -29,7 +30,7 @@ public class Transacao {
     }
 
     //construtor
-    public Transacao(String ticker, double quantidade, double precoUnitario, String tipo/*, double taxa*/){
+    public Transacao(String ticker, BigDecimal quantidade, BigDecimal precoUnitario, String tipo/*, double taxa*/){
         this.ticker = ticker.toUpperCase();
         this.quantidade = quantidade;
         this.precoUnitario = precoUnitario;
@@ -40,8 +41,8 @@ public class Transacao {
     
     //getters e setters
     public String getTicker(){ return ticker; }
-    public double getQuantidade(){ return quantidade; }
-    public double getPrecoUnitario(){ return precoUnitario; }
+    public BigDecimal getQuantidade(){ return quantidade; }
+    public BigDecimal getPrecoUnitario(){ return precoUnitario; }
     public String getTipo(){ return tipo; }
     public LocalDateTime getData(){ return data; }
 
@@ -56,11 +57,11 @@ public class Transacao {
         this.ticker = ticker;
     }
 
-    public void setQuantidade(double quantidade) {
+    public void setQuantidade(BigDecimal quantidade) {
         this.quantidade = quantidade;
     }
 
-    public void setPrecoUnitario(double precoUnitario) {
+    public void setPrecoUnitario(BigDecimal  precoUnitario) {
         this.precoUnitario = precoUnitario;
     }
 
