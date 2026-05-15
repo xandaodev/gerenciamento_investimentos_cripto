@@ -14,6 +14,8 @@ import br.com.criptovision.dto.SimulacaoDCADTO;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
@@ -43,33 +45,37 @@ public class CarteiraService {
     public void processarTransacao(Moeda moeda, Transacao transacao, boolean salvarNoBanco) throws SaldoInsuficienteException {
 
         if(transacao.getTipo().equals("COMPRA")){
-            double custoTotalAntigo = moeda.getSaldo() * moeda.getPrecoMedio();
-            double custoNovaCompra = transacao.getQuantidade() * transacao.getPrecoUnitario();
-            double novoSaldo = moeda.getSaldo() + transacao.getQuantidade();
-            double novoPrecoMedio = (custoTotalAntigo + custoNovaCompra) / novoSaldo;
+            BigDecimal custoTotalAntigo = moeda.getSaldo().multiply(moeda.getPrecoMedio());
+
+            // custoNovaCompra = quantidade * precoUnitario
+            BigDecimal custoNovaCompra = transacao.getQuantidade().multiply(transacao.getPrecoUnitario());
+
+            // novoSaldo = saldo + quantidade
+            BigDecimal novoSaldo = moeda.getSaldo().add(transacao.getQuantidade());
+
+            // novoPrecoMedio = (custoTotalAntigo + custoNovaCompra) / novoSaldo
+            BigDecimal novoPrecoMedio = custoTotalAntigo.add(custoNovaCompra).divide(novoSaldo, 8, RoundingMode.HALF_UP);
 
             moeda.setSaldo(novoSaldo);
             moeda.setPrecoMedio(novoPrecoMedio);
 
         }else if(transacao.getTipo().equals("VENDA")){
-            if (transacao.getQuantidade() <= 0){
+            if (transacao.getQuantidade().compareTo(BigDecimal.ZERO) <= 0){
                 throw new IllegalArgumentException("A quantidade de venda deve ser maior que zero.");
             }
-            if (transacao.getQuantidade() > moeda.getSaldo()){
+
+            if (transacao.getQuantidade().compareTo(moeda.getSaldo()) > 0){
                 throw new SaldoInsuficienteException(
                         "Saldo insuficiente para a venda! Você tentou vender " + transacao.getQuantidade() +
                                 ", mas possui apenas " + moeda.getSaldo() + " de " + moeda.getTicker()
                 );
             }
 
-            double custoParteVendida = transacao.getQuantidade() * moeda.getPrecoMedio();
-            double valorRecebidoNaVenda = transacao.getQuantidade() * transacao.getPrecoUnitario();
-            double lucroOperacao = valorRecebidoNaVenda - custoParteVendida;
+            BigDecimal custoParteVendida = transacao.getQuantidade().multiply(moeda.getPrecoMedio());
+            BigDecimal valorRecebidoNaVenda = transacao.getQuantidade().multiply(transacao.getPrecoUnitario());
+            BigDecimal lucroOperacao = valorRecebidoNaVenda.subtract(custoParteVendida);
 
-            //if(this.lucroRepo == null) this.lucroRepo = new LucroDAOMySQL();
-            //lucroRepo.salvarLucroRealizado(moeda.getTicker(), lucroOperacao);
-
-            moeda.setSaldo(moeda.getSaldo() - transacao.getQuantidade());
+            moeda.setSaldo(moeda.getSaldo().subtract(transacao.getQuantidade()));
         }
 
         if (salvarNoBanco){
