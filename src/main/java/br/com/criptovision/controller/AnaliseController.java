@@ -18,7 +18,6 @@ public class AnaliseController {
 
     @GetMapping("/aportes-por-moeda")
     public List<AportePorMoedaProjection> obterAportesPorMoeda() {
-        // Chamamos a query poderosa que acabamos de criar!
         return repository.calcularTotalAportadoPorMoeda();
     }
 }
