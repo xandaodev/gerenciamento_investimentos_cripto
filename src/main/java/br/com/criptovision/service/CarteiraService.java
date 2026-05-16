@@ -23,11 +23,6 @@ import java.util.Map;
 @Service
 public class CarteiraService {
 
-    // repositorio pra gravar os lucros toda vez que uma venda ocorre
-    //private LucroRepository lucroRepo = new LucroRepository();
-
-    //private LucroDAO lucroRepo = new LucroDAOMySQL();// agr usando a interface apontando para o MySQL
-
     @Autowired
     private TransacaoRepository transacaoRepo;
 
@@ -147,12 +142,6 @@ public class CarteiraService {
         );
     }
 
-    // método criado para permitir a injeção de um DAO falso durante os testes
-
-    /*public void setLucroRepo(LucroDAO lucroRepo){
-        this.lucroRepo = lucroRepo;
-    }*/
-
     // agora a reconstrução da carteira nao fica mais na main, fica aqui no service
     public void reconstruirCarteira(Carteira carteira, List<Transacao> historico) {
         for(Transacao tAntiga : historico){
@@ -165,14 +154,6 @@ public class CarteiraService {
         }
     }
 
-    // antes a propria main se conectava com o banco de dados, isso tava errado, agr temos esse metodo que faz esse trabalho pra ela
-    public double obterLucroTotalRealizado(){
-        /*if(this.lucroRepo == null){
-            this.lucroRepo = new LucroDAOMySQL();
-        }
-        return this.lucroRepo.lerLucroTotal();*/
-        return 0;
-    }
 
     // METODOS DTO
 
