@@ -1,0 +1,35 @@
+version: '3.8'
+
+services:
+  # BANCO DE DADOS MYSQL
+  db:
+    image: mysql:8.0
+    container_name: cripto-mysql
+    restart: always
+    environment:
+      # cria esse banco e essa senha automaticamente
+      MYSQL_DATABASE: criptovision
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      #mapeia a porta 3306 do container para a porta 3306 do PC
+      - "3307:3306"  #mudei o primeiro de 3306 para 3307
+    volumes:
+      - mysql_data:/var/lib/mysql
+
+  # api spring boot
+  api:
+    build: .
+    container_name: cripto-api
+    restart: always
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/criptovision?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      SPRING_DATASOURCE_USERNAME: root
+      SPRING_DATASOURCE_PASSWORD: root
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+
+volumes:
+  mysql_data:
