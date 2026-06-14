@@ -235,6 +235,10 @@ public class CarteiraService {
     }
 
     public Transacao registrarNovaTransacao(Transacao novaTransacao){
+        // nova trava de seguranças
+        if (!httpService.validarTicker(novaTransacao.getTicker())) {
+            throw new IllegalArgumentException("Moeda inválida ou não encontrada na Binance: " + novaTransacao.getTicker());
+        }
         Carteira carteiraTemporaria = new Carteira();
         List<Transacao> historico = transacaoRepo.findAll();
         reconstruirCarteira(carteiraTemporaria, historico);
@@ -245,6 +249,26 @@ public class CarteiraService {
         processarTransacao(moedaDaOperacao, novaTransacao, true);
 
         return novaTransacao;
+    }
+
+    public SimulacaoDCADTO executarSimulacaoDCA(String ticker, double valorAporte, double precoMercado) {
+        Carteira carteira = new Carteira();
+        List<Transacao> historico = transacaoRepo.findAll();
+        reconstruirCarteira(carteira, historico);
+
+        Moeda moeda = carteira.obterMoeda(ticker, ticker);
+        return simularDCA(moeda, valorAporte, precoMercado);
+    }
+
+    public SimulacaoVendaDTO executarSimulacaoVenda(String ticker, double precoFicticio){
+        Carteira carteira = new Carteira();
+        List<Transacao> historico = transacaoRepo.findAll();
+        reconstruirCarteira(carteira, historico);
+
+        Moeda moeda = carteira.obterMoeda(ticker, ticker);
+        double precoAtualMercado = httpService.buscarPrecoAtual(moeda);
+
+        return simularVendaFutura(moeda, precoFicticio, precoAtualMercado);
     }
 
 }
