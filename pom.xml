@@ -76,6 +76,13 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- Banco em memória utilizado exclusivamente nos testes -->
+        <dependency>
+            <groupId>com.h2database</groupId>
+            <artifactId>h2</artifactId>
+            <scope>test</scope>
+        </dependency>
+
         <!-- Documentação OpenAPI e Swagger UI -->
         <dependency>
             <groupId>org.springdoc</groupId>
