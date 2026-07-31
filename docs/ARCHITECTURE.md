@@ -460,13 +460,19 @@ Esse modelo faz com que o histórico de transações seja a fonte principal dos 
 * facilita auditoria do histórico;
 * permite reconstruir a carteira após mudanças nas regras.
 
+### Comportamento atual
+
+- o histórico é processado em ordem cronológica por data e ID;
+- inconsistências durante a reconstrução interrompem o cálculo;
+- a aplicação lança `HistoricoInconsistenteException`;
+- a exceção identifica ID, ticker e tipo da transação;
+- a causa original da inconsistência é preservada.
+
 ### Limitações atuais
 
-* o histórico ainda não possui ordenação explícita;
-* exceções durante a reconstrução são ignoradas;
-* a carteira ainda não é separada por usuário;
-* a carteira é reconstruída repetidamente em diferentes endpoints.
-
+- inconsistências do histórico ainda não possuem logs estruturados;
+- a carteira ainda não é separada por usuário;
+- a carteira é reconstruída repetidamente em diferentes endpoints.
 ---
 
 ## 9. Integração com a Binance
@@ -681,9 +687,9 @@ As seguintes decisões serão preservadas inicialmente:
 Os principais pontos identificados são:
 
 1. transações ainda não pertencem a usuários;
-2. histórico não possui ordenação explícita;
+2.
 3. atualização e exclusão ignoram regras financeiras;
-4. exceções são ignoradas durante a reconstrução;
+4. inconsistências do histórico ainda não possuem logs estruturados;
 5. entradas ainda não possuem validação completa;
 6. o tipo da transação é armazenado como texto livre;
 7. parte dos cálculos e DTOs utiliza `double`;

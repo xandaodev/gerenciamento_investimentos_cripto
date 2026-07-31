@@ -449,11 +449,19 @@ O histórico é obtido atualmente por `findAll()`.
 
 Como não existe uma ordenação explícita por data e ID, a ordem retornada pelo banco não é formalmente garantida.
 
-### Limitação de erros
+### Tratamento de inconsistências
 
-Exceções lançadas durante a reconstrução são capturadas e ignoradas.
+Quando uma transação não pode ser processada durante a reconstrução,
+o cálculo é interrompido.
 
-Assim, uma transação inválida pode deixar de participar dos cálculos sem que o erro seja apresentado ao usuário.
+A aplicação lança `HistoricoInconsistenteException`, informando:
+
+- ID da transação;
+- ticker;
+- tipo;
+- motivo original da falha.
+
+Uma transação inválida não é mais ignorada silenciosamente.
 
 ---
 

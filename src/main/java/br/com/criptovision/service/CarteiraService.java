@@ -12,6 +12,8 @@ import br.com.criptovision.dto.SimulacaoDCADTO;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import br.com.criptovision.exception.HistoricoInconsistenteException;
+
 import org.springframework.data.domain.Sort;
 
 import java.math.BigDecimal;
@@ -164,17 +166,26 @@ public class CarteiraService {
     }
 
     // agora a reconstrução da carteira nao fica mais na main, fica aqui no service
-    public void reconstruirCarteira(Carteira carteira, List<Transacao> historico) {
+    public void reconstruirCarteira(
+        Carteira carteira,
+        List<Transacao> historico
+    ) {
         List<Transacao> historicoOrdenado = new ArrayList<>(historico);
         historicoOrdenado.sort(ORDEM_CRONOLOGICA);
 
         for (Transacao transacao : historicoOrdenado) {
-            String ticker = transacao.getTicker().toUpperCase();
-            Moeda moeda = carteira.obterMoeda(ticker, ticker);
-
             try {
+                String ticker = transacao.getTicker().toUpperCase();
+                Moeda moeda = carteira.obterMoeda(ticker, ticker);
+
                 processarTransacao(moeda, transacao, false);
-            } catch (Exception e) {
+            } catch (RuntimeException e) {
+                throw new HistoricoInconsistenteException(
+                    transacao.getId(),
+                    transacao.getTicker(),
+                    transacao.getTipo(),
+                    e
+                );
             }
         }
     }
