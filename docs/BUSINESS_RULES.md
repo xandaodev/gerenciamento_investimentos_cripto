@@ -150,24 +150,29 @@ preço interno = 1.0
 variação de 24 horas = 0.0
 ```
 
-### Validação atual
 
-Antes de registrar uma nova transação, o sistema consulta o par:
+## Validação da criação de transações
+
+O endpoint `POST /transacoes` exige:
+
+- ticker obrigatório;
+- ticker com no máximo 20 caracteres;
+- ticker formado somente por letras e números;
+- quantidade obrigatória e maior que zero;
+- preço unitário obrigatório e maior que zero;
+- tipo obrigatório;
+- tipo restrito a `COMPRA` ou `VENDA`.
+
+O ticker é normalizado antes da validação:
 
 ```text
-TICKERUSDT
+" btc " → "BTC"
 ```
 
-na Binance.
+O ID e a data não são recebidos pelo DTO de criação.
+Esses campos são controlados pela aplicação.
 
-Exemplo:
-
-```text
-BTC → BTCUSDT
-ETH → ETHUSDT
-```
-
-Se a consulta não retornar uma resposta válida, a transação é rejeitada.
+O `PUT` ainda será corrigido.
 
 ### Limitação
 

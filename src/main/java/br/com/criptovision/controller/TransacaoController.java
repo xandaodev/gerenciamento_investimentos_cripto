@@ -7,6 +7,10 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import br.com.criptovision.dto.TransacaoRequestDTO;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+
 import java.util.List;
 import java.util.Optional;
 
@@ -26,9 +30,15 @@ public class TransacaoController {
     }
 
     @PostMapping
-    public Transacao salvar(@RequestBody Transacao novaTransacao) {
+    public ResponseEntity<Transacao> salvar(
+        @Valid @RequestBody TransacaoRequestDTO dados
+    ) {
+        Transacao transacaoSalva = carteiraService
+            .registrarNovaTransacao(dados.toEntity());
 
-        return carteiraService.registrarNovaTransacao(novaTransacao);
+        return ResponseEntity
+            .status(HttpStatus.CREATED)
+            .body(transacaoSalva);
     }
 
     @GetMapping("/{id}")
