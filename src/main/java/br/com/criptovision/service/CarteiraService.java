@@ -197,7 +197,13 @@ public class CarteiraService {
                 totalPatrimonioOntem += valorNoAtivo / (1 + (variacao24h / 100));
 
                 listaAtivos.add(new ResumoAtivoDTO(
-                        m.getTicker(), m.getSaldo().doubleValue(), preco, valorNoAtivo, porcentagemLucro, variacao24h
+                        m.getTicker(),
+                        m.getSaldo().doubleValue(),
+                        preco,
+                        m.getPrecoMedio().doubleValue(),
+                        valorNoAtivo,
+                        porcentagemLucro,
+                        variacao24h
                 ));
             }
         }
