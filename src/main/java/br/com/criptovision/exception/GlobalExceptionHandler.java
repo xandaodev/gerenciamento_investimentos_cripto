@@ -36,6 +36,26 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(erroJson);
     }
 
+    @ExceptionHandler(HistoricoInconsistenteException.class)
+    public ResponseEntity<Map<String, Object>> tratarHistoricoInconsistente(
+        HistoricoInconsistenteException ex
+    ) {
+        Map<String, Object> erroJson = new LinkedHashMap<>();
+
+        erroJson.put("timestamp", LocalDateTime.now());
+        erroJson.put(
+            "status",
+            HttpStatus.INTERNAL_SERVER_ERROR.value()
+        );
+        erroJson.put("erro", "Histórico inconsistente");
+        erroJson.put("mensagem", ex.getMessage());
+
+        return ResponseEntity
+            .status(HttpStatus.INTERNAL_SERVER_ERROR)
+            .body(erroJson);
+    }
+
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> tratarErroGenerico(Exception ex) {
 

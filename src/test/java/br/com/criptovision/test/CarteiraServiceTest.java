@@ -4,11 +4,20 @@ import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
+import br.com.criptovision.model.Carteira;
+
+import java.time.LocalDateTime;
+import java.util.List;
+
 import br.com.criptovision.model.Moeda;
 import br.com.criptovision.model.Transacao;
 import br.com.criptovision.service.CarteiraService;
 import br.com.criptovision.exception.SaldoInsuficienteException;
 import br.com.criptovision.dto.SimulacaoDCADTO;
+
+import br.com.criptovision.exception.HistoricoInconsistenteException;
+
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.math.BigDecimal;
 
@@ -87,5 +96,72 @@ public class CarteiraServiceTest {
         double lucroPotencial = service.calcularLucroPotencial(btc, 70000.0);
 
         assertEquals(10000.0, lucroPotencial, 0.001);
+    }
+
+    @Test
+    public void deveReconstruirCarteiraEmOrdemCronologicaMesmoComHistoricoDesordenado() {
+        CarteiraService service = new CarteiraService();
+        Carteira carteira = new Carteira();
+
+        Transacao compra = new Transacao(
+            "BTC",
+            BigDecimal.ONE,
+            BigDecimal.valueOf(50000),
+            "COMPRA"
+        );
+        compra.setId(1L);
+        compra.setData(LocalDateTime.of(2026, 1, 1, 10, 0));
+
+        Transacao venda = new Transacao(
+            "BTC",
+            BigDecimal.ONE,
+            BigDecimal.valueOf(60000),
+            "VENDA"
+        );
+        venda.setId(2L);
+        venda.setData(LocalDateTime.of(2026, 1, 1, 11, 0));
+
+        List<Transacao> historicoDesordenado = List.of(venda, compra);
+
+        service.reconstruirCarteira(carteira, historicoDesordenado);
+
+        Moeda btc = carteira.obterMoeda("BTC", "Bitcoin");
+
+        assertEquals(0.0, btc.getSaldo().doubleValue(), 0.001);
+    }
+
+    @Test
+    public void deveInterromperReconstrucaoQuandoHistoricoForInconsistente() {
+        CarteiraService service = new CarteiraService();
+        Carteira carteira = new Carteira();
+
+        Transacao vendaSemCompra = new Transacao(
+            "BTC",
+            BigDecimal.ONE,
+            BigDecimal.valueOf(60000),
+            "VENDA"
+        );
+
+        vendaSemCompra.setId(99L);
+        vendaSemCompra.setData(
+            LocalDateTime.of(2026, 1, 1, 10, 0)
+        );
+
+        HistoricoInconsistenteException excecao = assertThrows(
+            HistoricoInconsistenteException.class,
+            () -> service.reconstruirCarteira(
+                carteira,
+                List.of(vendaSemCompra)
+            )
+        );
+
+        assertTrue(excecao.getMessage().contains("id=99"));
+        assertTrue(excecao.getMessage().contains("ticker=BTC"));
+        assertTrue(excecao.getMessage().contains("tipo=VENDA"));
+
+        assertEquals(
+            SaldoInsuficienteException.class,
+            excecao.getCause().getClass()
+        );
     }
 }

@@ -12,16 +12,34 @@ import br.com.criptovision.dto.SimulacaoDCADTO;
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
 
+import br.com.criptovision.exception.HistoricoInconsistenteException;
+
+import org.springframework.data.domain.Sort;
+
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
 
+import java.util.Comparator;
+
 // uma das classes mais importantes, aqui são feitos todos os calculos usando os dados que as outras classes fornecem
 
 @Service
 public class CarteiraService {
+
+
+    private static final Comparator<Transacao> ORDEM_CRONOLOGICA =
+        Comparator.comparing(
+            Transacao::getData,
+            Comparator.nullsLast(Comparator.naturalOrder())
+        ).thenComparing(
+            Transacao::getId,
+            Comparator.nullsLast(Comparator.naturalOrder())
+        );
+
+
 
     @Autowired
     private TransacaoRepository transacaoRepo;
@@ -76,8 +94,13 @@ public class CarteiraService {
         }
     }
 
-    public List<Transacao> carregarHistoricoDeTransacoes(){
-        return this.transacaoRepo.findAll();
+    public List<Transacao> carregarHistoricoDeTransacoes() {
+        Sort ordemCronologica = Sort.by(
+            Sort.Order.asc("data"),
+            Sort.Order.asc("id")
+        );
+
+        return this.transacaoRepo.findAll(ordemCronologica);
     }
 
     // metodo muito importante e funcional, ele calcula quanto voce ganharia se vendesse tudo agora
@@ -143,13 +166,26 @@ public class CarteiraService {
     }
 
     // agora a reconstrução da carteira nao fica mais na main, fica aqui no service
-    public void reconstruirCarteira(Carteira carteira, List<Transacao> historico) {
-        for(Transacao tAntiga : historico){
-            String tickerOriginal = tAntiga.getTicker().toUpperCase();
-            Moeda m = carteira.obterMoeda(tickerOriginal, tickerOriginal);
-            try{
-                processarTransacao(m, tAntiga, false);
-            }catch(Exception e){
+    public void reconstruirCarteira(
+        Carteira carteira,
+        List<Transacao> historico
+    ) {
+        List<Transacao> historicoOrdenado = new ArrayList<>(historico);
+        historicoOrdenado.sort(ORDEM_CRONOLOGICA);
+
+        for (Transacao transacao : historicoOrdenado) {
+            try {
+                String ticker = transacao.getTicker().toUpperCase();
+                Moeda moeda = carteira.obterMoeda(ticker, ticker);
+
+                processarTransacao(moeda, transacao, false);
+            } catch (RuntimeException e) {
+                throw new HistoricoInconsistenteException(
+                    transacao.getId(),
+                    transacao.getTicker(),
+                    transacao.getTipo(),
+                    e
+                );
             }
         }
     }
@@ -213,7 +249,7 @@ public class CarteiraService {
     }
 
     public double calcularPatrimonioTotal() {
-        List<Transacao> todasAsTransacoes = this.transacaoRepo.findAll();
+        List<Transacao> todasAsTransacoes = carregarHistoricoDeTransacoes();
 
         double total = 0;
         for (Transacao t : todasAsTransacoes) {
@@ -233,7 +269,7 @@ public class CarteiraService {
     public ResumoCarteiraDTO obterResumoGeral(){
         Carteira carteira = new Carteira();//carteira vazia
 
-        List<Transacao> historico = transacaoRepo.findAll();
+        List<Transacao> historico = carregarHistoricoDeTransacoes();
 
         reconstruirCarteira(carteira, historico);//reconstroi a carteira
 
@@ -246,7 +282,7 @@ public class CarteiraService {
             throw new IllegalArgumentException("Moeda inválida ou não encontrada na Binance: " + novaTransacao.getTicker());
         }
         Carteira carteiraTemporaria = new Carteira();
-        List<Transacao> historico = transacaoRepo.findAll();
+        List<Transacao> historico = carregarHistoricoDeTransacoes();
         reconstruirCarteira(carteiraTemporaria, historico);
 
         String ticker = novaTransacao.getTicker().toUpperCase();
@@ -259,7 +295,7 @@ public class CarteiraService {
 
     public SimulacaoDCADTO executarSimulacaoDCA(String ticker, double valorAporte, double precoMercado) {
         Carteira carteira = new Carteira();
-        List<Transacao> historico = transacaoRepo.findAll();
+        List<Transacao> historico = carregarHistoricoDeTransacoes();
         reconstruirCarteira(carteira, historico);
 
         Moeda moeda = carteira.obterMoeda(ticker, ticker);
@@ -268,7 +304,7 @@ public class CarteiraService {
 
     public SimulacaoVendaDTO executarSimulacaoVenda(String ticker, double precoFicticio){
         Carteira carteira = new Carteira();
-        List<Transacao> historico = transacaoRepo.findAll();
+        List<Transacao> historico = carregarHistoricoDeTransacoes();
         reconstruirCarteira(carteira, historico);
 
         Moeda moeda = carteira.obterMoeda(ticker, ticker);
