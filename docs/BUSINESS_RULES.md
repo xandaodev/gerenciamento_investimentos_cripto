@@ -87,18 +87,15 @@ O código calcula esse valor durante o processamento de uma venda, mas ele ainda
 
 ---
 
-## 3. Tipos de transação
+## Tipos de transação
 
-O sistema trabalha atualmente com dois tipos:
+O sistema trabalha com o enum `TipoTransacao`.
+
+Valores permitidos:
 
 ```text
 COMPRA
 VENDA
-```
-
-O tipo ainda é armazenado como `String`.
-
-Portanto, não existe no modelo atual uma enumeração que impeça outros valores.
 
 ### Comportamento atual
 
@@ -107,20 +104,23 @@ O motor de cálculos compara o valor exatamente com:
 ```text
 COMPRA
 VENDA
+
+Valores recebidos pela API são normalizados para letras maiúsculas.
+Espaços no início e no final são removidos.
+
+Exemplos aceitos:
+
+COMPRA
+compra
+ Compra
+VENDA
+venda
+
+Qualquer outro valor é considerado inválido.
 ```
 
 Uma transação com outro valor pode não ser processada corretamente.
 
-### Regra futura planejada
-
-O tipo deverá ser representado por um enum:
-
-```java
-COMPRA
-VENDA
-```
-
-Essa alteração ainda não faz parte do comportamento atual.
 
 ---
 

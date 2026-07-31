@@ -2,6 +2,9 @@ package br.com.criptovision.controller;
 
 import br.com.criptovision.dto.AportePorMoedaProjection;
 import br.com.criptovision.repository.TransacaoRepository;
+
+import br.com.criptovision.model.TipoTransacao;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -18,6 +21,9 @@ public class AnaliseController {
 
     @GetMapping("/aportes-por-moeda")
     public List<AportePorMoedaProjection> obterAportesPorMoeda() {
-        return repository.calcularTotalAportadoPorMoeda();
+
+        return repository.calcularTotalAportadoPorMoeda(
+            TipoTransacao.COMPRA
+        );
     }
 }

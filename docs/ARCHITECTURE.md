@@ -198,7 +198,9 @@ A data é preenchida pelo Hibernate por meio de `@CreationTimestamp`.
 
 Os valores de quantidade e preço unitário utilizam `BigDecimal`.
 
-O tipo da transação é armazenado atualmente como texto, normalmente com um dos seguintes valores:
+O tipo da transação é representado pelo enum `TipoTransacao`.
+
+Valores permitidos:
 
 ```text
 COMPRA
@@ -691,7 +693,7 @@ Os principais pontos identificados são:
 3. atualização e exclusão ignoram regras financeiras;
 4. inconsistências do histórico ainda não possuem logs estruturados;
 5. entradas ainda não possuem validação completa;
-6. o tipo da transação é armazenado como texto livre;
+6.
 7. parte dos cálculos e DTOs utiliza `double`;
 8. falhas da Binance podem retornar preço zero;
 9. não há migrations do banco;

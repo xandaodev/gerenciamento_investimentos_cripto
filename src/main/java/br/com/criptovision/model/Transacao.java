@@ -19,7 +19,10 @@ public class Transacao {
     private BigDecimal precoUnitario;
     @CreationTimestamp
     private LocalDateTime data;
-    private String tipo;  // se vai ser compra ou venda
+
+    @Enumerated(EnumType.STRING)
+    private TipoTransacao tipo;
+
     //private double taxa;
 
     @Id
@@ -30,24 +33,25 @@ public class Transacao {
     }
 
     //construtor
-    public Transacao(String ticker, BigDecimal quantidade, BigDecimal precoUnitario, String tipo/*, double taxa*/){
+    public Transacao(String ticker, BigDecimal quantidade, BigDecimal precoUnitario, TipoTransacao tipo) {
         this.ticker = ticker.toUpperCase();
         this.quantidade = quantidade;
         this.precoUnitario = precoUnitario;
-        this.tipo = tipo.toUpperCase();
+        this.tipo = tipo;
         this.data = LocalDateTime.now();
-        //this.taxa = taxa;
     }
-    
+
     //getters e setters
     public String getTicker(){ return ticker; }
     public BigDecimal getQuantidade(){ return quantidade; }
     public BigDecimal getPrecoUnitario(){ return precoUnitario; }
-    public String getTipo(){ return tipo; }
+    public TipoTransacao getTipo() {
+        return tipo;
+    }
     public LocalDateTime getData(){ return data; }
 
     public void setData(LocalDateTime data){ this.data = data; }
-    
+
     //public double getTaxa(){ return taxa; }
 
     public Long getId() { return id; }
@@ -65,7 +69,7 @@ public class Transacao {
         this.precoUnitario = precoUnitario;
     }
 
-    public void setTipo(String tipo) {
+    public void setTipo(TipoTransacao tipo) {
         this.tipo = tipo;
     }
 }
