@@ -1,36 +1,51 @@
-HELP.md
+# Maven
 target/
 .mvn/wrapper/maven-wrapper.jar
+
+# Permite targets internos caso sejam necessários
 !**/src/main/**/target/
 !**/src/test/**/target/
 
-### STS ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
+# Variáveis de ambiente e segredos
+.env
+.env.*
+!.env.example
+application-secrets.properties
 
-### IntelliJ IDEA ###
-.idea
+# Logs
+*.log
+logs/
+
+# IntelliJ IDEA
+.idea/
 *.iws
 *.iml
 *.ipr
 
-### NetBeans ###
+# Eclipse e Spring Tool Suite
+.apt_generated/
+.classpath
+.factorypath
+.project
+.settings/
+.springBeans
+.sts4-cache/
+
+# NetBeans
 /nbproject/private/
 /nbbuild/
 /dist/
 /nbdist/
 /.nb-gradle/
-build/
-!**/src/main/**/build/
-!**/src/test/**/build/
 
-### VS Code ###
+# VS Code
 .vscode/
 
-
+# Arquivos compilados
 /bin/
+build/
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
