@@ -87,73 +87,61 @@ O código calcula esse valor durante o processamento de uma venda, mas ele ainda
 
 ---
 
-## Tipos de transação
+## 3. Tipos de transação
 
-O sistema trabalha com o enum `TipoTransacao`.
+O sistema representa o tipo pelo enum `TipoTransacao`.
 
 Valores permitidos:
 
 ```text
 COMPRA
 VENDA
-
-### Comportamento atual
-
-O motor de cálculos compara o valor exatamente com:
-
-```text
-COMPRA
-VENDA
-
-Valores recebidos pela API são normalizados para letras maiúsculas.
-Espaços no início e no final são removidos.
-
-Exemplos aceitos:
-
-COMPRA
-compra
- Compra
-VENDA
-venda
-
-Qualquer outro valor é considerado inválido.
 ```
 
-Uma transação com outro valor pode não ser processada corretamente.
+No motor financeiro, as comparações são feitas com `TipoTransacao.COMPRA` e `TipoTransacao.VENDA`, e não com textos livres.
 
+Na entrada JSON, valores como `"compra"` e `" Compra "` são normalizados. Qualquer outro valor, como `"TROCA"`, é rejeitado antes de chegar ao service e produz resposta `400 Bad Request`.
 
 ---
 
-## 4. Normalização de ticker
+## 4. Normalização e validação de entrada
 
-A aplicação converte alguns nomes conhecidos:
+### Normalização do ticker
+
+O `TransacaoRequestDTO` remove espaços nas extremidades e converte o ticker para letras maiúsculas.
+
+Exemplo:
 
 ```text
-BITCOIN  → BTC
-ETHEREUM → ETH
-SOLANA   → SOL
-CHAINLINK → LINK
-LNK      → LINK
+" btc " → "BTC"
 ```
 
-Nos demais casos, o valor é:
+O ticker deve conter somente letras e números e possuir no máximo 20 caracteres.
 
-1. convertido para letras maiúsculas;
-2. utilizado diretamente como ticker.
+O `HttpService` também possui tratamentos para alguns nomes conhecidos em determinadas consultas de preço:
+
+```text
+BITCOIN   → BTC
+ETHEREUM  → ETH
+SOLANA    → SOL
+CHAINLINK → LINK
+LNK       → LINK
+```
+
+No fluxo atual de criação e atualização, a entrada é normalizada para maiúsculas e validada como ticker. Por isso, os símbolos oficiais, como `BTC`, `ETH` e `SOL`, são a forma recomendada de entrada.
 
 ### USDT
 
-O USDT recebe tratamento especial:
+O USDT recebe tratamento especial nas consultas internas:
 
 ```text
 preço interno = 1.0
 variação de 24 horas = 0.0
 ```
 
+### Validação da criação e da atualização
 
-## Validação da criação de transações
-
-O endpoint `POST /transacoes` exige:
+Os endpoints `POST /transacoes` e `PUT /transacoes/{id}` utilizam `TransacaoRequestDTO` e exigem:
 
 - ticker obrigatório;
 - ticker com no máximo 20 caracteres;
@@ -163,51 +151,11 @@ O endpoint `POST /transacoes` exige:
 - tipo obrigatório;
 - tipo restrito a `COMPRA` ou `VENDA`.
 
-O ticker é normalizado antes da validação:
+O ID e a data não são recebidos pelo DTO. Na criação, esses campos são controlados pela aplicação. Na atualização, o ID e a data originais são preservados.
 
-```text
-" btc " → "BTC"
-```
+### Limitação da validação externa
 
-O ID e a data não são recebidos pelo DTO de criação.
-Esses campos são controlados pela aplicação.
-
-O `PUT` ainda será corrigido.
-
-
-## Alteração de transações
-
-Uma transação somente pode ser atualizada quando o histórico
-resultante continuar financeiramente consistente.
-
-Durante a atualização:
-
-- o ID original é preservado;
-- a data original é preservada;
-- somente ticker, quantidade, preço unitário e tipo podem ser alterados;
-- os novos dados passam pelas mesmas validações usadas na criação;
-- o ticker é validado;
-- uma cópia do histórico é reconstruída antes da persistência.
-
-Exemplo de alteração rejeitada:
-
-```text
-Histórico original:
-
-1. Compra de 2 BTC
-2. Venda de 1 BTC
-
-Tentativa:
-
-Alterar a compra para 0,5 BTC
-
-```
-
-
-
-### Limitação
-
-Uma indisponibilidade da Binance pode ser interpretada como se o ticker não existisse.
+Uma indisponibilidade da Binance pode ser interpretada como se o ticker não existisse, pois o `HttpService` ainda converte diferentes falhas externas em retorno nulo.
 
 ---
 
@@ -290,20 +238,13 @@ Preço médio: 55.000 USDT
 
 ---
 
-## 6. Validações atuais de compra
+## 6. Validações da compra
 
-O motor de cálculos ainda não valida explicitamente:
+Nas requisições HTTP de criação e atualização, o `TransacaoRequestDTO` rejeita quantidade e preço nulos, iguais a zero ou negativos. Também rejeita ticker e tipo ausentes.
 
-* quantidade nula;
-* quantidade igual a zero;
-* quantidade negativa;
-* preço nulo;
-* preço igual a zero;
-* preço negativo;
-* ticker nulo;
-* tipo nulo.
+O método interno `processarTransacao`, isoladamente, não repete todas essas verificações para compras. Portanto, a proteção completa depende atualmente de a criação e a atualização entrarem pelos fluxos validados do controller e do service.
 
-Essas validações serão adicionadas antes da próxima expansão funcional do sistema.
+Essa duplicação de proteção no núcleo financeiro ainda pode ser adicionada futuramente como defesa adicional.
 
 ---
 
@@ -479,11 +420,11 @@ O histórico de transações é atualmente a fonte de verdade para:
 * resumo;
 * simulações.
 
-### Limitação de ordenação
+### Ordenação determinística
 
-O histórico é obtido atualmente por `findAll()`.
+O histórico utilizado pelo `CarteiraService` é consultado em ordem crescente por `data` e `id`.
 
-Como não existe uma ordenação explícita por data e ID, a ordem retornada pelo banco não é formalmente garantida.
+Além disso, `reconstruirCarteira` ordena uma cópia da lista recebida antes de processá-la. Assim, o resultado não depende da ordem acidental fornecida pelo banco ou por um teste.
 
 ### Tratamento de inconsistências
 
@@ -515,60 +456,74 @@ Antes de registrar uma nova transação, o sistema:
 
 Esse fluxo evita que uma nova venda seja registrada quando não existe saldo suficiente.
 
-### Limitação
-
-A atualização e a exclusão não passam atualmente por esse mesmo fluxo.
+A atualização e a exclusão também simulam o histórico resultante antes de confirmar qualquer mudança no banco.
 
 ---
 
 ## 13. Atualização de transação
 
-O endpoint de atualização substitui diretamente:
+Uma transação somente pode ser atualizada quando o histórico resultante continuar financeiramente consistente.
+
+O endpoint recebe um `TransacaoRequestDTO`, portanto os novos valores passam pelas mesmas validações da criação.
+
+Durante a atualização:
+
+1. a transação é buscada pelo ID;
+2. o novo ticker é validado;
+3. uma transação candidata independente é criada;
+4. o ID original é preservado;
+5. a data original é preservada;
+6. somente ticker, quantidade, preço unitário e tipo podem mudar;
+7. a candidata substitui a original somente em uma cópia do histórico;
+8. a carteira temporária é reconstruída;
+9. a entidade persistida só é modificada e salva quando a simulação é válida.
+
+Exemplo rejeitado:
 
 ```text
-ticker
-quantidade
-precoUnitario
-tipo
+Histórico:
+1. Compra de 2 BTC
+2. Venda de 1 BTC
+
+Tentativa:
+Alterar a compra para 0,5 BTC
 ```
 
-A data original é mantida.
-
-### Limitação atual
-
-Depois da atualização, o histórico não é reconstruído para verificar se continua válido.
-
-Exemplo de inconsistência possível:
+A alteração produziria uma venda superior ao saldo disponível. Nesse caso, nada é salvo e a API retorna:
 
 ```text
-Compra original: 2 BTC
-Venda posterior: 1 BTC
-
-A compra é alterada para: 0,5 BTC
+409 Conflict
 ```
 
-O histórico passa a possuir uma venda de 1 BTC depois de uma compra de apenas 0,5 BTC.
-
-Essa validação será adicionada posteriormente no service.
+Um ID inexistente retorna `404 Not Found`. A operação é executada em método `@Transactional`.
 
 ---
 
 ## 14. Exclusão de transação
 
-A exclusão remove diretamente a transação pelo ID.
+Uma transação somente pode ser excluída quando o histórico restante continuar consistente.
 
-### Limitação atual
+Fluxo:
 
-O restante do histórico não é validado após a exclusão.
+1. a transação é buscada pelo ID;
+2. uma cópia do histórico é criada sem essa transação;
+3. a carteira temporária é reconstruída;
+4. a exclusão é executada somente quando a simulação é válida.
 
-Exemplo:
+Exemplo rejeitado:
 
 ```text
-Compra: 1 BTC
-Venda: 1 BTC
+1. Compra de 1 BTC
+2. Venda de 1 BTC
 ```
 
-Caso a compra seja excluída, permanece uma venda sem saldo correspondente.
+Excluir a compra deixaria uma venda sem saldo correspondente. Nesse caso, nenhuma exclusão ocorre e a API retorna:
+
+```text
+409 Conflict
+```
+
+Um ID inexistente retorna `404 Not Found`. A operação é executada em método `@Transactional`.
 
 ---
 

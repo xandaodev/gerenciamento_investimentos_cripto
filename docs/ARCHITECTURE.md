@@ -55,7 +55,7 @@ Binance Public API
 
 #### Controllers
 
-Recebem requisições HTTP, extraem parâmetros, chamam os serviços ou repositórios e constroem as respostas.
+Recebem requisições HTTP, extraem parâmetros, delegam operações às camadas apropriadas e constroem as respostas. O `TransacaoController` delega suas operações ao `CarteiraService`; o `AnaliseController` ainda consulta o `TransacaoRepository` diretamente.
 
 #### Services
 
@@ -138,17 +138,14 @@ Classes atuais:
 * `HistoricoInconsistenteException`.
 
 
-Na seção de tratamento de erros, acrescente:
-
-```markdown
 ### Erros relacionados às transações
 
-- `400 Bad Request`: dados de entrada inválidos;
+O tratamento global utiliza os seguintes status:
+
+- `400 Bad Request`: dados de entrada inválidos ou saldo insuficiente;
 - `404 Not Found`: transação inexistente;
 - `409 Conflict`: alteração ou exclusão que tornaria o histórico inconsistente;
-- `500 Internal Server Error`: histórico persistido já inconsistente.
-
-```
+- `500 Internal Server Error`: histórico já persistido inconsistente ou erro inesperado.
 
 ### `model`
 
@@ -157,6 +154,7 @@ Contém as entidades persistidas e os modelos utilizados na reconstrução da ca
 Classes atuais:
 
 * `Transacao`;
+* `TipoTransacao`;
 * `Usuario`;
 * `Carteira`;
 * `Moeda`.
@@ -211,7 +209,7 @@ tipo
 
 O identificador é gerado automaticamente pelo banco.
 
-A data é preenchida pelo Hibernate por meio de `@CreationTimestamp`.
+A data é inicializada no construtor da entidade e o campo também utiliza `@CreationTimestamp` para o preenchimento durante a persistência.
 
 Os valores de quantidade e preço unitário utilizam `BigDecimal`.
 
@@ -335,11 +333,11 @@ O `UsuarioRepository` oferece:
 * operações CRUD de usuários;
 * busca de usuário pelo login.
 
-### Limitação atual
+### Ordenação do histórico
 
-A ordem das transações retornadas por `findAll()` não é garantida explicitamente.
+As consultas utilizadas pelo `CarteiraService` solicitam ordenação crescente por `data` e, em caso de empate, por `id`.
 
-Como os cálculos dependem da ordem histórica de compras e vendas, uma ordenação determinística será adicionada posteriormente.
+Além disso, `reconstruirCarteira` ordena uma cópia da lista recebida antes do processamento. Essa segunda ordenação protege o motor mesmo quando ele recebe uma lista criada fora do repository.
 
 ---
 
@@ -414,52 +412,9 @@ Essas portas são utilizadas pelo frontend React com Vite.
 
 ---
 
-## 7. Fluxo de registro de transação
+## 7. Operações de transação
 
-O endpoint responsável pelo cadastro é:
-
-```http
-POST /transacoes
-```
-
-O endpoint `POST /transacoes` recebe um `TransacaoRequestDTO`.
-
-Antes de chegar às regras de negócio:
-
-1. o ticker é normalizado;
-2. os campos são validados pelo Bean Validation;
-3. o DTO é convertido para uma entidade `Transacao`;
-4. o service valida o ticker e a consistência financeira;
-5. a transação é persistida.
-
-O cliente não pode definir diretamente o ID ou a data da transação.
-
----
-
-Fluxo atual:
-
-```text
-TransacaoController
-        ↓
-CarteiraService.registrarNovaTransacao
-        ↓
-Validação do ticker na Binance
-        ↓
-Busca de todas as transações
-        ↓
-Reconstrução de uma carteira temporária
-        ↓
-Processamento da nova transação
-        ↓
-Validação de saldo em caso de venda
-        ↓
-Persistência no MySQL
-```
-
-## Fluxo das operações de transação
-
-O `TransacaoController` recebe as requisições HTTP e delega as
-operações ao `CarteiraService`.
+O `TransacaoController` recebe as requisições HTTP e delega as operações ao `CarteiraService`.
 
 ```text
 TransacaoController
@@ -467,15 +422,81 @@ TransacaoController
 CarteiraService
         ↓
 TransacaoRepository
+```
 
+O controller de transações não realiza operações de persistência diretamente.
 
-O cadastro passa pelo `CarteiraService`, permitindo que vendas sem saldo suficiente sejam rejeitadas.
+### Criação
 
-### Limitação atual
+O endpoint responsável pelo cadastro é:
 
-A atualização e a exclusão de transações utilizam diretamente o repository.
+```http
+POST /transacoes
+```
 
-Portanto, os endpoints `PUT` e `DELETE` ainda não revalidam todo o histórico financeiro após uma alteração.
+Fluxo:
+
+1. recebe um `TransacaoRequestDTO`;
+2. normaliza o ticker e valida os campos com Bean Validation;
+3. converte o DTO para `Transacao`;
+4. valida o ticker por meio da Binance;
+5. busca o histórico em ordem cronológica;
+6. reconstrói uma carteira temporária;
+7. processa a nova transação;
+8. valida o saldo em caso de venda;
+9. persiste a transação;
+10. retorna `201 Created`.
+
+O cliente não pode definir diretamente o ID ou a data da transação.
+
+### Consulta
+
+Os endpoints de listagem e busca por ID também passam pelo `CarteiraService`.
+
+A listagem utiliza a ordenação cronológica por data e ID. A busca de um ID inexistente lança `TransacaoNaoEncontradaException` e retorna `404 Not Found`.
+
+### Atualização
+
+O endpoint:
+
+```http
+PUT /transacoes/{id}
+```
+
+recebe o mesmo `TransacaoRequestDTO` validado utilizado na criação.
+
+Fluxo:
+
+1. busca a transação existente;
+2. valida o novo ticker;
+3. cria uma transação candidata independente;
+4. preserva o ID e a data originais;
+5. substitui a transação somente em uma cópia do histórico;
+6. reconstrói uma carteira temporária;
+7. modifica e salva a entidade existente apenas quando o histórico simulado é válido;
+8. retorna `200 OK`.
+
+A entidade gerenciada pelo JPA não é modificada antes da validação da cópia. O método é transacional.
+
+Uma atualização que tornaria o histórico inconsistente lança `AlteracaoHistoricoInvalidaException` e retorna `409 Conflict`.
+
+### Exclusão
+
+O endpoint:
+
+```http
+DELETE /transacoes/{id}
+```
+
+executa o seguinte fluxo:
+
+1. busca a transação;
+2. cria uma cópia do histórico sem ela;
+3. reconstrói uma carteira temporária;
+4. exclui a entidade apenas quando o histórico restante é válido;
+5. retorna `204 No Content`.
+
+O método é transacional. Uma exclusão que tornaria o histórico inconsistente retorna `409 Conflict`.
 
 ---
 
@@ -486,7 +507,7 @@ O estado atual da carteira não é armazenado diretamente no banco.
 Sempre que um resumo ou simulação é solicitado, o sistema:
 
 ```text
-Busca todas as transações
+Busca as transações em ordem cronológica
         ↓
 Cria uma Carteira vazia
         ↓
@@ -495,8 +516,6 @@ Processa as transações individualmente
 Atualiza saldo e preço médio de cada Moeda
         ↓
 Produz o resultado solicitado
-
-O controller não realiza diretamente operações de persistência.
 ```
 
 Esse modelo faz com que o histórico de transações seja a fonte principal dos dados financeiros.
@@ -734,23 +753,21 @@ As seguintes decisões serão preservadas inicialmente:
 
 Os principais pontos identificados são:
 
-1. transações ainda não pertencem a usuários;
-2.
-3. atualização e exclusão ignoram regras financeiras;
+1. as transações ainda não pertencem ao usuário autenticado;
+2. o `AnaliseController` ainda acessa o repository diretamente;
+3. a carteira é reconstruída repetidamente em diferentes endpoints;
 4. inconsistências do histórico ainda não possuem logs estruturados;
-5. o endpoint de atualização ainda não utiliza um DTO validado;
-6.
-7. parte dos cálculos e DTOs utiliza `double`;
-8. falhas da Binance podem retornar preço zero;
-9. não há migrations do banco;
-10. `ddl-auto=update` é utilizado;
-11. testes dependem do ambiente local;
-12. injeção de dependências é realizada por atributos;
-13. erros de autenticação ainda não são totalmente padronizados;
-14. não há paginação do histórico;
-15. não há lucro realizado persistido ou consolidado;
-16. não há suporte a taxas;
-17. não há cache de cotações;
-18. o README ainda contém informações desatualizadas.
+5. parte dos cálculos e DTOs ainda utiliza `double`;
+6. falhas da Binance podem retornar zero ou `null` e ser confundidas com ticker inválido;
+7. a validação do ticker na atualização ocorre durante um método transacional;
+8. não há migrations versionadas do banco;
+9. `spring.jpa.hibernate.ddl-auto=update` ainda é utilizado;
+10. a injeção de dependências é realizada por atributos;
+11. erros de autenticação ainda não são totalmente padronizados;
+12. não há paginação ou filtros no histórico;
+13. não há lucro realizado persistido ou consolidado;
+14. não há suporte a taxas;
+15. não há cache nem consulta em lote de cotações;
+16. o README ainda contém informações desatualizadas.
 
 Esses itens serão tratados em commits pequenos e independentes.
