@@ -2,13 +2,12 @@ package br.com.criptovision.test;
 
 import br.com.criptovision.model.TipoTransacao;
 import br.com.criptovision.model.Transacao;
+import br.com.criptovision.model.Usuario;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 
 public class TransacaoTest {
 
@@ -57,6 +56,28 @@ public class TransacaoTest {
         assertEquals(
             "Tipo de transação inválido. Use COMPRA ou VENDA.",
             excecao.getMessage()
+        );
+    }
+
+    @Test
+    public void deveAssociarUsuarioATransacao() {
+        Usuario usuario = new Usuario(
+            "alexandre",
+            "senha-criptografada"
+        );
+
+        Transacao transacao = new Transacao(
+            "BTC",
+            BigDecimal.ONE,
+            BigDecimal.valueOf(60000),
+            TipoTransacao.COMPRA
+        );
+
+        transacao.setUsuario(usuario);
+
+        assertSame(
+            usuario,
+            transacao.getUsuario()
         );
     }
 }
