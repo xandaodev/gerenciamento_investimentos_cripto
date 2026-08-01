@@ -8,8 +8,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 
 @Service
 public class TokenService {
@@ -28,21 +27,25 @@ public class TokenService {
         }
     }
 
-    public String validarToken(String token){
-        try{
+    public String validarToken(String token) {
+        try {
             Algorithm algorithm = Algorithm.HMAC256(secret);
+
             return JWT.require(algorithm)
-                    .withIssuer("CriptoVision API")
-                    .build()
-                    .verify(token)
-                    .getSubject(); // devolve o username se o token for válido
-        }catch (JWTVerificationException exception) {
-            return ""; // se for inválido, devolve vazio e a requisição é bloqueada
+                .withIssuer("CriptoVision API")
+                .build()
+                .verify(token)
+                .getSubject();
+        } catch (JWTVerificationException exception) {
+            return null;
         }
     }
 
     // regra de negócio: o token expira em 2 horas
-    private Instant gerarDataExpiracao(){
-        return LocalDateTime.now().plusHours(2).toInstant(ZoneOffset.of("-03:00"));
+    private Instant gerarDataExpiracao() {
+        return Instant.now().plus(
+            2,
+            ChronoUnit.HOURS
+        );
     }
 }

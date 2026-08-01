@@ -1,5 +1,6 @@
 package br.com.criptovision.security;
 
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -30,7 +31,14 @@ public class SecurityConfigurations {
         return http
                 .cors(cors -> cors.configurationSource(corsConfigurationSource())) // ATIVAMOS O CORS AQUI
                 .csrf(csrf -> csrf.disable())
-                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS)).exceptionHandling(exception -> exception
+                .authenticationEntryPoint(
+                    (request, response, authException) ->
+                        response.sendError(
+                            HttpServletResponse.SC_UNAUTHORIZED
+                        )
+                )
+            )
                 .authorizeHttpRequests(req -> {
                     // libera a rota de login para qualquer um tentar entrar
                     req.requestMatchers("/auth/login").permitAll();
