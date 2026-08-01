@@ -10,12 +10,18 @@ import br.com.criptovision.dto.ResumoAtivoDTO;
 import br.com.criptovision.dto.SimulacaoVendaDTO;
 import br.com.criptovision.dto.SimulacaoDCADTO;
 
+import br.com.criptovision.dto.TransacaoRequestDTO;
+import br.com.criptovision.exception.AlteracaoHistoricoInvalidaException;
+import br.com.criptovision.exception.TransacaoNaoEncontradaException;
+import br.com.criptovision.exception.HistoricoInconsistenteException;
+
 import br.com.criptovision.model.TipoTransacao;
 
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
 
-import br.com.criptovision.exception.HistoricoInconsistenteException;
+
 
 import org.springframework.data.domain.Sort;
 
@@ -24,6 +30,7 @@ import java.math.RoundingMode;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Map;
+import java.util.Objects;
 
 import java.util.Comparator;
 
@@ -283,11 +290,144 @@ public class CarteiraService {
         return gerarResumoCompleto(carteira, this.httpService);
     }
 
+    public List<Transacao> listarTransacoes() {
+        return carregarHistoricoDeTransacoes();
+    }
+
+    public Transacao buscarTransacaoPorId(Long id) {
+        return transacaoRepo
+            .findById(id)
+            .orElseThrow(
+                () -> new TransacaoNaoEncontradaException(id)
+            );
+    }
+
+    private void validarTicker(String ticker) {
+        if (!httpService.validarTicker(ticker)) {
+            throw new IllegalArgumentException(
+                "Moeda inválida ou não encontrada na Binance: "
+                    + ticker
+            );
+        }
+    }
+
+    private void validarHistoricoAposAlteracao(List<Transacao> historico, String mensagemDeErro){
+        try{
+            Carteira carteiraTemporaria = new Carteira();
+
+            reconstruirCarteira(carteiraTemporaria, historico);
+        }catch(HistoricoInconsistenteException ex){
+            throw new AlteracaoHistoricoInvalidaException(mensagemDeErro, ex);
+        }
+    }
+
+
+    @Transactional
+    public Transacao atualizarTransacao(
+        Long id,
+        TransacaoRequestDTO dados
+    ) {
+        Transacao transacaoExistente =
+            buscarTransacaoPorId(id);
+
+        validarTicker(dados.ticker());
+
+        Transacao transacaoCandidata = dados.toEntity();
+
+        transacaoCandidata.setId(
+            transacaoExistente.getId()
+        );
+        transacaoCandidata.setData(
+            transacaoExistente.getData()
+        );
+
+        List<Transacao> historicoSimulado =
+            new ArrayList<>(
+                carregarHistoricoDeTransacoes()
+            );
+
+        boolean transacaoSubstituida = false;
+
+        for (int indice = 0;
+             indice < historicoSimulado.size();
+             indice++) {
+
+            Transacao transacaoDoHistorico =
+                historicoSimulado.get(indice);
+
+            if (Objects.equals(
+                transacaoDoHistorico.getId(),
+                id
+            )) {
+                historicoSimulado.set(
+                    indice,
+                    transacaoCandidata
+                );
+
+                transacaoSubstituida = true;
+                break;
+            }
+        }
+
+        if (!transacaoSubstituida) {
+            throw new TransacaoNaoEncontradaException(id);
+        }
+
+        validarHistoricoAposAlteracao(
+            historicoSimulado,
+            "A alteração da transação de ID "
+                + id
+                + " tornaria o histórico inconsistente."
+        );
+
+        transacaoExistente.setTicker(
+            transacaoCandidata.getTicker()
+        );
+        transacaoExistente.setQuantidade(
+            transacaoCandidata.getQuantidade()
+        );
+        transacaoExistente.setPrecoUnitario(
+            transacaoCandidata.getPrecoUnitario()
+        );
+        transacaoExistente.setTipo(
+            transacaoCandidata.getTipo()
+        );
+
+        return transacaoRepo.save(transacaoExistente);
+    }
+
+
+    @Transactional
+    public void excluirTransacao(Long id) {
+        Transacao transacaoExistente =
+            buscarTransacaoPorId(id);
+
+        List<Transacao> historicoSemTransacao =
+            carregarHistoricoDeTransacoes()
+                .stream()
+                .filter(transacao ->
+                    !Objects.equals(
+                        transacao.getId(),
+                        id
+                    )
+                )
+                .toList();
+
+        validarHistoricoAposAlteracao(
+            historicoSemTransacao,
+            "A exclusão da transação de ID "
+                + id
+                + " tornaria o histórico inconsistente."
+        );
+
+        transacaoRepo.delete(transacaoExistente);
+    }
+
+
+
     public Transacao registrarNovaTransacao(Transacao novaTransacao){
         // nova trava de seguranças
-        if (!httpService.validarTicker(novaTransacao.getTicker())) {
-            throw new IllegalArgumentException("Moeda inválida ou não encontrada na Binance: " + novaTransacao.getTicker());
-        }
+        validarTicker(novaTransacao.getTicker());
         Carteira carteiraTemporaria = new Carteira();
         List<Transacao> historico = carregarHistoricoDeTransacoes();
         reconstruirCarteira(carteiraTemporaria, historico);

@@ -102,6 +102,44 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(erroJson);
     }
 
+    @ExceptionHandler(TransacaoNaoEncontradaException.class)
+    public ResponseEntity<Map<String, Object>> tratarTransacaoNaoEncontrada(
+        TransacaoNaoEncontradaException ex
+    ) {
+        Map<String, Object> erroJson = new LinkedHashMap<>();
+
+        erroJson.put("timestamp", LocalDateTime.now());
+        erroJson.put(
+            "status",
+            HttpStatus.NOT_FOUND.value()
+        );
+        erroJson.put("erro", "Transação não encontrada");
+        erroJson.put("mensagem", ex.getMessage());
+
+        return ResponseEntity
+            .status(HttpStatus.NOT_FOUND)
+            .body(erroJson);
+    }
+
+    @ExceptionHandler(AlteracaoHistoricoInvalidaException.class)
+    public ResponseEntity<Map<String, Object>> tratarAlteracaoHistoricoInvalida(
+        AlteracaoHistoricoInvalidaException ex
+    ) {
+        Map<String, Object> erroJson = new LinkedHashMap<>();
+
+        erroJson.put("timestamp", LocalDateTime.now());
+        erroJson.put(
+            "status",
+            HttpStatus.CONFLICT.value()
+        );
+        erroJson.put("erro", "Conflito no histórico");
+        erroJson.put("mensagem", ex.getMessage());
+
+        return ResponseEntity
+            .status(HttpStatus.CONFLICT)
+            .body(erroJson);
+    }
+
     @ExceptionHandler(HistoricoInconsistenteException.class)
     public ResponseEntity<Map<String, Object>> tratarHistoricoInconsistente(
         HistoricoInconsistenteException ex

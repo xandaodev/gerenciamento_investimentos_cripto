@@ -174,6 +174,37 @@ Esses campos são controlados pela aplicação.
 
 O `PUT` ainda será corrigido.
 
+
+## Alteração de transações
+
+Uma transação somente pode ser atualizada quando o histórico
+resultante continuar financeiramente consistente.
+
+Durante a atualização:
+
+- o ID original é preservado;
+- a data original é preservada;
+- somente ticker, quantidade, preço unitário e tipo podem ser alterados;
+- os novos dados passam pelas mesmas validações usadas na criação;
+- o ticker é validado;
+- uma cópia do histórico é reconstruída antes da persistência.
+
+Exemplo de alteração rejeitada:
+
+```text
+Histórico original:
+
+1. Compra de 2 BTC
+2. Venda de 1 BTC
+
+Tentativa:
+
+Alterar a compra para 0,5 BTC
+
+```
+
+
+
 ### Limitação
 
 Uma indisponibilidade da Binance pode ser interpretada como se o ticker não existisse.
