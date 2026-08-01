@@ -312,6 +312,40 @@ public class CarteiraServiceTransacaoTest {
             .delete(any(Transacao.class));
     }
 
+    @Test
+    public void deveAssociarUsuarioAutenticadoAoRegistrarTransacao() {
+        Transacao novaTransacao = new Transacao(
+            "BTC",
+            BigDecimal.ONE,
+            BigDecimal.valueOf(50000),
+            TipoTransacao.COMPRA
+        );
+
+        when(httpService.validarTicker("BTC"))
+            .thenReturn(true);
+
+        when(transacaoRepo
+            .findAllByUsuarioOrderByDataAscIdAsc(usuario))
+            .thenReturn(List.of());
+
+        Transacao resultado =
+            service.registrarNovaTransacao(
+                novaTransacao,
+                usuario
+            );
+
+        assertSame(novaTransacao, resultado);
+        assertSame(usuario, resultado.getUsuario());
+
+        verify(transacaoRepo)
+            .findAllByUsuarioOrderByDataAscIdAsc(
+                same(usuario)
+            );
+
+        verify(transacaoRepo)
+            .save(same(novaTransacao));
+    }
+
     private Transacao criarTransacao(
         Long id,
         LocalDateTime data,
