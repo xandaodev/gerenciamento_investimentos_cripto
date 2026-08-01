@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import br.com.criptovision.model.Carteira;
+import br.com.criptovision.model.TipoTransacao;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -28,10 +29,10 @@ public class CarteiraServiceTest {
         CarteiraService service = new CarteiraService();
         Moeda btc = new Moeda("BTC", "Bitcoin");
 
-        Transacao t1 = new Transacao("BTC", BigDecimal.valueOf(1.0), BigDecimal.valueOf(50000.0), "COMPRA");
+        Transacao t1 = new Transacao("BTC", BigDecimal.valueOf(1.0), BigDecimal.valueOf(50000.0), TipoTransacao.COMPRA);
         service.processarTransacao(btc, t1, false);
 
-        Transacao t2 = new Transacao("BTC", BigDecimal.valueOf(1.0), BigDecimal.valueOf(60000.0), "COMPRA");
+        Transacao t2 = new Transacao("BTC", BigDecimal.valueOf(1.0), BigDecimal.valueOf(60000.0), TipoTransacao.COMPRA);
         service.processarTransacao(btc, t2, false);
 
         assertEquals(55000.0, btc.getPrecoMedio().doubleValue(), 0.001);
@@ -43,9 +44,9 @@ public class CarteiraServiceTest {
         CarteiraService service = new CarteiraService();
         Moeda link = new Moeda("LINK", "Chainlink");
 
-        service.processarTransacao(link, new Transacao("LINK", BigDecimal.valueOf(10.0), BigDecimal.valueOf(10.0), "COMPRA"), false);
+        service.processarTransacao(link, new Transacao("LINK", BigDecimal.valueOf(10.0), BigDecimal.valueOf(10.0), TipoTransacao.COMPRA), false);
 
-        Transacao venda = new Transacao("LINK", BigDecimal.valueOf(5.0), BigDecimal.valueOf(20.0), "VENDA");
+        Transacao venda = new Transacao("LINK", BigDecimal.valueOf(5.0), BigDecimal.valueOf(20.0), TipoTransacao.VENDA);
 
         double custoParteVendida = 5.0 * link.getPrecoMedio().doubleValue();
         double lucroEsperado = (5.0 * 20.0) - custoParteVendida;
@@ -61,9 +62,9 @@ public class CarteiraServiceTest {
         CarteiraService service = new CarteiraService();
         Moeda sol = new Moeda("SOL", "Solana");
 
-        service.processarTransacao(sol, new Transacao("SOL", BigDecimal.valueOf(10.0), BigDecimal.valueOf(100.0), "COMPRA"), false);
+        service.processarTransacao(sol, new Transacao("SOL", BigDecimal.valueOf(10.0), BigDecimal.valueOf(100.0), TipoTransacao.COMPRA), false);
 
-        Transacao vendaInvalida = new Transacao("SOL", BigDecimal.valueOf(15.0), BigDecimal.valueOf(150.0), "VENDA");
+        Transacao vendaInvalida = new Transacao("SOL", BigDecimal.valueOf(15.0), BigDecimal.valueOf(150.0), TipoTransacao.VENDA);
 
         assertThrows(SaldoInsuficienteException.class, () -> {
             service.processarTransacao(sol, vendaInvalida, false);
@@ -107,7 +108,7 @@ public class CarteiraServiceTest {
             "BTC",
             BigDecimal.ONE,
             BigDecimal.valueOf(50000),
-            "COMPRA"
+            TipoTransacao.COMPRA
         );
         compra.setId(1L);
         compra.setData(LocalDateTime.of(2026, 1, 1, 10, 0));
@@ -116,7 +117,7 @@ public class CarteiraServiceTest {
             "BTC",
             BigDecimal.ONE,
             BigDecimal.valueOf(60000),
-            "VENDA"
+            TipoTransacao.VENDA
         );
         venda.setId(2L);
         venda.setData(LocalDateTime.of(2026, 1, 1, 11, 0));
@@ -139,7 +140,7 @@ public class CarteiraServiceTest {
             "BTC",
             BigDecimal.ONE,
             BigDecimal.valueOf(60000),
-            "VENDA"
+            TipoTransacao.VENDA
         );
 
         vendaSemCompra.setId(99L);

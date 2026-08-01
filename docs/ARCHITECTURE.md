@@ -119,7 +119,8 @@ Classes atuais:
 * `ResumoCarteiraDTO`;
 * `SimulacaoDCADTO`;
 * `SimulacaoVendaDTO`;
-* `AportePorMoedaProjection`.
+* `AportePorMoedaProjection`;
+* `TransacaoRequestDTO`.
 
 ### `exception`
 
@@ -198,7 +199,9 @@ A data é preenchida pelo Hibernate por meio de `@CreationTimestamp`.
 
 Os valores de quantidade e preço unitário utilizam `BigDecimal`.
 
-O tipo da transação é armazenado atualmente como texto, normalmente com um dos seguintes valores:
+O tipo da transação é representado pelo enum `TipoTransacao`.
+
+Valores permitidos:
 
 ```text
 COMPRA
@@ -402,6 +405,20 @@ O endpoint responsável pelo cadastro é:
 ```http
 POST /transacoes
 ```
+
+O endpoint `POST /transacoes` recebe um `TransacaoRequestDTO`.
+
+Antes de chegar às regras de negócio:
+
+1. o ticker é normalizado;
+2. os campos são validados pelo Bean Validation;
+3. o DTO é convertido para uma entidade `Transacao`;
+4. o service valida o ticker e a consistência financeira;
+5. a transação é persistida.
+
+O cliente não pode definir diretamente o ID ou a data da transação.
+
+---
 
 Fluxo atual:
 
@@ -690,8 +707,8 @@ Os principais pontos identificados são:
 2.
 3. atualização e exclusão ignoram regras financeiras;
 4. inconsistências do histórico ainda não possuem logs estruturados;
-5. entradas ainda não possuem validação completa;
-6. o tipo da transação é armazenado como texto livre;
+5. o endpoint de atualização ainda não utiliza um DTO validado;
+6.
 7. parte dos cálculos e DTOs utiliza `double`;
 8. falhas da Binance podem retornar preço zero;
 9. não há migrations do banco;

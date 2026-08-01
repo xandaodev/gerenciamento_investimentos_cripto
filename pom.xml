@@ -57,6 +57,14 @@
             <artifactId>spring-boot-starter-webmvc</artifactId>
         </dependency>
 
+
+        <!-- Validação de dados recebidos pela API -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-validation</artifactId>
+        </dependency>
+
+
         <!-- Persistência com Spring Data JPA e Hibernate -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

@@ -9,6 +9,9 @@ import br.com.criptovision.dto.ResumoCarteiraDTO;
 import br.com.criptovision.dto.ResumoAtivoDTO;
 import br.com.criptovision.dto.SimulacaoVendaDTO;
 import br.com.criptovision.dto.SimulacaoDCADTO;
+
+import br.com.criptovision.model.TipoTransacao;
+
 import org.springframework.stereotype.Service;
 import org.springframework.beans.factory.annotation.Autowired;
 
@@ -55,7 +58,7 @@ public class CarteiraService {
     // metodo 2, o motor
     public void processarTransacao(Moeda moeda, Transacao transacao, boolean salvarNoBanco) throws SaldoInsuficienteException {
 
-        if(transacao.getTipo().equals("COMPRA")){
+        if (transacao.getTipo() == TipoTransacao.COMPRA) {
             BigDecimal custoTotalAntigo = moeda.getSaldo().multiply(moeda.getPrecoMedio());
 
             // custoNovaCompra = quantidade * precoUnitario
@@ -70,7 +73,7 @@ public class CarteiraService {
             moeda.setSaldo(novoSaldo);
             moeda.setPrecoMedio(novoPrecoMedio);
 
-        }else if(transacao.getTipo().equals("VENDA")){
+        } else if (transacao.getTipo() == TipoTransacao.VENDA) {
             if (transacao.getQuantidade().compareTo(BigDecimal.ZERO) <= 0){
                 throw new IllegalArgumentException("A quantidade de venda deve ser maior que zero.");
             }
@@ -180,10 +183,14 @@ public class CarteiraService {
 
                 processarTransacao(moeda, transacao, false);
             } catch (RuntimeException e) {
+                String tipo = transacao.getTipo() == null
+                    ? null
+                    : transacao.getTipo().name();
+
                 throw new HistoricoInconsistenteException(
                     transacao.getId(),
                     transacao.getTicker(),
-                    transacao.getTipo(),
+                    tipo,
                     e
                 );
             }
@@ -254,9 +261,9 @@ public class CarteiraService {
         double total = 0;
         for (Transacao t : todasAsTransacoes) {
             double valorTrans = t.getQuantidade().multiply(t.getPrecoUnitario()).doubleValue();
-            if(t.getTipo().equals("COMPRA")){
+            if (t.getTipo() == TipoTransacao.COMPRA) {
                 total += valorTrans;
-            }else if(t.getTipo().equals("VENDA")){
+            } else if (t.getTipo() == TipoTransacao.VENDA) {
                 total -= valorTrans;
             }
         }
