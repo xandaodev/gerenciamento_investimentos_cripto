@@ -31,10 +31,12 @@ public interface TransacaoRepository extends JpaRepository<Transacao, Long> {
             SUM(t.quantidade * t.precoUnitario) AS totalAportado
         FROM Transacao t
         WHERE t.tipo = :tipo
+          AND t.usuario = :usuario
         GROUP BY t.ticker
         """)
     List<AportePorMoedaProjection> calcularTotalAportadoPorMoeda(
-        @Param("tipo") TipoTransacao tipo
+        @Param("tipo") TipoTransacao tipo,
+        @Param("usuario") Usuario usuario
     );
 
 }

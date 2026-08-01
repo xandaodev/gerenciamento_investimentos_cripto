@@ -5,33 +5,31 @@ import br.com.criptovision.exception.AlteracaoHistoricoInvalidaException;
 import br.com.criptovision.exception.TransacaoNaoEncontradaException;
 import br.com.criptovision.model.TipoTransacao;
 import br.com.criptovision.model.Transacao;
+import br.com.criptovision.model.Usuario;
 import br.com.criptovision.repository.TransacaoRepository;
 import br.com.criptovision.service.CarteiraService;
 import br.com.criptovision.service.HttpService;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Sort;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
-import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertSame;
-import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.same;
-import static org.mockito.Mockito.never;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 public class CarteiraServiceTransacaoTest {
+
+    private Usuario usuario;
 
     @Mock
     private TransacaoRepository transacaoRepo;
@@ -41,6 +39,14 @@ public class CarteiraServiceTransacaoTest {
 
     @InjectMocks
     private CarteiraService service;
+
+    @BeforeEach
+    public void criarUsuario() {
+        usuario = new Usuario(
+            "alexandre",
+            "senha-criptografada"
+        );
+    }
 
     @Test
     public void deveAtualizarTransacaoValidaPreservandoIdEData() {
@@ -63,22 +69,29 @@ public class CarteiraServiceTransacaoTest {
             TipoTransacao.COMPRA
         );
 
-        when(transacaoRepo.findById(1L))
+        when(transacaoRepo.findByIdAndUsuario(1L, usuario))
             .thenReturn(Optional.of(existente));
 
         when(httpService.validarTicker("ETH"))
             .thenReturn(true);
 
-        when(transacaoRepo.findAll(any(Sort.class)))
+        when(transacaoRepo
+            .findAllByUsuarioOrderByDataAscIdAsc(usuario))
             .thenReturn(List.of(existente));
 
         when(transacaoRepo.save(same(existente)))
             .thenReturn(existente);
 
         Transacao resultado =
-            service.atualizarTransacao(1L, dados);
+            service.atualizarTransacao(1L, dados, usuario);
 
         assertSame(existente, resultado);
+
+        assertSame(
+            usuario,
+            resultado.getUsuario()
+        );
+
         assertEquals(1L, resultado.getId());
         assertEquals(dataOriginal, resultado.getData());
         assertEquals("ETH", resultado.getTicker());
@@ -99,6 +112,8 @@ public class CarteiraServiceTransacaoTest {
             TipoTransacao.COMPRA,
             resultado.getTipo()
         );
+
+
 
         verify(transacaoRepo).save(same(existente));
     }
@@ -131,13 +146,14 @@ public class CarteiraServiceTransacaoTest {
                 TipoTransacao.COMPRA
             );
 
-        when(transacaoRepo.findById(1L))
+        when(transacaoRepo.findByIdAndUsuario(1L, usuario))
             .thenReturn(Optional.of(compra));
 
         when(httpService.validarTicker("BTC"))
             .thenReturn(true);
 
-        when(transacaoRepo.findAll(any(Sort.class)))
+        when(transacaoRepo
+            .findAllByUsuarioOrderByDataAscIdAsc(usuario))
             .thenReturn(List.of(compra, venda));
 
         AlteracaoHistoricoInvalidaException excecao =
@@ -145,7 +161,7 @@ public class CarteiraServiceTransacaoTest {
                 AlteracaoHistoricoInvalidaException.class,
                 () -> service.atualizarTransacao(
                     1L,
-                    dadosInvalidos
+                    dadosInvalidos, usuario
                 )
             );
 
@@ -168,7 +184,7 @@ public class CarteiraServiceTransacaoTest {
             TipoTransacao.COMPRA
         );
 
-        when(transacaoRepo.findById(999L))
+        when(transacaoRepo.findByIdAndUsuario(999L, usuario))
             .thenReturn(Optional.empty());
 
         TransacaoNaoEncontradaException excecao =
@@ -176,7 +192,7 @@ public class CarteiraServiceTransacaoTest {
                 TransacaoNaoEncontradaException.class,
                 () -> service.atualizarTransacao(
                     999L,
-                    dados
+                    dados, usuario
                 )
             );
 
@@ -188,7 +204,9 @@ public class CarteiraServiceTransacaoTest {
         verifyNoInteractions(httpService);
 
         verify(transacaoRepo, never())
-            .findAll(any(Sort.class));
+            .findAllByUsuarioOrderByDataAscIdAsc(
+                any(Usuario.class)
+            );
 
         verify(transacaoRepo, never())
             .save(any(Transacao.class));
@@ -214,13 +232,14 @@ public class CarteiraServiceTransacaoTest {
             TipoTransacao.VENDA
         );
 
-        when(transacaoRepo.findById(2L))
+        when(transacaoRepo.findByIdAndUsuario(2L, usuario))
             .thenReturn(Optional.of(venda));
 
-        when(transacaoRepo.findAll(any(Sort.class)))
+        when(transacaoRepo
+            .findAllByUsuarioOrderByDataAscIdAsc(usuario))
             .thenReturn(List.of(compra, venda));
 
-        service.excluirTransacao(2L);
+        service.excluirTransacao(2L, usuario);
 
         verify(transacaoRepo).delete(same(venda));
     }
@@ -245,16 +264,17 @@ public class CarteiraServiceTransacaoTest {
             TipoTransacao.VENDA
         );
 
-        when(transacaoRepo.findById(1L))
+        when(transacaoRepo.findByIdAndUsuario(1L, usuario))
             .thenReturn(Optional.of(compra));
 
-        when(transacaoRepo.findAll(any(Sort.class)))
+        when(transacaoRepo
+            .findAllByUsuarioOrderByDataAscIdAsc(usuario))
             .thenReturn(List.of(compra, venda));
 
         AlteracaoHistoricoInvalidaException excecao =
             assertThrows(
                 AlteracaoHistoricoInvalidaException.class,
-                () -> service.excluirTransacao(1L)
+                () -> service.excluirTransacao(1L, usuario)
             );
 
         assertEquals(
@@ -269,13 +289,13 @@ public class CarteiraServiceTransacaoTest {
 
     @Test
     public void deveRejeitarExclusaoDeTransacaoInexistente() {
-        when(transacaoRepo.findById(999L))
+        when(transacaoRepo.findByIdAndUsuario(999L, usuario))
             .thenReturn(Optional.empty());
 
         TransacaoNaoEncontradaException excecao =
             assertThrows(
                 TransacaoNaoEncontradaException.class,
-                () -> service.excluirTransacao(999L)
+                () -> service.excluirTransacao(999L, usuario)
             );
 
         assertEquals(
@@ -284,7 +304,9 @@ public class CarteiraServiceTransacaoTest {
         );
 
         verify(transacaoRepo, never())
-            .findAll(any(Sort.class));
+            .findAllByUsuarioOrderByDataAscIdAsc(
+                any(Usuario.class)
+            );
 
         verify(transacaoRepo, never())
             .delete(any(Transacao.class));
@@ -307,6 +329,7 @@ public class CarteiraServiceTransacaoTest {
 
         transacao.setId(id);
         transacao.setData(data);
+        transacao.setUsuario(usuario);
 
         return transacao;
     }
