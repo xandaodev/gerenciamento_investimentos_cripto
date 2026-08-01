@@ -4,7 +4,6 @@ import br.com.criptovision.controller.TransacaoController;
 import br.com.criptovision.exception.GlobalExceptionHandler;
 import br.com.criptovision.model.TipoTransacao;
 import br.com.criptovision.model.Transacao;
-import br.com.criptovision.repository.TransacaoRepository;
 import br.com.criptovision.service.CarteiraService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -36,9 +35,6 @@ public class TransacaoControllerTest {
 
     private MockMvc mockMvc;
     private LocalValidatorFactoryBean validator;
-
-    @Mock
-    private TransacaoRepository repository;
 
     @Mock
     private CarteiraService carteiraService;
