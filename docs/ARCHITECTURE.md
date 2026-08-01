@@ -132,7 +132,23 @@ Classes atuais:
 * `SaldoInsuficienteException`;
 * `ArquivoNaoEncontradoException`;
 * `BancoDeDadosException`;
-* `GlobalExceptionHandler`.
+* `GlobalExceptionHandler`;
+* `TransacaoNaoEncontradaException`;
+* `AlteracaoHistoricoInvalidaException`;
+* `HistoricoInconsistenteException`.
+
+
+Na seção de tratamento de erros, acrescente:
+
+```markdown
+### Erros relacionados às transações
+
+- `400 Bad Request`: dados de entrada inválidos;
+- `404 Not Found`: transação inexistente;
+- `409 Conflict`: alteração ou exclusão que tornaria o histórico inconsistente;
+- `500 Internal Server Error`: histórico persistido já inconsistente.
+
+```
 
 ### `model`
 
@@ -440,6 +456,19 @@ Validação de saldo em caso de venda
 Persistência no MySQL
 ```
 
+## Fluxo das operações de transação
+
+O `TransacaoController` recebe as requisições HTTP e delega as
+operações ao `CarteiraService`.
+
+```text
+TransacaoController
+        ↓
+CarteiraService
+        ↓
+TransacaoRepository
+
+
 O cadastro passa pelo `CarteiraService`, permitindo que vendas sem saldo suficiente sejam rejeitadas.
 
 ### Limitação atual
@@ -466,6 +495,8 @@ Processa as transações individualmente
 Atualiza saldo e preço médio de cada Moeda
         ↓
 Produz o resultado solicitado
+
+O controller não realiza diretamente operações de persistência.
 ```
 
 Esse modelo faz com que o histórico de transações seja a fonte principal dos dados financeiros.
