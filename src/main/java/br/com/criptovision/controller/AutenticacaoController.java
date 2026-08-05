@@ -37,18 +37,26 @@ public class AutenticacaoController {
 
     @PostMapping("/login")
     public ResponseEntity<TokenJwtDTO> efetuarLogin(
-        @RequestBody DadosAutenticacao dados
+        @Valid @RequestBody DadosAutenticacao dados
     ) {
-        var authenticationToken = new UsernamePasswordAuthenticationToken(
-            dados.login(),
-            dados.senha()
+        var authenticationToken =
+            new UsernamePasswordAuthenticationToken(
+                dados.login(),
+                dados.senha()
+            );
+
+        var authentication =
+            manager.authenticate(authenticationToken);
+
+        var usuario =
+            (Usuario) authentication.getPrincipal();
+
+        var tokenJWT =
+            tokenService.gerarToken(usuario.getLogin());
+
+        return ResponseEntity.ok(
+            new TokenJwtDTO(tokenJWT)
         );
-
-        var authentication = manager.authenticate(authenticationToken);
-        var usuario = (Usuario) authentication.getPrincipal();
-        var tokenJWT = tokenService.gerarToken(usuario.getLogin());
-
-        return ResponseEntity.ok(new TokenJwtDTO(tokenJWT));
     }
 
     @PostMapping("/register")

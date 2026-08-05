@@ -1,7 +1,5 @@
 package br.com.criptovision.security;
 
-import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -23,23 +21,34 @@ import java.util.Arrays;
 @EnableWebSecurity
 public class SecurityConfigurations {
 
-    @Autowired
-    private SecurityFilter securityFilter;
+    private final SecurityFilter securityFilter;
+    private final AutenticacaoEntryPoint autenticacaoEntryPoint;
+
+    public SecurityConfigurations(
+        SecurityFilter securityFilter,
+        AutenticacaoEntryPoint autenticacaoEntryPoint
+    ) {
+        this.securityFilter = securityFilter;
+        this.autenticacaoEntryPoint = autenticacaoEntryPoint;
+    }
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(
+        HttpSecurity http
+    ) throws Exception {
         return http
-            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .cors(cors -> cors.configurationSource(
+                corsConfigurationSource()
+            ))
             .csrf(csrf -> csrf.disable())
             .sessionManagement(sm ->
-                sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                sm.sessionCreationPolicy(
+                    SessionCreationPolicy.STATELESS
+                )
             )
             .exceptionHandling(exception -> exception
                 .authenticationEntryPoint(
-                    (request, response, authException) ->
-                        response.sendError(
-                            HttpServletResponse.SC_UNAUTHORIZED
-                        )
+                    autenticacaoEntryPoint
                 )
             )
             .authorizeHttpRequests(req -> {
@@ -77,7 +86,8 @@ public class SecurityConfigurations {
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration configuration = new CorsConfiguration();
+        CorsConfiguration configuration =
+            new CorsConfiguration();
 
         configuration.setAllowedOrigins(Arrays.asList(
             "http://localhost:5173",
@@ -97,7 +107,11 @@ public class SecurityConfigurations {
         UrlBasedCorsConfigurationSource source =
             new UrlBasedCorsConfigurationSource();
 
-        source.registerCorsConfiguration("/**", configuration);
+        source.registerCorsConfiguration(
+            "/**",
+            configuration
+        );
+
         return source;
     }
 }
