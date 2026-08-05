@@ -4,6 +4,7 @@ import br.com.criptovision.controller.TransacaoController;
 import br.com.criptovision.exception.GlobalExceptionHandler;
 import br.com.criptovision.model.TipoTransacao;
 import br.com.criptovision.model.Transacao;
+import br.com.criptovision.model.Usuario;
 import br.com.criptovision.service.CarteiraService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -14,6 +15,10 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContext;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.web.method.annotation.AuthenticationPrincipalArgumentResolver;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
@@ -23,15 +28,16 @@ import java.math.BigDecimal;
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
-import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.same;
+import static org.mockito.Mockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @ExtendWith(MockitoExtension.class)
 public class TransacaoControllerTest {
+
+    private Usuario usuario;
 
     private MockMvc mockMvc;
     private LocalValidatorFactoryBean validator;
@@ -44,18 +50,40 @@ public class TransacaoControllerTest {
 
     @BeforeEach
     public void configurarMockMvc() {
+
+        usuario = new Usuario(
+            "alexandre",
+            "senha-criptografada"
+        );
+
+        UsernamePasswordAuthenticationToken authentication =
+            new UsernamePasswordAuthenticationToken(
+                usuario,
+                null,
+                usuario.getAuthorities()
+            );
+
+        SecurityContext context =
+            SecurityContextHolder.createEmptyContext();
+
+        context.setAuthentication(authentication);
+        SecurityContextHolder.setContext(context);
+
         validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
 
         mockMvc = MockMvcBuilders
             .standaloneSetup(controller)
             .setControllerAdvice(new GlobalExceptionHandler())
-            .setValidator(validator)
+            .setValidator(validator).setCustomArgumentResolvers(
+                new AuthenticationPrincipalArgumentResolver()
+            )
             .build();
     }
 
     @AfterEach
     public void encerrarValidador() {
+        SecurityContextHolder.clearContext();
         validator.close();
     }
 
@@ -73,7 +101,8 @@ public class TransacaoControllerTest {
         transacaoSalva.setId(1L);
 
         when(carteiraService.registrarNovaTransacao(
-            any(Transacao.class)
+            any(Transacao.class),
+            same(usuario)
         )).thenReturn(transacaoSalva);
 
         mockMvc.perform(
@@ -97,7 +126,10 @@ public class TransacaoControllerTest {
             ArgumentCaptor.forClass(Transacao.class);
 
         verify(carteiraService)
-            .registrarNovaTransacao(captor.capture());
+            .registrarNovaTransacao(
+                captor.capture(),
+                same(usuario)
+            );
 
         Transacao recebidaPeloService = captor.getValue();
 

@@ -1,5 +1,7 @@
 package br.com.criptovision.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 import jakarta.persistence.*;
 import org.hibernate.annotations.CreationTimestamp;
 
@@ -22,6 +24,17 @@ public class Transacao {
 
     @Enumerated(EnumType.STRING)
     private TipoTransacao tipo;
+
+    @JsonIgnore
+    @ManyToOne(
+        fetch = FetchType.LAZY,
+        optional = false
+    )
+    @JoinColumn(
+        name = "usuario_id",
+        nullable = false
+    )
+    private Usuario usuario;
 
     //private double taxa;
 
@@ -71,5 +84,13 @@ public class Transacao {
 
     public void setTipo(TipoTransacao tipo) {
         this.tipo = tipo;
+    }
+
+    public Usuario getUsuario() {
+        return usuario;
+    }
+
+    public void setUsuario(Usuario usuario) {
+        this.usuario = usuario;
     }
 }

@@ -1,38 +1,19 @@
 package br.com.criptovision.service;
 
-import br.com.criptovision.model.Moeda;
-import br.com.criptovision.model.Transacao;
-import br.com.criptovision.model.Carteira;
-import br.com.criptovision.repository.TransacaoRepository;
-import br.com.criptovision.exception.SaldoInsuficienteException;
-import br.com.criptovision.dto.ResumoCarteiraDTO;
-import br.com.criptovision.dto.ResumoAtivoDTO;
-import br.com.criptovision.dto.SimulacaoVendaDTO;
-import br.com.criptovision.dto.SimulacaoDCADTO;
-
-import br.com.criptovision.dto.TransacaoRequestDTO;
+import br.com.criptovision.dto.*;
 import br.com.criptovision.exception.AlteracaoHistoricoInvalidaException;
-import br.com.criptovision.exception.TransacaoNaoEncontradaException;
 import br.com.criptovision.exception.HistoricoInconsistenteException;
-
-import br.com.criptovision.model.TipoTransacao;
-
-import org.springframework.stereotype.Service;
+import br.com.criptovision.exception.SaldoInsuficienteException;
+import br.com.criptovision.exception.TransacaoNaoEncontradaException;
+import br.com.criptovision.model.*;
+import br.com.criptovision.repository.TransacaoRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-
-
-import org.springframework.data.domain.Sort;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.util.List;
-import java.util.ArrayList;
-import java.util.Map;
-import java.util.Objects;
-
-import java.util.Comparator;
+import java.util.*;
 
 // uma das classes mais importantes, aqui são feitos todos os calculos usando os dados que as outras classes fornecem
 
@@ -104,13 +85,9 @@ public class CarteiraService {
         }
     }
 
-    public List<Transacao> carregarHistoricoDeTransacoes() {
-        Sort ordemCronologica = Sort.by(
-            Sort.Order.asc("data"),
-            Sort.Order.asc("id")
-        );
-
-        return this.transacaoRepo.findAll(ordemCronologica);
+    public List<Transacao> carregarHistoricoDeTransacoes(Usuario usuario){
+        return transacaoRepo
+            .findAllByUsuarioOrderByDataAscIdAsc(usuario);
     }
 
     // metodo muito importante e funcional, ele calcula quanto voce ganharia se vendesse tudo agora
@@ -262,8 +239,8 @@ public class CarteiraService {
         return new ResumoCarteiraDTO(totalCalculado, pnlTotalGeral, varTotalCarteira, listaAtivos);
     }
 
-    public double calcularPatrimonioTotal() {
-        List<Transacao> todasAsTransacoes = carregarHistoricoDeTransacoes();
+    public double calcularPatrimonioTotal(Usuario usuario){
+        List<Transacao> todasAsTransacoes = carregarHistoricoDeTransacoes(usuario);
 
         double total = 0;
         for (Transacao t : todasAsTransacoes) {
@@ -280,26 +257,22 @@ public class CarteiraService {
     @Autowired
     private HttpService httpService;
 
-    public ResumoCarteiraDTO obterResumoGeral(){
+    public ResumoCarteiraDTO obterResumoGeral(Usuario usuario){
         Carteira carteira = new Carteira();//carteira vazia
 
-        List<Transacao> historico = carregarHistoricoDeTransacoes();
+        List<Transacao> historico = carregarHistoricoDeTransacoes(usuario);
 
         reconstruirCarteira(carteira, historico);//reconstroi a carteira
 
         return gerarResumoCompleto(carteira, this.httpService);
     }
 
-    public List<Transacao> listarTransacoes() {
-        return carregarHistoricoDeTransacoes();
+    public List<Transacao> listarTransacoes(Usuario usuario){
+        return carregarHistoricoDeTransacoes(usuario);
     }
 
-    public Transacao buscarTransacaoPorId(Long id) {
-        return transacaoRepo
-            .findById(id)
-            .orElseThrow(
-                () -> new TransacaoNaoEncontradaException(id)
-            );
+    public Transacao buscarTransacaoPorId(Long id, Usuario usuario){
+        return transacaoRepo.findByIdAndUsuario(id, usuario).orElseThrow(() -> new TransacaoNaoEncontradaException(id));
     }
 
     private void validarTicker(String ticker) {
@@ -323,12 +296,8 @@ public class CarteiraService {
 
 
     @Transactional
-    public Transacao atualizarTransacao(
-        Long id,
-        TransacaoRequestDTO dados
-    ) {
-        Transacao transacaoExistente =
-            buscarTransacaoPorId(id);
+    public Transacao atualizarTransacao(Long id, TransacaoRequestDTO dados, Usuario usuario){
+        Transacao transacaoExistente = buscarTransacaoPorId(id, usuario);
 
         validarTicker(dados.ticker());
 
@@ -337,28 +306,25 @@ public class CarteiraService {
         transacaoCandidata.setId(
             transacaoExistente.getId()
         );
+
         transacaoCandidata.setData(
             transacaoExistente.getData()
         );
 
+        transacaoCandidata.setUsuario(
+            transacaoExistente.getUsuario()
+        );
+
         List<Transacao> historicoSimulado =
-            new ArrayList<>(
-                carregarHistoricoDeTransacoes()
-            );
+            new ArrayList<>(carregarHistoricoDeTransacoes(usuario));
 
         boolean transacaoSubstituida = false;
 
-        for (int indice = 0;
-             indice < historicoSimulado.size();
-             indice++) {
+        for (int indice = 0; indice < historicoSimulado.size(); indice++) {
 
-            Transacao transacaoDoHistorico =
-                historicoSimulado.get(indice);
+            Transacao transacaoDoHistorico = historicoSimulado.get(indice);
 
-            if (Objects.equals(
-                transacaoDoHistorico.getId(),
-                id
-            )) {
+            if (Objects.equals(transacaoDoHistorico.getId(), id)) {
                 historicoSimulado.set(
                     indice,
                     transacaoCandidata
@@ -398,12 +364,11 @@ public class CarteiraService {
 
 
     @Transactional
-    public void excluirTransacao(Long id) {
-        Transacao transacaoExistente =
-            buscarTransacaoPorId(id);
+    public void excluirTransacao(Long id, Usuario usuario){
+        Transacao transacaoExistente = buscarTransacaoPorId(id, usuario);
 
         List<Transacao> historicoSemTransacao =
-            carregarHistoricoDeTransacoes()
+            carregarHistoricoDeTransacoes(usuario)
                 .stream()
                 .filter(transacao ->
                     !Objects.equals(
@@ -425,11 +390,12 @@ public class CarteiraService {
 
 
 
-    public Transacao registrarNovaTransacao(Transacao novaTransacao){
+    public Transacao registrarNovaTransacao(Transacao novaTransacao, Usuario usuario){
+        novaTransacao.setUsuario(usuario);
         // nova trava de seguranças
         validarTicker(novaTransacao.getTicker());
         Carteira carteiraTemporaria = new Carteira();
-        List<Transacao> historico = carregarHistoricoDeTransacoes();
+        List<Transacao> historico = carregarHistoricoDeTransacoes(usuario);
         reconstruirCarteira(carteiraTemporaria, historico);
 
         String ticker = novaTransacao.getTicker().toUpperCase();
@@ -440,18 +406,18 @@ public class CarteiraService {
         return novaTransacao;
     }
 
-    public SimulacaoDCADTO executarSimulacaoDCA(String ticker, double valorAporte, double precoMercado) {
+    public SimulacaoDCADTO executarSimulacaoDCA(String ticker, double valorAporte, double precoMercado, Usuario usuario){
         Carteira carteira = new Carteira();
-        List<Transacao> historico = carregarHistoricoDeTransacoes();
+        List<Transacao> historico = carregarHistoricoDeTransacoes(usuario);
         reconstruirCarteira(carteira, historico);
 
         Moeda moeda = carteira.obterMoeda(ticker, ticker);
         return simularDCA(moeda, valorAporte, precoMercado);
     }
 
-    public SimulacaoVendaDTO executarSimulacaoVenda(String ticker, double precoFicticio){
+    public SimulacaoVendaDTO executarSimulacaoVenda(String ticker, double precoFicticio, Usuario usuario){
         Carteira carteira = new Carteira();
-        List<Transacao> historico = carregarHistoricoDeTransacoes();
+        List<Transacao> historico = carregarHistoricoDeTransacoes(usuario);
         reconstruirCarteira(carteira, historico);
 
         Moeda moeda = carteira.obterMoeda(ticker, ticker);
