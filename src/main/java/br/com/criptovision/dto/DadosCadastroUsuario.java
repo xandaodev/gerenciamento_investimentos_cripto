@@ -1,12 +1,24 @@
 package br.com.criptovision.dto;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 import java.util.Locale;
 
+@Schema(
+    name = "DadosCadastroUsuario",
+    description = "Dados necessários para criar uma conta no CriptoVision."
+)
 public record DadosCadastroUsuario(
+    @Schema(
+        description = "Login único. É normalizado para letras minúsculas.",
+        example = "alexandre.dev",
+        minLength = 3,
+        maxLength = 100,
+        pattern = "^[a-zA-Z0-9._-]+$"
+    )
     @NotBlank(message = "O login é obrigatório.")
     @Size(
         min = 3,
@@ -19,6 +31,13 @@ public record DadosCadastroUsuario(
     )
     String login,
 
+    @Schema(
+        description = "Senha com 8 a 64 caracteres.",
+        example = "SenhaSegura@2026",
+        minLength = 8,
+        maxLength = 64,
+        accessMode = Schema.AccessMode.WRITE_ONLY
+    )
     @NotBlank(message = "A senha é obrigatória.")
     @Size(
         min = 8,

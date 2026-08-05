@@ -3,6 +3,7 @@ package br.com.criptovision.model;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import jakarta.persistence.*;
+import io.swagger.v3.oas.annotations.media.Schema;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.math.BigDecimal;
@@ -14,18 +15,32 @@ import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "transacoes")
+@Schema(
+    name = "Transacao",
+    description = "Operação de compra ou venda registrada pelo usuário autenticado."
+)
 public class Transacao {
 
+    @Schema(description = "Ticker do ativo.", example = "BTC")
     private String ticker; // moeda (btc, eth, sol ....)
+    @Schema(description = "Quantidade negociada.", example = "0.015")
     private BigDecimal quantidade;
+    @Schema(description = "Preço unitário informado na operação.", example = "64000.00")
     private BigDecimal precoUnitario;
     @CreationTimestamp
+    @Schema(
+        description = "Data e hora de criação da transação.",
+        example = "2026-08-05T17:30:00",
+        accessMode = Schema.AccessMode.READ_ONLY
+    )
     private LocalDateTime data;
 
     @Enumerated(EnumType.STRING)
+    @Schema(description = "Tipo da operação.", example = "COMPRA")
     private TipoTransacao tipo;
 
     @JsonIgnore
+    @Schema(hidden = true)
     @ManyToOne(
         fetch = FetchType.LAZY,
         optional = false
@@ -40,6 +55,11 @@ public class Transacao {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY) // AUTO_INCREMENT
+    @Schema(
+        description = "Identificador da transação.",
+        example = "42",
+        accessMode = Schema.AccessMode.READ_ONLY
+    )
     private Long id; // chave primaria
 
     public Transacao() {
