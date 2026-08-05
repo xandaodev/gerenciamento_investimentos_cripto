@@ -6,6 +6,8 @@ O CriptoVision é uma API REST desenvolvida para registrar e acompanhar investim
 
 O sistema permite armazenar compras e vendas, reconstruir a posição atual de cada ativo, calcular preço médio, patrimônio, lucro ou prejuízo não realizado e realizar simulações financeiras.
 
+Cada transação pertence obrigatoriamente a um usuário. O histórico, os cálculos, as simulações e as análises são isolados pelo usuário autenticado no JWT.
+
 A aplicação utiliza atualmente:
 
 * Java 25;
@@ -55,7 +57,7 @@ Binance Public API
 
 #### Controllers
 
-Recebem requisições HTTP, extraem parâmetros, delegam operações às camadas apropriadas e constroem as respostas. O `TransacaoController` delega suas operações ao `CarteiraService`; o `AnaliseController` ainda consulta o `TransacaoRepository` diretamente.
+Recebem requisições HTTP, extraem parâmetros, obtêm o usuário autenticado por meio de `@AuthenticationPrincipal`, delegam operações às camadas apropriadas e constroem as respostas. O `TransacaoController` e o `CarteiraController` delegam suas operações ao `CarteiraService`; o `AnaliseController` ainda consulta o `TransacaoRepository` diretamente, mas utiliza uma consulta filtrada pelo usuário autenticado.
 
 #### Services
 
@@ -143,7 +145,8 @@ Classes atuais:
 O tratamento global utiliza os seguintes status:
 
 - `400 Bad Request`: dados de entrada inválidos ou saldo insuficiente;
-- `404 Not Found`: transação inexistente;
+- `401 Unauthorized`: credenciais inválidas, token ausente, expirado ou inválido;
+- `404 Not Found`: transação inexistente ou pertencente a outro usuário;
 - `409 Conflict`: alteração ou exclusão que tornaria o histórico inconsistente;
 - `500 Internal Server Error`: histórico já persistido inconsistente ou erro inesperado.
 
@@ -205,6 +208,7 @@ quantidade
 precoUnitario
 data
 tipo
+usuario
 ```
 
 O identificador é gerado automaticamente pelo banco.
@@ -222,7 +226,9 @@ COMPRA
 VENDA
 ```
 
-Atualmente, a entidade `Transacao` não possui relacionamento com a entidade `Usuario`.
+A entidade `Transacao` possui relacionamento obrigatório `@ManyToOne` com `Usuario`. A coluna `usuario_id` é `NOT NULL` e possui chave estrangeira para `usuarios.id`.
+
+O relacionamento utiliza carregamento `LAZY` e o campo `usuario` é ignorado na serialização JSON. Assim, as respostas de transação não expõem a entidade `Usuario`, o login ou a senha.
 
 ---
 
@@ -249,6 +255,8 @@ ROLE_USER
 ```
 
 Não existem diferentes níveis de permissão neste momento.
+
+Um usuário pode possuir várias transações, enquanto cada transação pertence a exatamente um usuário. O usuário associado à operação é definido pela aplicação a partir do contexto de segurança, e não por um campo enviado pelo cliente.
 
 ---
 
@@ -321,12 +329,16 @@ Transacao
 
 Os objetos `Carteira` e `Moeda` existem apenas durante a execução dos cálculos.
 
+No schema atual, `transacoes.usuario_id` é obrigatório e referencia `usuarios.id`. Essa restrição também protege a integridade do vínculo no banco de dados.
+
 ### Repositórios
 
 O `TransacaoRepository` oferece:
 
-* operações CRUD de transações;
-* consulta do total aportado agrupado por ticker.
+* listagem cronológica das transações de um usuário;
+* busca de uma transação por ID e usuário;
+* persistência e exclusão de transações;
+* consulta do total aportado agrupado por ticker e filtrado por usuário.
 
 O `UsuarioRepository` oferece:
 
@@ -335,7 +347,7 @@ O `UsuarioRepository` oferece:
 
 ### Ordenação do histórico
 
-As consultas utilizadas pelo `CarteiraService` solicitam ordenação crescente por `data` e, em caso de empate, por `id`.
+As consultas utilizadas pelo `CarteiraService` recuperam somente as transações do usuário autenticado e solicitam ordenação crescente por `data` e, em caso de empate, por `id`.
 
 Além disso, `reconstruirCarteira` ordena uma cópia da lista recebida antes do processamento. Essa segunda ordenação protege o motor mesmo quando ele recebe uma lista criada fora do repository.
 
@@ -344,6 +356,8 @@ Além disso, `reconstruirCarteira` ordena uma cópia da lista recebida antes do 
 ## 6. Autenticação e autorização
 
 A API utiliza autenticação stateless com JWT.
+
+Os controllers protegidos recebem a própria entidade `Usuario` autenticada pelo `SecurityContext`. Esse usuário é repassado aos services e repositories para limitar todas as operações ao proprietário dos dados.
 
 O endpoint público de login é:
 
@@ -394,10 +408,12 @@ Usuário é buscado pelo login
         ↓
 Autenticação é registrada no SecurityContext
         ↓
+Controller recebe o Usuario autenticado
+        ↓
 Requisição continua
 ```
 
-A aplicação utiliza sessões stateless, portanto o servidor não mantém uma sessão HTTP para o usuário.
+A aplicação utiliza sessões stateless, portanto o servidor não mantém uma sessão HTTP para o usuário. Tokens ausentes, expirados, malformados ou com assinatura inválida não autenticam a requisição e resultam em `401 Unauthorized` nas rotas protegidas.
 
 ### CORS
 
@@ -414,7 +430,7 @@ Essas portas são utilizadas pelo frontend React com Vite.
 
 ## 7. Operações de transação
 
-O `TransacaoController` recebe as requisições HTTP e delega as operações ao `CarteiraService`.
+O `TransacaoController` recebe as requisições HTTP, obtém o `Usuario` autenticado e delega as operações ao `CarteiraService`.
 
 ```text
 TransacaoController
@@ -437,23 +453,27 @@ POST /transacoes
 Fluxo:
 
 1. recebe um `TransacaoRequestDTO`;
-2. normaliza o ticker e valida os campos com Bean Validation;
-3. converte o DTO para `Transacao`;
-4. valida o ticker por meio da Binance;
-5. busca o histórico em ordem cronológica;
-6. reconstrói uma carteira temporária;
-7. processa a nova transação;
-8. valida o saldo em caso de venda;
-9. persiste a transação;
-10. retorna `201 Created`.
+2. obtém o usuário autenticado pelo Spring Security;
+3. normaliza o ticker e valida os campos com Bean Validation;
+4. converte o DTO para `Transacao`;
+5. associa a nova transação ao usuário autenticado;
+6. valida o ticker por meio da Binance;
+7. busca somente o histórico desse usuário em ordem cronológica;
+8. reconstrói uma carteira temporária;
+9. processa a nova transação;
+10. valida o saldo em caso de venda;
+11. persiste a transação;
+12. retorna `201 Created`.
 
-O cliente não pode definir diretamente o ID ou a data da transação.
+O cliente não pode definir diretamente o ID, a data ou o proprietário da transação. O `TransacaoRequestDTO` não possui `usuarioId`.
 
 ### Consulta
 
 Os endpoints de listagem e busca por ID também passam pelo `CarteiraService`.
 
-A listagem utiliza a ordenação cronológica por data e ID. A busca de um ID inexistente lança `TransacaoNaoEncontradaException` e retorna `404 Not Found`.
+A listagem utiliza a ordenação cronológica por data e ID e retorna somente as transações do usuário autenticado. A busca por ID exige simultaneamente o identificador e o proprietário.
+
+Um ID inexistente ou pertencente a outro usuário lança `TransacaoNaoEncontradaException` e retorna `404 Not Found`. A resposta não informa se o recurso existe para outra conta.
 
 ### Atualização
 
@@ -467,18 +487,18 @@ recebe o mesmo `TransacaoRequestDTO` validado utilizado na criação.
 
 Fluxo:
 
-1. busca a transação existente;
+1. busca a transação pelo ID e pelo usuário autenticado;
 2. valida o novo ticker;
 3. cria uma transação candidata independente;
-4. preserva o ID e a data originais;
-5. substitui a transação somente em uma cópia do histórico;
+4. preserva o ID, a data e o proprietário originais;
+5. substitui a transação somente em uma cópia do histórico do usuário;
 6. reconstrói uma carteira temporária;
 7. modifica e salva a entidade existente apenas quando o histórico simulado é válido;
 8. retorna `200 OK`.
 
 A entidade gerenciada pelo JPA não é modificada antes da validação da cópia. O método é transacional.
 
-Uma atualização que tornaria o histórico inconsistente lança `AlteracaoHistoricoInvalidaException` e retorna `409 Conflict`.
+Uma atualização que tornaria o histórico inconsistente lança `AlteracaoHistoricoInvalidaException` e retorna `409 Conflict`. Uma tentativa de alterar a transação de outro usuário retorna `404 Not Found` e não modifica o recurso.
 
 ### Exclusão
 
@@ -490,13 +510,13 @@ DELETE /transacoes/{id}
 
 executa o seguinte fluxo:
 
-1. busca a transação;
-2. cria uma cópia do histórico sem ela;
+1. busca a transação pelo ID e pelo usuário autenticado;
+2. cria uma cópia do histórico desse usuário sem a transação;
 3. reconstrói uma carteira temporária;
 4. exclui a entidade apenas quando o histórico restante é válido;
 5. retorna `204 No Content`.
 
-O método é transacional. Uma exclusão que tornaria o histórico inconsistente retorna `409 Conflict`.
+O método é transacional. Uma exclusão que tornaria o histórico inconsistente retorna `409 Conflict`. Uma tentativa de excluir a transação de outro usuário retorna `404 Not Found` e não remove o recurso.
 
 ---
 
@@ -507,7 +527,7 @@ O estado atual da carteira não é armazenado diretamente no banco.
 Sempre que um resumo ou simulação é solicitado, o sistema:
 
 ```text
-Busca as transações em ordem cronológica
+Busca as transações do usuário em ordem cronológica
         ↓
 Cria uma Carteira vazia
         ↓
@@ -529,6 +549,7 @@ Esse modelo faz com que o histórico de transações seja a fonte principal dos 
 
 ### Comportamento atual
 
+- somente o histórico do usuário autenticado participa da reconstrução;
 - o histórico é processado em ordem cronológica por data e ID;
 - inconsistências durante a reconstrução interrompem o cálculo;
 - a aplicação lança `HistoricoInconsistenteException`;
@@ -538,7 +559,6 @@ Esse modelo faz com que o histórico de transações seja a fonte principal dos 
 ### Limitações atuais
 
 - inconsistências do histórico ainda não possuem logs estruturados;
-- a carteira ainda não é separada por usuário;
 - a carteira é reconstruída repetidamente em diferentes endpoints.
 ---
 
@@ -640,6 +660,8 @@ GET /carteira/simulador/venda
 GET /analise/aportes-por-moeda
 ```
 
+Todos os endpoints de transações, carteira e análises exigem autenticação e operam exclusivamente sobre os dados do usuário identificado pelo JWT.
+
 ---
 
 ## 11. Fluxo do resumo da carteira
@@ -657,7 +679,7 @@ CarteiraController
         ↓
 CarteiraService.obterResumoGeral
         ↓
-Busca do histórico
+Busca do histórico do usuário autenticado
         ↓
 Reconstrução da carteira
         ↓
@@ -705,8 +727,9 @@ docker-compose.yml
 O Docker Compose define:
 
 * um container MySQL;
-* um container para a API;
-* um volume persistente para o banco.
+* um container para a API construída a partir do código atual;
+* um volume persistente para o banco;
+* credenciais e segredos recebidos por variáveis de ambiente.
 
 O MySQL é exposto localmente na porta:
 
@@ -722,6 +745,8 @@ A API é exposta na porta:
 
 O Dockerfile espera que o JAR já tenha sido gerado em `target/`.
 
+O ambiente local utiliza um arquivo `.env`, ignorado pelo Git, para fornecer `MYSQL_ROOT_PASSWORD`, `DB_USER`, `DB_PASSWORD` e `JWT_SECRET`. Dentro da rede do Compose, a API acessa o banco pelo hostname `db` e pela porta interna `3306`.
+
 Fluxo atual:
 
 ```text
@@ -734,7 +759,28 @@ Java executa o arquivo app.jar
 
 ---
 
-## 13. Decisões arquiteturais atuais
+## 13. Testes automatizados
+
+A aplicação possui testes de unidade, persistência e integração HTTP.
+
+A separação por usuário é verificada em diferentes níveis:
+
+* testes de service confirmam que a criação associa a transação ao usuário recebido;
+* `TransacaoRepositoryUsuarioTest` utiliza H2 e valida listagem e busca restritas ao proprietário;
+* `IsolamentoTransacoesHttpTest` inicializa o contexto Spring Boot, autentica dois usuários com JWT e exercita a API por `MockMvc`;
+* os testes HTTP verificam que um usuário não lista, consulta, altera ou exclui transações do outro;
+* os testes também verificam o isolamento dos endpoints de carteira e análise;
+* tentativas de acessar recursos de outra conta retornam `404 Not Found`.
+
+A suíte completa pode ser executada com:
+
+```powershell
+.\mvnw.cmd clean test
+```
+
+---
+
+## 14. Decisões arquiteturais atuais
 
 As seguintes decisões serão preservadas inicialmente:
 
@@ -742,6 +788,8 @@ As seguintes decisões serão preservadas inicialmente:
 * uso de `BigDecimal` no núcleo financeiro;
 * separação entre controllers, services e repositories;
 * autenticação stateless com JWT;
+* associação obrigatória de cada transação ao usuário autenticado;
+* isolamento de históricos, cálculos e análises por usuário;
 * MySQL como banco principal;
 * Binance como fonte inicial de preços;
 * DTOs para respostas específicas;
@@ -749,12 +797,12 @@ As seguintes decisões serão preservadas inicialmente:
 
 ---
 
-## 14. Dívidas técnicas conhecidas
+## 15. Dívidas técnicas conhecidas
 
 Os principais pontos identificados são:
 
-1. as transações ainda não pertencem ao usuário autenticado;
-2. o `AnaliseController` ainda acessa o repository diretamente;
+1. o `AnaliseController` ainda acessa o repository diretamente;
+2. ainda não existe endpoint público de cadastro de usuário;
 3. a carteira é reconstruída repetidamente em diferentes endpoints;
 4. inconsistências do histórico ainda não possuem logs estruturados;
 5. parte dos cálculos e DTOs ainda utiliza `double`;
@@ -763,11 +811,12 @@ Os principais pontos identificados são:
 8. não há migrations versionadas do banco;
 9. `spring.jpa.hibernate.ddl-auto=update` ainda é utilizado;
 10. a injeção de dependências é realizada por atributos;
-11. erros de autenticação ainda não são totalmente padronizados;
+11. o corpo das respostas de erro de autenticação ainda não é totalmente padronizado;
 12. não há paginação ou filtros no histórico;
 13. não há lucro realizado persistido ou consolidado;
 14. não há suporte a taxas;
 15. não há cache nem consulta em lote de cotações;
-16. o README ainda contém informações desatualizadas.
+16. `spring.jpa.open-in-view` ainda utiliza a configuração padrão;
+17. o README ainda contém informações desatualizadas.
 
 Esses itens serão tratados em commits pequenos e independentes.

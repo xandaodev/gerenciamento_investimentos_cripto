@@ -32,7 +32,10 @@ preço unitário
 tipo
 data
 identificador
+usuário proprietário
 ```
+
+Cada transação pertence obrigatoriamente a um único usuário. O proprietário não é escolhido no corpo da requisição; ele é obtido do JWT autenticado.
 
 ### Ticker
 
@@ -87,7 +90,56 @@ O código calcula esse valor durante o processamento de uma venda, mas ele ainda
 
 ---
 
-## 3. Tipos de transação
+## 3. Isolamento por usuário
+
+O CriptoVision mantém um histórico financeiro independente para cada usuário autenticado.
+
+### Associação obrigatória
+
+Cada transação possui um proprietário obrigatório:
+
+```text
+Transacao.usuario → Usuario
+transacoes.usuario_id → usuarios.id
+```
+
+A coluna `usuario_id` não aceita valor nulo. Na criação, a aplicação associa a transação ao `Usuario` presente no contexto de segurança.
+
+O cliente não envia `usuarioId` e não pode registrar uma transação em nome de outra conta.
+
+### Escopo das operações
+
+As seguintes operações utilizam somente os dados do usuário autenticado:
+
+* criação e listagem de transações;
+* busca de transação por ID;
+* atualização e exclusão;
+* reconstrução da carteira;
+* cálculo do total histórico;
+* resumo da carteira;
+* simulação de DCA;
+* simulação de venda;
+* total aportado por moeda.
+
+A busca, a atualização e a exclusão exigem simultaneamente o ID da transação e o proprietário.
+
+### Acesso a dados de outra conta
+
+Quando um usuário tenta consultar, alterar ou excluir uma transação pertencente a outra conta, a API retorna:
+
+```text
+404 Not Found
+```
+
+A API usa `404`, em vez de revelar que o ID existe para outro usuário. Nenhuma alteração é realizada no recurso.
+
+### Proteção das respostas
+
+O campo `usuario` da entidade `Transacao` não é serializado nas respostas JSON. Dados como login e senha não são expostos junto das transações.
+
+---
+
+## 4. Tipos de transação
 
 O sistema representa o tipo pelo enum `TipoTransacao`.
 
@@ -104,7 +156,7 @@ Na entrada JSON, valores como `"compra"` e `" Compra "` são normalizados. Qualq
 
 ---
 
-## 4. Normalização e validação de entrada
+## 5. Normalização e validação de entrada
 
 ### Normalização do ticker
 
@@ -159,7 +211,7 @@ Uma indisponibilidade da Binance pode ser interpretada como se o ticker não exi
 
 ---
 
-## 5. Regra de compra
+## 6. Regra de compra
 
 Uma compra aumenta o saldo e recalcula o preço médio.
 
@@ -238,7 +290,7 @@ Preço médio: 55.000 USDT
 
 ---
 
-## 6. Validações da compra
+## 7. Validações da compra
 
 Nas requisições HTTP de criação e atualização, o `TransacaoRequestDTO` rejeita quantidade e preço nulos, iguais a zero ou negativos. Também rejeita ticker e tipo ausentes.
 
@@ -248,7 +300,7 @@ Essa duplicação de proteção no núcleo financeiro ainda pode ser adicionada 
 
 ---
 
-## 7. Regra de venda
+## 8. Regra de venda
 
 Uma venda reduz o saldo do ativo.
 
@@ -290,7 +342,7 @@ Essa é a regra utilizada atualmente pelo sistema.
 
 ---
 
-## 8. Validações atuais de venda
+## 9. Validações atuais de venda
 
 ### Quantidade positiva
 
@@ -321,7 +373,7 @@ Tentativa de venda: 1 BTC
 
 ---
 
-## 9. Lucro realizado de uma venda
+## 10. Lucro realizado de uma venda
 
 Durante o processamento da venda, o sistema calcula:
 
@@ -372,7 +424,7 @@ Atualmente ele:
 
 ---
 
-## 10. Venda total da posição
+## 11. Venda total da posição
 
 Quando todo o saldo é vendido:
 
@@ -386,9 +438,9 @@ Uma regra explícita para zerar o preço médio quando o saldo chegar a zero ain
 
 ---
 
-## 11. Reconstrução da carteira
+## 12. Reconstrução da carteira
 
-A carteira atual é calculada a partir do histórico completo.
+A carteira atual é calculada a partir do histórico completo do usuário autenticado.
 
 Fluxo:
 
@@ -412,7 +464,7 @@ Para cada transação:
 
 ### Fonte de verdade
 
-O histórico de transações é atualmente a fonte de verdade para:
+O histórico de transações do usuário autenticado é atualmente a fonte de verdade para:
 
 * saldo;
 * preço médio;
@@ -422,7 +474,7 @@ O histórico de transações é atualmente a fonte de verdade para:
 
 ### Ordenação determinística
 
-O histórico utilizado pelo `CarteiraService` é consultado em ordem crescente por `data` e `id`.
+O histórico utilizado pelo `CarteiraService` contém somente as transações do usuário autenticado e é consultado em ordem crescente por `data` e `id`.
 
 Além disso, `reconstruirCarteira` ordena uma cópia da lista recebida antes de processá-la. Assim, o resultado não depende da ordem acidental fornecida pelo banco ou por um teste.
 
@@ -442,17 +494,19 @@ Uma transação inválida não é mais ignorada silenciosamente.
 
 ---
 
-## 12. Registro de nova transação
+## 13. Registro de nova transação
 
 Antes de registrar uma nova transação, o sistema:
 
-1. valida o ticker na Binance;
-2. cria uma carteira temporária;
-3. busca todo o histórico existente;
-4. reconstrói a carteira;
-5. obtém o ativo correspondente;
-6. processa a nova transação;
-7. salva a transação no banco.
+1. identifica o usuário autenticado;
+2. associa a nova transação a esse usuário;
+3. valida o ticker na Binance;
+4. cria uma carteira temporária;
+5. busca somente o histórico do usuário;
+6. reconstrói a carteira;
+7. obtém o ativo correspondente;
+8. processa a nova transação;
+9. salva a transação no banco.
 
 Esse fluxo evita que uma nova venda seja registrada quando não existe saldo suficiente.
 
@@ -460,7 +514,7 @@ A atualização e a exclusão também simulam o histórico resultante antes de c
 
 ---
 
-## 13. Atualização de transação
+## 14. Atualização de transação
 
 Uma transação somente pode ser atualizada quando o histórico resultante continuar financeiramente consistente.
 
@@ -468,15 +522,16 @@ O endpoint recebe um `TransacaoRequestDTO`, portanto os novos valores passam pel
 
 Durante a atualização:
 
-1. a transação é buscada pelo ID;
+1. a transação é buscada pelo ID e pelo usuário autenticado;
 2. o novo ticker é validado;
 3. uma transação candidata independente é criada;
 4. o ID original é preservado;
 5. a data original é preservada;
-6. somente ticker, quantidade, preço unitário e tipo podem mudar;
-7. a candidata substitui a original somente em uma cópia do histórico;
-8. a carteira temporária é reconstruída;
-9. a entidade persistida só é modificada e salva quando a simulação é válida.
+6. o proprietário original é preservado;
+7. somente ticker, quantidade, preço unitário e tipo podem mudar;
+8. a candidata substitui a original somente em uma cópia do histórico do usuário;
+9. a carteira temporária é reconstruída;
+10. a entidade persistida só é modificada e salva quando a simulação é válida.
 
 Exemplo rejeitado:
 
@@ -495,18 +550,18 @@ A alteração produziria uma venda superior ao saldo disponível. Nesse caso, na
 409 Conflict
 ```
 
-Um ID inexistente retorna `404 Not Found`. A operação é executada em método `@Transactional`.
+Um ID inexistente ou pertencente a outro usuário retorna `404 Not Found`. A operação é executada em método `@Transactional`.
 
 ---
 
-## 14. Exclusão de transação
+## 15. Exclusão de transação
 
 Uma transação somente pode ser excluída quando o histórico restante continuar consistente.
 
 Fluxo:
 
-1. a transação é buscada pelo ID;
-2. uma cópia do histórico é criada sem essa transação;
+1. a transação é buscada pelo ID e pelo usuário autenticado;
+2. uma cópia do histórico desse usuário é criada sem a transação;
 3. a carteira temporária é reconstruída;
 4. a exclusão é executada somente quando a simulação é válida.
 
@@ -523,11 +578,11 @@ Excluir a compra deixaria uma venda sem saldo correspondente. Nesse caso, nenhum
 409 Conflict
 ```
 
-Um ID inexistente retorna `404 Not Found`. A operação é executada em método `@Transactional`.
+Um ID inexistente ou pertencente a outro usuário retorna `404 Not Found`. A operação é executada em método `@Transactional`.
 
 ---
 
-## 15. Cálculo de lucro potencial
+## 16. Cálculo de lucro potencial
 
 O lucro potencial representa o PNL não realizado.
 
@@ -575,7 +630,7 @@ PNL = 3.000 - 4.000 = -1.000
 
 ---
 
-## 16. Porcentagem de PNL
+## 17. Porcentagem de PNL
 
 Para cada ativo:
 
@@ -588,7 +643,7 @@ Caso o custo da posição seja zero, a porcentagem retornada é zero.
 
 ---
 
-## 17. Valor atual da carteira
+## 18. Valor atual da carteira
 
 No resumo da carteira, o valor atual é calculado somando o valor de mercado dos ativos com saldo positivo.
 
@@ -611,9 +666,9 @@ Portanto, o valor resultante é atualmente denominado principalmente em USDT, tr
 
 ---
 
-## 18. Endpoint `/carteira/total`
+## 19. Endpoint `/carteira/total`
 
-O método utilizado por esse endpoint não calcula o valor atual de mercado da carteira.
+O método utilizado por esse endpoint considera somente as transações do usuário autenticado e não calcula o valor atual de mercado da carteira.
 
 Ele realiza:
 
@@ -649,7 +704,7 @@ Esse endpoint será renomeado ou substituído posteriormente.
 
 ---
 
-## 19. Resumo por ativo
+## 20. Resumo por ativo
 
 Cada ativo com saldo positivo possui no resumo:
 
@@ -682,7 +737,7 @@ porcentagemPNL =
 
 ---
 
-## 20. PNL total da carteira
+## 21. PNL total da carteira
 
 O PNL total é a soma do PNL não realizado de todos os ativos com saldo positivo.
 
@@ -702,7 +757,7 @@ O PNL total atual não inclui:
 
 ---
 
-## 21. Variação estimada da carteira em 24 horas
+## 22. Variação estimada da carteira em 24 horas
 
 Para cada ativo, o sistema estima o valor anterior utilizando:
 
@@ -729,9 +784,9 @@ Ela é uma estimativa e não utiliza snapshots históricos próprios da carteira
 
 ---
 
-## 22. Simulação de DCA
+## 23. Simulação de DCA
 
-A simulação de DCA calcula o efeito de um novo aporte no preço médio.
+A simulação de DCA calcula o efeito de um novo aporte no preço médio da carteira do usuário autenticado.
 
 Entradas:
 
@@ -806,7 +861,7 @@ Esses casos podem produzir divisão por zero ou resultados sem significado finan
 
 ---
 
-## 23. Simulação de venda futura
+## 24. Simulação de venda futura
 
 A simulação de venda utiliza:
 
@@ -815,7 +870,7 @@ ticker
 preço-alvo
 ```
 
-O sistema reconstrói a carteira, consulta o preço atual e calcula quanto a posição valeria no preço-alvo.
+O sistema reconstrói a carteira do usuário autenticado, consulta o preço atual e calcula quanto a posição valeria no preço-alvo.
 
 ### Lucro simulado
 
@@ -853,9 +908,9 @@ Ainda não é possível informar uma quantidade parcial para a simulação.
 
 ---
 
-## 24. Total aportado por moeda
+## 25. Total aportado por moeda
 
-O endpoint de análise agrupa as compras por ticker.
+O endpoint de análise agrupa por ticker somente as compras do usuário autenticado.
 
 Para cada ativo:
 
@@ -882,7 +937,7 @@ Portanto, ela não representa o custo atual da posição.
 
 ---
 
-## 25. Moeda de referência
+## 26. Moeda de referência
 
 A maior parte das cotações utiliza pares com USDT.
 
@@ -902,7 +957,7 @@ Também não existe conversão consistente de todos os valores para BRL.
 
 ---
 
-## 26. Precisão numérica
+## 27. Precisão numérica
 
 O núcleo das entidades `Transacao` e `Moeda` utiliza `BigDecimal`.
 
@@ -921,7 +976,7 @@ Assim, a aplicação ainda não utiliza `BigDecimal` de ponta a ponta.
 
 ---
 
-## 27. Regras ainda não implementadas
+## 28. Regras ainda não implementadas
 
 A aplicação ainda não possui regras completas para:
 
@@ -940,14 +995,13 @@ A aplicação ainda não possui regras completas para:
 * airdrops;
 * compras em reais;
 * conversão cambial histórica;
-* separação da carteira por usuário;
-* múltiplas carteiras por usuário.
+* múltiplas carteiras para um mesmo usuário.
 
 Esses recursos deverão ser definidos antes de serem implementados.
 
 ---
 
-## 28. Princípios para futuras alterações
+## 29. Princípios para futuras alterações
 
 As próximas mudanças devem respeitar os seguintes princípios:
 
@@ -957,7 +1011,7 @@ As próximas mudanças devem respeitar os seguintes princípios:
 4. criação, edição e exclusão devem passar pelo service;
 5. cálculos financeiros devem evitar `double` quando precisão monetária for necessária;
 6. falhas externas não devem ser transformadas silenciosamente em preço zero;
-7. cada transação deve pertencer ao usuário autenticado;
+7. o isolamento entre usuários deve ser preservado em toda consulta, cálculo e alteração;
 8. regras financeiras devem possuir testes automatizados;
 9. migrations devem controlar a evolução do banco;
 10. a documentação deve ser atualizada junto com as regras.
