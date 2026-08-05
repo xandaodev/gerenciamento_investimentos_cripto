@@ -1,6 +1,11 @@
 package br.com.criptovision.model;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -17,27 +22,41 @@ public class Usuario implements UserDetails {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(unique = true)
+    @Column(
+        nullable = false,
+        unique = true,
+        length = 100
+    )
     private String login;
 
+    @Column(
+        nullable = false,
+        length = 255
+    )
     private String senha;
 
-    public Usuario() {}
+    public Usuario() {
+    }
 
     public Usuario(String login, String senha) {
         this.login = login;
         this.senha = senha;
     }
 
-    public Long getId() { return id; }
-    public String getLogin() { return login; }
-    public String getSenha() { return senha; }
+    public Long getId() {
+        return id;
+    }
 
-    // metodos obrigatorios do spring security
+    public String getLogin() {
+        return login;
+    }
+
+    public String getSenha() {
+        return senha;
+    }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        // Todo usuário que criarmos terá a permissão básica de "USER"
         return List.of(new SimpleGrantedAuthority("ROLE_USER"));
     }
 
@@ -52,28 +71,41 @@ public class Usuario implements UserDetails {
     }
 
     @Override
-    public boolean isAccountNonExpired() { return true; }
+    public boolean isAccountNonExpired() {
+        return true;
+    }
 
     @Override
-    public boolean isAccountNonLocked() { return true; }
+    public boolean isAccountNonLocked() {
+        return true;
+    }
 
     @Override
-    public boolean isCredentialsNonExpired() { return true; }
+    public boolean isCredentialsNonExpired() {
+        return true;
+    }
 
     @Override
-    public boolean isEnabled() { return true; }
+    public boolean isEnabled() {
+        return true;
+    }
 
-    // equals e hashCode (boas práticas para entidades do banco)
     @Override
-    public boolean equals(Object o){
-        if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+    public boolean equals(Object o) {
+        if (this == o) {
+            return true;
+        }
+
+        if (o == null || getClass() != o.getClass()) {
+            return false;
+        }
+
         Usuario usuario = (Usuario) o;
         return Objects.equals(id, usuario.id);
     }
 
     @Override
-    public int hashCode(){
+    public int hashCode() {
         return Objects.hash(id);
     }
 }

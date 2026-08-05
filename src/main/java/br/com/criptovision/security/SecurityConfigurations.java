@@ -29,9 +29,12 @@ public class SecurityConfigurations {
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         return http
-                .cors(cors -> cors.configurationSource(corsConfigurationSource())) // ATIVAMOS O CORS AQUI
-                .csrf(csrf -> csrf.disable())
-                .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS)).exceptionHandling(exception -> exception
+            .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+            .csrf(csrf -> csrf.disable())
+            .sessionManagement(sm ->
+                sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            )
+            .exceptionHandling(exception -> exception
                 .authenticationEntryPoint(
                     (request, response, authException) ->
                         response.sendError(
@@ -39,40 +42,61 @@ public class SecurityConfigurations {
                         )
                 )
             )
-                .authorizeHttpRequests(req -> {
-                    // libera a rota de login para qualquer um tentar entrar
-                    req.requestMatchers("/auth/login").permitAll();
-                    // libera as rotas do Swagger para podermos testar e documentar
-                    req.requestMatchers("/v3/api-docs/**", "/swagger-ui.html", "/swagger-ui/**").permitAll();
-                    // qualquer outra rota precisa estar autenticado
-                    req.anyRequest().authenticated();
-                })
-                // coloca o leao de chacara ANTES do filtro padrão do Spring
-                .addFilterBefore(securityFilter, UsernamePasswordAuthenticationFilter.class)
-                .build();
+            .authorizeHttpRequests(req -> {
+                req.requestMatchers(
+                    "/auth/login",
+                    "/auth/register"
+                ).permitAll();
+
+                req.requestMatchers(
+                    "/v3/api-docs/**",
+                    "/swagger-ui.html",
+                    "/swagger-ui/**"
+                ).permitAll();
+
+                req.anyRequest().authenticated();
+            })
+            .addFilterBefore(
+                securityFilter,
+                UsernamePasswordAuthenticationFilter.class
+            )
+            .build();
     }
 
     @Bean
-    public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception {
+    public AuthenticationManager authenticationManager(
+        AuthenticationConfiguration configuration
+    ) throws Exception {
         return configuration.getAuthenticationManager();
     }
 
-    // configura o algoritmo de Hash de senhas para o banco de dados
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    // NOVA CONFIGURAÇÃO DE CORS
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // Permite o seu React local acessar a API (adicionei as portas 5173 e 5174 do Vite)
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:5173", "http://localhost:5174"));
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
+
+        configuration.setAllowedOrigins(Arrays.asList(
+            "http://localhost:5173",
+            "http://localhost:5174"
+        ));
+
+        configuration.setAllowedMethods(Arrays.asList(
+            "GET",
+            "POST",
+            "PUT",
+            "DELETE",
+            "OPTIONS"
+        ));
+
         configuration.setAllowedHeaders(Arrays.asList("*"));
 
-        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        UrlBasedCorsConfigurationSource source =
+            new UrlBasedCorsConfigurationSource();
+
         source.registerCorsConfiguration("/**", configuration);
         return source;
     }

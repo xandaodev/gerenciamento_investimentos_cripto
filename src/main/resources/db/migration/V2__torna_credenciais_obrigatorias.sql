@@ -1,0 +1,3 @@
+ALTER TABLE usuarios
+    MODIFY login VARCHAR(100) NOT NULL,
+    MODIFY senha VARCHAR(255) NOT NULL;

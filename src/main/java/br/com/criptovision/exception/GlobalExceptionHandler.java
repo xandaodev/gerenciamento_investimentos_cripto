@@ -160,6 +160,23 @@ public class GlobalExceptionHandler {
     }
 
 
+    @ExceptionHandler(LoginJaCadastradoException.class)
+    public ResponseEntity<Map<String, Object>> tratarLoginJaCadastrado(
+        LoginJaCadastradoException ex
+    ) {
+        Map<String, Object> erroJson = new LinkedHashMap<>();
+
+        erroJson.put("timestamp", LocalDateTime.now());
+        erroJson.put("status", HttpStatus.CONFLICT.value());
+        erroJson.put("erro", "Login já cadastrado");
+        erroJson.put("mensagem", ex.getMessage());
+
+        return ResponseEntity
+            .status(HttpStatus.CONFLICT)
+            .body(erroJson);
+    }
+
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<Map<String, Object>> tratarErroGenerico(Exception ex) {
 
