@@ -85,7 +85,12 @@ class CadastroUsuarioHttpTest {
                     """))
             .andExpect(status().isConflict())
             .andExpect(jsonPath("$.status").value(409))
-            .andExpect(jsonPath("$.erro").value("Login já cadastrado"));
+                        .andExpect(jsonPath("$.title").value("Login já cadastrado"))
+            .andExpect(jsonPath("$.detail").value(
+                "O login informado já está cadastrado."
+            ))
+            .andExpect(jsonPath("$.instance").value("/auth/register"))
+            .andExpect(jsonPath("$.dataHora").exists());
     }
 
     @Test
@@ -99,7 +104,10 @@ class CadastroUsuarioHttpTest {
                     }
                     """))
             .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.campos.login").exists());
+                        .andExpect(jsonPath("$.title").value("Dados inválidos"))
+            .andExpect(jsonPath("$.erros[*].campo").value(
+                org.hamcrest.Matchers.hasItem("login")
+            ));
     }
 
     @Test
@@ -113,7 +121,10 @@ class CadastroUsuarioHttpTest {
                     }
                     """))
             .andExpect(status().isBadRequest())
-            .andExpect(jsonPath("$.campos.senha").exists());
+                        .andExpect(jsonPath("$.title").value("Dados inválidos"))
+            .andExpect(jsonPath("$.erros[*].campo").value(
+                org.hamcrest.Matchers.hasItem("senha")
+            ));
     }
 
     @Test

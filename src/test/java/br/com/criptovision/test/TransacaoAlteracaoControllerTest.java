@@ -168,11 +168,11 @@ public class TransacaoAlteracaoControllerTest {
             )
             .andExpect(status().isBadRequest())
             .andExpect(
-                jsonPath("$.erro")
+                jsonPath("$.title")
                     .value("Dados inválidos")
             )
             .andExpect(
-                jsonPath("$.campos.quantidade")
+                jsonPath("$.erros[0].mensagem")
                     .value(
                         "A quantidade deve ser maior que zero."
                     )
@@ -209,11 +209,11 @@ public class TransacaoAlteracaoControllerTest {
             )
             .andExpect(status().isNotFound())
             .andExpect(
-                jsonPath("$.erro")
-                    .value("Transação não encontrada")
+                jsonPath("$.title")
+                    .value("Recurso não encontrado")
             )
             .andExpect(
-                jsonPath("$.mensagem")
+                jsonPath("$.detail")
                     .value(
                         "Transação não encontrada "
                             + "para o ID 999."
@@ -252,11 +252,11 @@ public class TransacaoAlteracaoControllerTest {
             )
             .andExpect(status().isConflict())
             .andExpect(
-                jsonPath("$.erro")
+                jsonPath("$.title")
                     .value("Conflito no histórico")
             )
             .andExpect(
-                jsonPath("$.mensagem")
+                jsonPath("$.detail")
                     .value(
                         "A alteração tornaria o "
                             + "histórico inconsistente."
@@ -295,11 +295,11 @@ public class TransacaoAlteracaoControllerTest {
             )
             .andExpect(status().isNotFound())
             .andExpect(
-                jsonPath("$.erro")
-                    .value("Transação não encontrada")
+                jsonPath("$.title")
+                    .value("Recurso não encontrado")
             )
             .andExpect(
-                jsonPath("$.mensagem")
+                jsonPath("$.detail")
                     .value(
                         "Transação não encontrada "
                             + "para o ID 999."
@@ -326,11 +326,11 @@ public class TransacaoAlteracaoControllerTest {
             )
             .andExpect(status().isConflict())
             .andExpect(
-                jsonPath("$.erro")
+                jsonPath("$.title")
                     .value("Conflito no histórico")
             )
             .andExpect(
-                jsonPath("$.mensagem")
+                jsonPath("$.detail")
                     .value(
                         "A exclusão tornaria o "
                             + "histórico inconsistente."

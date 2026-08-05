@@ -177,9 +177,9 @@ public class IsolamentoTransacoesHttpTest {
             )
             .andExpect(status().isNotFound())
             .andExpect(
-                jsonPath("$.erro")
+                jsonPath("$.title")
                     .value(
-                        "Transação não encontrada"
+                        "Recurso não encontrado"
                     )
             );
     }

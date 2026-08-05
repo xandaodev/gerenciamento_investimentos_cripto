@@ -158,11 +158,11 @@ public class TransacaoControllerTest {
             )
             .andExpect(status().isBadRequest())
             .andExpect(
-                jsonPath("$.erro")
+                jsonPath("$.title")
                     .value("Dados inválidos")
             )
             .andExpect(
-                jsonPath("$.campos.quantidade")
+                jsonPath("$.erros[0].mensagem")
                     .value(
                         "A quantidade deve ser maior que zero."
                     )
@@ -189,11 +189,11 @@ public class TransacaoControllerTest {
             )
             .andExpect(status().isBadRequest())
             .andExpect(
-                jsonPath("$.erro")
+                jsonPath("$.title")
                     .value("Corpo da requisição inválido")
             )
             .andExpect(
-                jsonPath("$.mensagem")
+                jsonPath("$.detail")
                     .value(
                         containsString(
                             "Tipo de transação inválido"
