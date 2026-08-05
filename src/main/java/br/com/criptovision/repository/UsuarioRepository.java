@@ -8,7 +8,7 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface UsuarioRepository extends JpaRepository<Usuario, Long> {
 
-    // o spring security vai usar este metodo para procurar o usuario na hora do login
     UserDetails findByLogin(String login);
 
+    boolean existsByLogin(String login);
 }

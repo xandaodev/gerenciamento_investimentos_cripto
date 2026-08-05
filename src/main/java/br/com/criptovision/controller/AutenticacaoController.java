@@ -1,10 +1,14 @@
 package br.com.criptovision.controller;
 
 import br.com.criptovision.dto.DadosAutenticacao;
+import br.com.criptovision.dto.DadosCadastroUsuario;
 import br.com.criptovision.dto.TokenJwtDTO;
+import br.com.criptovision.dto.UsuarioCadastradoDTO;
 import br.com.criptovision.model.Usuario;
 import br.com.criptovision.security.TokenService;
-import org.springframework.beans.factory.annotation.Autowired;
+import br.com.criptovision.service.UsuarioService;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -17,24 +21,44 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/auth")
 public class AutenticacaoController {
 
-    @Autowired
-    private AuthenticationManager manager;
+    private final AuthenticationManager manager;
+    private final TokenService tokenService;
+    private final UsuarioService usuarioService;
 
-    @Autowired
-    private TokenService tokenService;
+    public AutenticacaoController(
+        AuthenticationManager manager,
+        TokenService tokenService,
+        UsuarioService usuarioService
+    ) {
+        this.manager = manager;
+        this.tokenService = tokenService;
+        this.usuarioService = usuarioService;
+    }
 
     @PostMapping("/login")
-    public ResponseEntity efetuarLogin(@RequestBody DadosAutenticacao dados) {
-        // encapsula o login e senha recebidos
-        var authenticationToken = new UsernamePasswordAuthenticationToken(dados.login(), dados.senha());
+    public ResponseEntity<TokenJwtDTO> efetuarLogin(
+        @RequestBody DadosAutenticacao dados
+    ) {
+        var authenticationToken = new UsernamePasswordAuthenticationToken(
+            dados.login(),
+            dados.senha()
+        );
 
-        // o Spring vai no banco e testa se a senha bate
         var authentication = manager.authenticate(authenticationToken);
-
         var usuario = (Usuario) authentication.getPrincipal();
         var tokenJWT = tokenService.gerarToken(usuario.getLogin());
 
-        //devolve o JSON com o token dentro
         return ResponseEntity.ok(new TokenJwtDTO(tokenJWT));
+    }
+
+    @PostMapping("/register")
+    public ResponseEntity<UsuarioCadastradoDTO> cadastrar(
+        @Valid @RequestBody DadosCadastroUsuario dados
+    ) {
+        Usuario usuario = usuarioService.cadastrar(dados);
+
+        return ResponseEntity
+            .status(HttpStatus.CREATED)
+            .body(new UsuarioCadastradoDTO(usuario));
     }
 }
