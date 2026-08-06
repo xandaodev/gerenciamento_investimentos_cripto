@@ -6,6 +6,7 @@ import br.com.criptovision.model.Transacao;
 import br.com.criptovision.model.Usuario;
 import br.com.criptovision.repository.TransacaoRepository;
 import br.com.criptovision.repository.UsuarioRepository;
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,6 +30,9 @@ public class TransacaoRepositoryUsuarioTest {
     @Autowired
     private UsuarioRepository usuarioRepository;
 
+    @Autowired
+    private EntityManager entityManager;
+
     private Usuario alexandre;
     private Usuario outroUsuario;
 
@@ -45,6 +49,46 @@ public class TransacaoRepositoryUsuarioTest {
             new Usuario(
                 "outro-usuario",
                 "senha-criptografada-outro"
+            )
+        );
+    }
+
+    @Test
+    public void devePreservarPrecisaoDeQuantidadeEPrecoUnitario() {
+        BigDecimal quantidade =
+            new BigDecimal("0.00000001");
+
+        BigDecimal precoUnitario =
+            new BigDecimal("0.00001234");
+
+        Transacao salva = salvarTransacao(
+            alexandre,
+            "BTC",
+            quantidade,
+            precoUnitario,
+            TipoTransacao.COMPRA
+        );
+
+        Long id = salva.getId();
+
+        entityManager.clear();
+
+        Transacao recarregada =
+            transacaoRepository
+                .findById(id)
+                .orElseThrow();
+
+        assertEquals(
+            0,
+            quantidade.compareTo(
+                recarregada.getQuantidade()
+            )
+        );
+
+        assertEquals(
+            0,
+            precoUnitario.compareTo(
+                recarregada.getPrecoUnitario()
             )
         );
     }
