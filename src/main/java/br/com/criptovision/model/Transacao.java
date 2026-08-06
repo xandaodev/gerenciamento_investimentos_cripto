@@ -23,9 +23,25 @@ public class Transacao {
 
     @Schema(description = "Ticker do ativo.", example = "BTC")
     private String ticker; // moeda (btc, eth, sol ....)
-    @Schema(description = "Quantidade negociada.", example = "0.015")
+    @Schema(
+        description = "Quantidade negociada, com até 18 casas decimais.",
+        example = "0.001"
+    )
+    @Column(
+        precision = 38,
+        scale = 18
+    )
     private BigDecimal quantidade;
-    @Schema(description = "Preço unitário informado na operação.", example = "64000.00")
+
+    @Schema(
+        description = "Preço unitário informado na operação, com até 18 casas decimais.",
+        example = "64000.00"
+    )
+    @Column(
+        name = "preco_unitario",
+        precision = 38,
+        scale = 18
+    )
     private BigDecimal precoUnitario;
     @CreationTimestamp
     @Schema(

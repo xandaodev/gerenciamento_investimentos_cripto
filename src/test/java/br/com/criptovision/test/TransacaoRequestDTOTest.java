@@ -53,6 +53,35 @@ public class TransacaoRequestDTOTest {
     }
 
     @Test
+    public void deveAceitarDezoitoCasasDecimais() {
+        TransacaoRequestDTO dados =
+            new TransacaoRequestDTO(
+                "BTC",
+                new BigDecimal("0.000000000000000001"),
+                new BigDecimal("0.000000000000000001"),
+                TipoTransacao.COMPRA
+            );
+
+        assertTrue(validator.validate(dados).isEmpty());
+    }
+
+    @Test
+    public void deveRejeitarMaisDeDezoitoCasasDecimais() {
+        TransacaoRequestDTO dados =
+            new TransacaoRequestDTO(
+                "BTC",
+                new BigDecimal("0.0000000000000000001"),
+                BigDecimal.ONE,
+                TipoTransacao.COMPRA
+            );
+
+        assertTrue(
+            camposInvalidos(dados)
+                .contains("quantidade")
+        );
+    }
+
+    @Test
     public void deveRejeitarTickerEmBranco() {
         TransacaoRequestDTO dados = criarDadosValidosComTicker("   ");
 

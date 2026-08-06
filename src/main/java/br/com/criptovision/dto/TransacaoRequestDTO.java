@@ -3,6 +3,7 @@ package br.com.criptovision.dto;
 import br.com.criptovision.model.TipoTransacao;
 import br.com.criptovision.model.Transacao;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
@@ -36,23 +37,33 @@ public record TransacaoRequestDTO(
     String ticker,
 
     @Schema(
-        description = "Quantidade negociada.",
-        example = "0.015",
+        description = "Quantidade negociada, com até 18 casas decimais.",
+        example = "0.001",
         minimum = "0",
         exclusiveMinimum = true
     )
     @NotNull(message = "A quantidade é obrigatória.")
     @Positive(message = "A quantidade deve ser maior que zero.")
+    @Digits(
+        integer = 20,
+        fraction = 18,
+        message = "A quantidade deve possuir no máximo 20 dígitos inteiros e 18 casas decimais."
+    )
     BigDecimal quantidade,
 
     @Schema(
-        description = "Preço unitário do ativo na operação.",
+        description = "Preço unitário do ativo, com até 18 casas decimais.",
         example = "64000.00",
         minimum = "0",
         exclusiveMinimum = true
     )
     @NotNull(message = "O preço unitário é obrigatório.")
     @Positive(message = "O preço unitário deve ser maior que zero.")
+    @Digits(
+        integer = 20,
+        fraction = 18,
+        message = "O preço unitário deve possuir no máximo 20 dígitos inteiros e 18 casas decimais."
+    )
     BigDecimal precoUnitario,
 
     @Schema(

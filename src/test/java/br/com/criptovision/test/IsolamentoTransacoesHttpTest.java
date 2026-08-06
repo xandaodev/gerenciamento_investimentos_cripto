@@ -153,6 +153,39 @@ public class IsolamentoTransacoesHttpTest {
     }
 
     @Test
+    public void devePreservarQuantidadeFracionariaNaResposta()
+        throws Exception {
+
+        mockMvc.perform(
+                post("/transacoes")
+                    .header(
+                        HttpHeaders.AUTHORIZATION,
+                        bearer(tokenAlexandre)
+                    )
+                    .contentType(
+                        MediaType.APPLICATION_JSON
+                    )
+                    .content("""
+                        {
+                          "ticker": "BTC",
+                          "quantidade": 0.001,
+                          "precoUnitario": 64000.12345678,
+                          "tipo": "COMPRA"
+                        }
+                        """)
+            )
+            .andExpect(status().isCreated())
+            .andExpect(
+                jsonPath("$.quantidade")
+                    .value(0.001)
+            )
+            .andExpect(
+                jsonPath("$.precoUnitario")
+                    .value(64000.12345678)
+            );
+    }
+
+    @Test
     public void deveRetornar404AoBuscarTransacaoDeOutroUsuario()
         throws Exception {
 
