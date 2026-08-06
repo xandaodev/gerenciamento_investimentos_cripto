@@ -138,6 +138,14 @@ public class TransacaoController {
                 mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                 schema = @Schema(implementation = ProblemaApiDTO.class)
             )
+        ),
+        @ApiResponse(
+            responseCode = "503",
+            description = "O serviço de cotações está temporariamente indisponível.",
+            content = @Content(
+                mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                schema = @Schema(implementation = ProblemaApiDTO.class)
+            )
         )
     })
     public ResponseEntity<Transacao> salvar(
@@ -259,6 +267,14 @@ public class TransacaoController {
         @ApiResponse(
             responseCode = "409",
             description = "A alteração tornaria o histórico inconsistente.",
+            content = @Content(
+                mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                schema = @Schema(implementation = ProblemaApiDTO.class)
+            )
+        ),
+        @ApiResponse(
+            responseCode = "503",
+            description = "O serviço de cotações está temporariamente indisponível.",
             content = @Content(
                 mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                 schema = @Schema(implementation = ProblemaApiDTO.class)

@@ -26,7 +26,7 @@ public class CarteiraServiceTest {
 
     @Test
     public void deveCalcularPrecoMedioCorretamenteAposDuasCompras(){
-        CarteiraService service = new CarteiraService();
+        CarteiraService service = new CarteiraService(null, null);
         Moeda btc = new Moeda("BTC", "Bitcoin");
 
         Transacao t1 = new Transacao("BTC", BigDecimal.valueOf(1.0), BigDecimal.valueOf(50000.0), TipoTransacao.COMPRA);
@@ -41,7 +41,7 @@ public class CarteiraServiceTest {
 
     @Test
     public void deveCalcularLucroCorretamenteAposVendaParcial(){
-        CarteiraService service = new CarteiraService();
+        CarteiraService service = new CarteiraService(null, null);
         Moeda link = new Moeda("LINK", "Chainlink");
 
         service.processarTransacao(link, new Transacao("LINK", BigDecimal.valueOf(10.0), BigDecimal.valueOf(10.0), TipoTransacao.COMPRA), false);
@@ -59,7 +59,7 @@ public class CarteiraServiceTest {
 
     @Test
     public void naoDevePermitirVendaMaiorQueSaldo() {
-        CarteiraService service = new CarteiraService();
+        CarteiraService service = new CarteiraService(null, null);
         Moeda sol = new Moeda("SOL", "Solana");
 
         service.processarTransacao(sol, new Transacao("SOL", BigDecimal.valueOf(10.0), BigDecimal.valueOf(100.0), TipoTransacao.COMPRA), false);
@@ -73,7 +73,7 @@ public class CarteiraServiceTest {
 
     @Test
     public void deveCalcularSimulacaoDCACorretamente(){
-        CarteiraService service = new CarteiraService();
+        CarteiraService service = new CarteiraService(null, null);
         Moeda eth = new Moeda("ETH", "Ethereum");
 
         eth.setSaldo(BigDecimal.valueOf(2.0));
@@ -88,7 +88,7 @@ public class CarteiraServiceTest {
 
     @Test
     public void deveCalcularLucroPotencialCorretamente(){
-        CarteiraService service = new CarteiraService();
+        CarteiraService service = new CarteiraService(null, null);
         Moeda btc = new Moeda("BTC", "Bitcoin");
 
         btc.setSaldo(BigDecimal.valueOf(0.5));
@@ -101,7 +101,7 @@ public class CarteiraServiceTest {
 
     @Test
     public void deveReconstruirCarteiraEmOrdemCronologicaMesmoComHistoricoDesordenado() {
-        CarteiraService service = new CarteiraService();
+        CarteiraService service = new CarteiraService(null, null);
         Carteira carteira = new Carteira();
 
         Transacao compra = new Transacao(
@@ -133,7 +133,7 @@ public class CarteiraServiceTest {
 
     @Test
     public void deveInterromperReconstrucaoQuandoHistoricoForInconsistente() {
-        CarteiraService service = new CarteiraService();
+        CarteiraService service = new CarteiraService(null, null);
         Carteira carteira = new Carteira();
 
         Transacao vendaSemCompra = new Transacao(

@@ -117,6 +117,46 @@ public class GlobalExceptionHandler {
             .body(problema);
     }
 
+    @ExceptionHandler(TickerInvalidoException.class)
+    public ResponseEntity<ProblemDetail> tratarTickerInvalido(
+        TickerInvalidoException ex,
+        HttpServletRequest request
+    ) {
+        ProblemDetail problema = criarProblema(
+            HttpStatus.BAD_REQUEST,
+            "Ticker inválido",
+            ex.getMessage(),
+            request
+        );
+
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(problema);
+    }
+
+    @ExceptionHandler(ServicoCotacaoIndisponivelException.class)
+    public ResponseEntity<ProblemDetail> tratarCotacaoIndisponivel(
+        ServicoCotacaoIndisponivelException ex,
+        HttpServletRequest request
+    ) {
+        LOGGER.warn(
+            "Serviço de cotações indisponível ao processar {}",
+            request.getRequestURI(),
+            ex
+        );
+
+        ProblemDetail problema = criarProblema(
+            HttpStatus.SERVICE_UNAVAILABLE,
+            "Cotações indisponíveis",
+            ex.getMessage(),
+            request
+        );
+
+        return ResponseEntity
+            .status(HttpStatus.SERVICE_UNAVAILABLE)
+            .body(problema);
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ProblemDetail> tratarArgumentoInvalido(
         IllegalArgumentException ex,

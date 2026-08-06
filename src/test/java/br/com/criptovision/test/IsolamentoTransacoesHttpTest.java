@@ -6,7 +6,7 @@ import br.com.criptovision.model.Usuario;
 import br.com.criptovision.repository.TransacaoRepository;
 import br.com.criptovision.repository.UsuarioRepository;
 import br.com.criptovision.security.TokenService;
-import br.com.criptovision.service.HttpService;
+import br.com.criptovision.cotacao.service.CotacaoService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -52,7 +52,7 @@ public class IsolamentoTransacoesHttpTest {
     private TokenService tokenService;
 
     @MockitoBean
-    private HttpService httpService;
+    private CotacaoService cotacaoService;
 
     private Usuario alexandre;
     private Usuario outroUsuario;
@@ -85,8 +85,12 @@ public class IsolamentoTransacoesHttpTest {
         tokenOutroUsuario =
             tokenService.gerarToken(outroUsuario.getLogin());
 
-        when(httpService.validarTicker(anyString()))
-            .thenReturn(true);
+        when(cotacaoService.normalizarTicker(anyString()))
+            .thenAnswer(invocacao ->
+                invocacao.<String>getArgument(0)
+                    .trim()
+                    .toUpperCase()
+            );
     }
 
     @Test

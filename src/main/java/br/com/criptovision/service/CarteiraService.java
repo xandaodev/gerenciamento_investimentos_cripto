@@ -1,5 +1,9 @@
 package br.com.criptovision.service;
 
+import br.com.criptovision.cotacao.model.CotacaoMercado;
+import br.com.criptovision.cotacao.model.ResultadoCotacoes;
+import br.com.criptovision.cotacao.service.CotacaoService;
+import br.com.criptovision.cotacao.util.TickerNormalizer;
 import br.com.criptovision.dto.*;
 import br.com.criptovision.exception.AlteracaoHistoricoInvalidaException;
 import br.com.criptovision.exception.HistoricoInconsistenteException;
@@ -7,12 +11,12 @@ import br.com.criptovision.exception.SaldoInsuficienteException;
 import br.com.criptovision.exception.TransacaoNaoEncontradaException;
 import br.com.criptovision.model.*;
 import br.com.criptovision.repository.TransacaoRepository;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Instant;
 import java.util.*;
 
 // uma das classes mais importantes, aqui são feitos todos os calculos usando os dados que as outras classes fornecem
@@ -32,8 +36,19 @@ public class CarteiraService {
 
 
 
-    @Autowired
-    private TransacaoRepository transacaoRepo;
+    private static final BigDecimal CEM =
+        BigDecimal.valueOf(100);
+
+    private final TransacaoRepository transacaoRepo;
+    private final CotacaoService cotacaoService;
+
+    public CarteiraService(
+        TransacaoRepository transacaoRepo,
+        CotacaoService cotacaoService
+    ) {
+        this.transacaoRepo = transacaoRepo;
+        this.cotacaoService = cotacaoService;
+    }
 
     // nesse metodo é atualizado o estado de uma moeda baseado numa transacao
     // ele é chamado e rechamado varias vezes quando o programa é iniciado para reconstruir seu saldo
@@ -101,31 +116,6 @@ public class CarteiraService {
         return valorAtual - valorInvestido;
     }
 
-    //metodo para calcular valor total da carteira, ele soma o valor de todas as suas moedas da carteira a preço atual de mercado
-    public double calcularValorTotalCarteira(Map<String, Moeda> moedas, HttpService http){
-        double valorTotal = 0;
-        for(Moeda m : moedas.values()){
-            if(m.getSaldo().compareTo(BigDecimal.ZERO) > 0){
-                double precoAtual = http.buscarPrecoAtual(m);// aqui ele pede ao HttpService o preço atual da Binance
-                double saldoDaMoeda = m.getSaldo().doubleValue();
-                valorTotal += (saldoDaMoeda * precoAtual);
-            }
-        }
-        return valorTotal;
-    }
-
-    //esse metodo soma o lucro/prejuizo individual de cada moeda que voce tem na carteira e calcula o pnl total dela
-    public double calcularPnlTotal(Map<String, Moeda> moedas, HttpService http){
-        double pnlTotal = 0;
-        for(Moeda m : moedas.values()){
-            if(m.getSaldo().compareTo(BigDecimal.ZERO) > 0){
-                double precoAtual = http.buscarPrecoAtual(m);
-                pnlTotal += calcularLucroPotencial(m, precoAtual);
-            }
-        }
-        return pnlTotal;
-    }
-
     // agr o metodo puro, sem prints, apenas regra de negócio
     public SimulacaoDCADTO simularDCA(Moeda moeda, double valorAporteUSD, double precoMercado){
         double saldoAtual = moeda.getSaldo().doubleValue();
@@ -162,7 +152,9 @@ public class CarteiraService {
 
         for (Transacao transacao : historicoOrdenado) {
             try {
-                String ticker = transacao.getTicker().toUpperCase();
+                String ticker = TickerNormalizer.normalizar(
+                    transacao.getTicker()
+                );
                 Moeda moeda = carteira.obterMoeda(ticker, ticker);
 
                 processarTransacao(moeda, transacao, false);
@@ -200,43 +192,127 @@ public class CarteiraService {
     }
 
     // gera o resumo completo da carteira e empacota tudo num DTO
-    public ResumoCarteiraDTO gerarResumoCompleto(Carteira carteira, HttpService httpService){
-
-        double totalCalculado = 0;
-        double pnlTotalGeral = 0;
-        double totalPatrimonioOntem = 0;
+    public ResumoCarteiraDTO gerarResumoCompleto(
+        Carteira carteira,
+        ResultadoCotacoes resultadoCotacoes
+    ) {
+        BigDecimal totalCalculado = BigDecimal.ZERO;
+        BigDecimal pnlTotalGeral = BigDecimal.ZERO;
+        BigDecimal totalPatrimonioOntem = BigDecimal.ZERO;
         List<ResumoAtivoDTO> listaAtivos = new ArrayList<>();
+        Instant cotacoesAtualizadasEm = null;
 
-        for(Moeda m : carteira.getMoedas().values()){
-            if(m.getSaldo().compareTo(BigDecimal.ZERO) > 0){
-                double[] dadosApi = httpService.buscarPrecoEVariacao(m);
-                double preco = dadosApi[0];
-                double variacao24h = dadosApi[1];
-
-                double valorNoAtivo = m.getSaldo().doubleValue() * preco;
-                double lucroDestaMoeda = calcularLucroPotencial(m, preco);
-                double custoBase = m.getSaldo().multiply(m.getPrecoMedio()).doubleValue();
-
-                double porcentagemLucro = custoBase == 0 ? 0 : (lucroDestaMoeda / custoBase) * 100;
-
-                pnlTotalGeral += lucroDestaMoeda;
-                totalCalculado += valorNoAtivo;
-                totalPatrimonioOntem += valorNoAtivo / (1 + (variacao24h / 100));
-
-                listaAtivos.add(new ResumoAtivoDTO(
-                        m.getTicker(),
-                        m.getSaldo().doubleValue(),
-                        preco,
-                        m.getPrecoMedio().doubleValue(),
-                        valorNoAtivo,
-                        porcentagemLucro,
-                        variacao24h
-                ));
+        for (Moeda moeda : carteira.getMoedas().values()) {
+            if (moeda.getSaldo().compareTo(BigDecimal.ZERO) <= 0) {
+                continue;
             }
-        }
-        double varTotalCarteira = (totalPatrimonioOntem > 0) ? ((totalCalculado - totalPatrimonioOntem) / totalPatrimonioOntem) * 100 : 0;
 
-        return new ResumoCarteiraDTO(totalCalculado, pnlTotalGeral, varTotalCarteira, listaAtivos);
+            Optional<CotacaoMercado> cotacaoOptional =
+                resultadoCotacoes.obter(moeda.getTicker());
+
+            if (cotacaoOptional.isEmpty()) {
+                listaAtivos.add(
+                    ResumoAtivoDTO.semCotacao(
+                        moeda.getTicker(),
+                        moeda.getSaldo(),
+                        moeda.getPrecoMedio()
+                    )
+                );
+                continue;
+            }
+
+            CotacaoMercado cotacao = cotacaoOptional.get();
+            BigDecimal preco = cotacao.preco();
+            BigDecimal variacao24h = cotacao.variacao24h();
+
+            BigDecimal valorNoAtivo = moeda.getSaldo()
+                .multiply(preco);
+
+            BigDecimal custoBase = moeda.getSaldo()
+                .multiply(moeda.getPrecoMedio());
+
+            BigDecimal lucroDestaMoeda =
+                valorNoAtivo.subtract(custoBase);
+
+            BigDecimal porcentagemLucro =
+                custoBase.compareTo(BigDecimal.ZERO) == 0
+                    ? BigDecimal.ZERO
+                    : lucroDestaMoeda
+                        .multiply(CEM)
+                        .divide(
+                            custoBase,
+                            8,
+                            RoundingMode.HALF_UP
+                        );
+
+            totalCalculado = totalCalculado.add(valorNoAtivo);
+            pnlTotalGeral = pnlTotalGeral.add(
+                lucroDestaMoeda
+            );
+
+            BigDecimal fatorVariacao = BigDecimal.ONE.add(
+                variacao24h.divide(
+                    CEM,
+                    12,
+                    RoundingMode.HALF_UP
+                )
+            );
+
+            if (fatorVariacao.compareTo(BigDecimal.ZERO) > 0) {
+                totalPatrimonioOntem =
+                    totalPatrimonioOntem.add(
+                        valorNoAtivo.divide(
+                            fatorVariacao,
+                            12,
+                            RoundingMode.HALF_UP
+                        )
+                    );
+            }
+
+            if (cotacoesAtualizadasEm == null
+                || cotacao.atualizadaEm()
+                    .isBefore(cotacoesAtualizadasEm)) {
+                cotacoesAtualizadasEm =
+                    cotacao.atualizadaEm();
+            }
+
+            listaAtivos.add(new ResumoAtivoDTO(
+                moeda.getTicker(),
+                moeda.getSaldo(),
+                preco,
+                moeda.getPrecoMedio(),
+                valorNoAtivo,
+                porcentagemLucro,
+                variacao24h,
+                true,
+                cotacao.desatualizada(),
+                cotacao.atualizadaEm()
+            ));
+        }
+
+        BigDecimal variacaoCarteira =
+            totalPatrimonioOntem.compareTo(BigDecimal.ZERO) > 0
+                ? totalCalculado
+                    .subtract(totalPatrimonioOntem)
+                    .multiply(CEM)
+                    .divide(
+                        totalPatrimonioOntem,
+                        8,
+                        RoundingMode.HALF_UP
+                    )
+                : BigDecimal.ZERO;
+
+        return new ResumoCarteiraDTO(
+            totalCalculado,
+            pnlTotalGeral,
+            variacaoCarteira,
+            listaAtivos,
+            cotacoesAtualizadasEm,
+            resultadoCotacoes.possuiDadosParciais(),
+            new ArrayList<>(
+                resultadoCotacoes.indisponiveis()
+            )
+        );
     }
 
     public double calcularPatrimonioTotal(Usuario usuario){
@@ -254,17 +330,34 @@ public class CarteiraService {
         return total;
     }
 
-    @Autowired
-    private HttpService httpService;
-
     public ResumoCarteiraDTO obterResumoGeral(Usuario usuario){
-        Carteira carteira = new Carteira();//carteira vazia
+        Carteira carteira = new Carteira();
 
-        List<Transacao> historico = carregarHistoricoDeTransacoes(usuario);
+        List<Transacao> historico =
+            carregarHistoricoDeTransacoes(usuario);
 
-        reconstruirCarteira(carteira, historico);//reconstroi a carteira
+        reconstruirCarteira(carteira, historico);
 
-        return gerarResumoCompleto(carteira, this.httpService);
+        Set<String> tickers = carteira.getMoedas()
+            .values()
+            .stream()
+            .filter(moeda ->
+                moeda.getSaldo().compareTo(BigDecimal.ZERO) > 0
+            )
+            .map(Moeda::getTicker)
+            .collect(
+                java.util.stream.Collectors.toCollection(
+                    LinkedHashSet::new
+                )
+            );
+
+        ResultadoCotacoes resultadoCotacoes =
+            cotacaoService.buscarCotacoes(tickers);
+
+        return gerarResumoCompleto(
+            carteira,
+            resultadoCotacoes
+        );
     }
 
     public List<Transacao> listarTransacoes(Usuario usuario){
@@ -275,13 +368,12 @@ public class CarteiraService {
         return transacaoRepo.findByIdAndUsuario(id, usuario).orElseThrow(() -> new TransacaoNaoEncontradaException(id));
     }
 
-    private void validarTicker(String ticker) {
-        if (!httpService.validarTicker(ticker)) {
-            throw new IllegalArgumentException(
-                "Moeda inválida ou não encontrada na Binance: "
-                    + ticker
-            );
-        }
+    private String validarTicker(String ticker) {
+        String normalizado =
+            cotacaoService.normalizarTicker(ticker);
+
+        cotacaoService.validarTicker(normalizado);
+        return normalizado;
     }
 
     private void validarHistoricoAposAlteracao(List<Transacao> historico, String mensagemDeErro){
@@ -299,9 +391,11 @@ public class CarteiraService {
     public Transacao atualizarTransacao(Long id, TransacaoRequestDTO dados, Usuario usuario){
         Transacao transacaoExistente = buscarTransacaoPorId(id, usuario);
 
-        validarTicker(dados.ticker());
+        String tickerNormalizado =
+            validarTicker(dados.ticker());
 
         Transacao transacaoCandidata = dados.toEntity();
+        transacaoCandidata.setTicker(tickerNormalizado);
 
         transacaoCandidata.setId(
             transacaoExistente.getId()
@@ -392,14 +486,18 @@ public class CarteiraService {
 
     public Transacao registrarNovaTransacao(Transacao novaTransacao, Usuario usuario){
         novaTransacao.setUsuario(usuario);
-        // nova trava de seguranças
-        validarTicker(novaTransacao.getTicker());
+
+        String tickerNormalizado =
+            validarTicker(novaTransacao.getTicker());
+        novaTransacao.setTicker(tickerNormalizado);
         Carteira carteiraTemporaria = new Carteira();
         List<Transacao> historico = carregarHistoricoDeTransacoes(usuario);
         reconstruirCarteira(carteiraTemporaria, historico);
 
-        String ticker = novaTransacao.getTicker().toUpperCase();
-        Moeda moedaDaOperacao = carteiraTemporaria.obterMoeda(ticker, ticker);
+        Moeda moedaDaOperacao = carteiraTemporaria.obterMoeda(
+            tickerNormalizado,
+            tickerNormalizado
+        );
 
         processarTransacao(moedaDaOperacao, novaTransacao, true);
 
@@ -411,7 +509,13 @@ public class CarteiraService {
         List<Transacao> historico = carregarHistoricoDeTransacoes(usuario);
         reconstruirCarteira(carteira, historico);
 
-        Moeda moeda = carteira.obterMoeda(ticker, ticker);
+        String tickerNormalizado =
+            TickerNormalizer.normalizar(ticker);
+
+        Moeda moeda = carteira.obterMoeda(
+            tickerNormalizado,
+            tickerNormalizado
+        );
         return simularDCA(moeda, valorAporte, precoMercado);
     }
 
@@ -420,10 +524,24 @@ public class CarteiraService {
         List<Transacao> historico = carregarHistoricoDeTransacoes(usuario);
         reconstruirCarteira(carteira, historico);
 
-        Moeda moeda = carteira.obterMoeda(ticker, ticker);
-        double precoAtualMercado = httpService.buscarPrecoAtual(moeda);
+        String tickerNormalizado =
+            cotacaoService.normalizarTicker(ticker);
 
-        return simularVendaFutura(moeda, precoFicticio, precoAtualMercado);
+        Moeda moeda = carteira.obterMoeda(
+            tickerNormalizado,
+            tickerNormalizado
+        );
+
+        double precoAtualMercado =
+            cotacaoService.buscarCotacao(
+                tickerNormalizado
+            ).preco().doubleValue();
+
+        return simularVendaFutura(
+            moeda,
+            precoFicticio,
+            precoAtualMercado
+        );
     }
 
 }

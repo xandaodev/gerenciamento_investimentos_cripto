@@ -74,7 +74,7 @@ public class CarteiraController {
     @GetMapping("/resumo")
     @Operation(
         summary = "Obter resumo da carteira",
-        description = "Reconstrói a carteira e retorna valores atuais, PNL e variação em 24 horas.",
+        description = "Reconstrói a carteira e retorna valores atuais, PNL e variação em 24 horas. Quando uma cotação falha, preserva os demais ativos e informa dados parciais.",
         operationId = "obterResumoCarteira"
     )
     @ApiResponses({
@@ -215,6 +215,14 @@ public class CarteiraController {
         @ApiResponse(
             responseCode = "500",
             description = "O histórico da carteira está inconsistente.",
+            content = @Content(
+                mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                schema = @Schema(implementation = ProblemaApiDTO.class)
+            )
+        ),
+        @ApiResponse(
+            responseCode = "503",
+            description = "O serviço de cotações está temporariamente indisponível.",
             content = @Content(
                 mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                 schema = @Schema(implementation = ProblemaApiDTO.class)
