@@ -57,6 +57,15 @@ class OpenApiDocumentationTest {
             ).exists())
             .andExpect(jsonPath(
                 "$.components.schemas.ProblemaApi"
+            ).exists())
+            .andExpect(jsonPath(
+                "$.paths['/transacoes'].post.responses['503']"
+            ).exists())
+            .andExpect(jsonPath(
+                "$.components.schemas.ResumoCarteira.properties.cotacoesParciais"
+            ).exists())
+            .andExpect(jsonPath(
+                "$.components.schemas.ResumoAtivo.properties.cotacaoDisponivel"
             ).exists());
     }
 }

@@ -8,7 +8,7 @@ import br.com.criptovision.model.Transacao;
 import br.com.criptovision.model.Usuario;
 import br.com.criptovision.repository.TransacaoRepository;
 import br.com.criptovision.service.CarteiraService;
-import br.com.criptovision.service.HttpService;
+import br.com.criptovision.cotacao.service.CotacaoService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -35,7 +35,7 @@ public class CarteiraServiceTransacaoTest {
     private TransacaoRepository transacaoRepo;
 
     @Mock
-    private HttpService httpService;
+    private CotacaoService cotacaoService;
 
     @InjectMocks
     private CarteiraService service;
@@ -46,6 +46,14 @@ public class CarteiraServiceTransacaoTest {
             "alexandre",
             "senha-criptografada"
         );
+
+        lenient()
+            .when(cotacaoService.normalizarTicker(any(String.class)))
+            .thenAnswer(invocacao ->
+                invocacao.<String>getArgument(0)
+                    .trim()
+                    .toUpperCase()
+            );
     }
 
     @Test
@@ -71,9 +79,6 @@ public class CarteiraServiceTransacaoTest {
 
         when(transacaoRepo.findByIdAndUsuario(1L, usuario))
             .thenReturn(Optional.of(existente));
-
-        when(httpService.validarTicker("ETH"))
-            .thenReturn(true);
 
         when(transacaoRepo
             .findAllByUsuarioOrderByDataAscIdAsc(usuario))
@@ -149,9 +154,6 @@ public class CarteiraServiceTransacaoTest {
         when(transacaoRepo.findByIdAndUsuario(1L, usuario))
             .thenReturn(Optional.of(compra));
 
-        when(httpService.validarTicker("BTC"))
-            .thenReturn(true);
-
         when(transacaoRepo
             .findAllByUsuarioOrderByDataAscIdAsc(usuario))
             .thenReturn(List.of(compra, venda));
@@ -201,7 +203,7 @@ public class CarteiraServiceTransacaoTest {
             excecao.getMessage()
         );
 
-        verifyNoInteractions(httpService);
+        verifyNoInteractions(cotacaoService);
 
         verify(transacaoRepo, never())
             .findAllByUsuarioOrderByDataAscIdAsc(
@@ -320,9 +322,6 @@ public class CarteiraServiceTransacaoTest {
             BigDecimal.valueOf(50000),
             TipoTransacao.COMPRA
         );
-
-        when(httpService.validarTicker("BTC"))
-            .thenReturn(true);
 
         when(transacaoRepo
             .findAllByUsuarioOrderByDataAscIdAsc(usuario))
