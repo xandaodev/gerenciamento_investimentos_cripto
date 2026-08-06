@@ -58,6 +58,13 @@
         </dependency>
 
 
+        <!-- Cliente HTTP bloqueante para comunicação com APIs externas -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-restclient</artifactId>
+        </dependency>
+
+
         <!-- Validação de dados recebidos pela API -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
