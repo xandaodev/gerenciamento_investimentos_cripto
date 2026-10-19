@@ -94,6 +94,16 @@ O código calcula esse valor durante o processamento de uma venda, mas ele ainda
 
 O CriptoVision mantém um histórico financeiro independente para cada usuário autenticado.
 
+### Cadastro de conta
+
+Uma conta é criada por `POST /auth/register` com login e senha:
+
+- o login é obrigatório, possui de 3 a 100 caracteres e aceita somente letras, números, ponto, hífen e underline;
+- o login é normalizado para letras minúsculas antes de ser salvo;
+- a senha é obrigatória e possui de 8 a 64 caracteres;
+- a senha é armazenada somente como hash BCrypt;
+- um login já cadastrado é rejeitado com `409 Conflict`.
+
 ### Associação obrigatória
 
 Cada transação possui um proprietário obrigatório:
@@ -170,7 +180,7 @@ Exemplo:
 
 O ticker deve conter somente letras e números e possuir no máximo 20 caracteres.
 
-O `HttpService` também possui tratamentos para alguns nomes conhecidos em determinadas consultas de preço:
+Depois da validação do DTO, o `TickerNormalizer` converte alguns nomes conhecidos para o ticker oficial:
 
 ```text
 BITCOIN   → BTC
@@ -180,15 +190,15 @@ CHAINLINK → LINK
 LNK       → LINK
 ```
 
-No fluxo atual de criação e atualização, a entrada é normalizada para maiúsculas e validada como ticker. Por isso, os símbolos oficiais, como `BTC`, `ETH` e `SOL`, são a forma recomendada de entrada.
+Essa conversão é aplicada na criação, na atualização, na reconstrução da carteira, nas simulações e nas consultas de cotação. Assim, uma transação enviada com `"bitcoin"` é salva com o ticker `BTC`. Os demais valores são usados como informados, em maiúsculas.
 
 ### USDT
 
-O USDT recebe tratamento especial nas consultas internas:
+O USDT recebe tratamento especial no `CotacaoService` e nunca é consultado na Binance:
 
 ```text
-preço interno = 1.0
-variação de 24 horas = 0.0
+preço = 1
+variação de 24 horas = 0
 ```
 
 ### Validação da criação e da atualização
@@ -198,16 +208,22 @@ Os endpoints `POST /transacoes` e `PUT /transacoes/{id}` utilizam `TransacaoRequ
 - ticker obrigatório;
 - ticker com no máximo 20 caracteres;
 - ticker formado somente por letras e números;
-- quantidade obrigatória e maior que zero;
-- preço unitário obrigatório e maior que zero;
+- quantidade obrigatória e maior que zero, com no máximo 20 dígitos inteiros e 18 casas decimais;
+- preço unitário obrigatório e maior que zero, com no máximo 20 dígitos inteiros e 18 casas decimais;
 - tipo obrigatório;
 - tipo restrito a `COMPRA` ou `VENDA`.
 
 O ID e a data não são recebidos pelo DTO. Na criação, esses campos são controlados pela aplicação. Na atualização, o ID e a data originais são preservados.
 
-### Limitação da validação externa
+### Validação externa do ticker
 
-Uma indisponibilidade da Binance pode ser interpretada como se o ticker não existisse, pois o `HttpService` ainda converte diferentes falhas externas em retorno nulo.
+Além da validação de formato, o ticker precisa existir como par com USDT na Binance:
+
+- ticker rejeitado pela Binance → `400 Bad Request` ("Ticker inválido");
+- Binance indisponível, mas com cotação do ticker obtida há no máximo `cotacoes.cache.max-stale` (15 minutos por padrão) → o ticker é aceito;
+- Binance indisponível e sem cotação recente → `503 Service Unavailable`, e a transação não é salva.
+
+Uma indisponibilidade do provedor não é mais confundida com ticker inexistente.
 
 ---
 
@@ -458,7 +474,7 @@ Estado atual da carteira
 
 Para cada transação:
 
-1. o ticker é convertido para letras maiúsculas;
+1. o ticker é normalizado pelo `TickerNormalizer`;
 2. o ativo é obtido ou criado na carteira;
 3. a transação é processada sem ser salva novamente.
 
@@ -500,7 +516,7 @@ Antes de registrar uma nova transação, o sistema:
 
 1. identifica o usuário autenticado;
 2. associa a nova transação a esse usuário;
-3. valida o ticker na Binance;
+3. normaliza o ticker e valida sua existência na Binance;
 4. cria uma carteira temporária;
 5. busca somente o histórico do usuário;
 6. reconstrói a carteira;
@@ -509,6 +525,14 @@ Antes de registrar uma nova transação, o sistema:
 9. salva a transação no banco.
 
 Esse fluxo evita que uma nova venda seja registrada quando não existe saldo suficiente.
+
+### Operações simultâneas
+
+Criação, atualização e exclusão de transações de um mesmo usuário são executadas uma de cada vez. Cada operação bloqueia o registro do usuário no banco antes de ler o histórico, e as demais aguardam o término dela.
+
+Assim, quando duas vendas de 1 BTC chegam ao mesmo tempo para um saldo de 1 BTC, a segunda é validada depois que a primeira foi salva e é rejeitada por saldo insuficiente.
+
+Operações de usuários diferentes não bloqueiam umas às outras.
 
 A atualização e a exclusão também simulam o histórico resultante antes de confirmar qualquer mudança no banco.
 
@@ -523,7 +547,7 @@ O endpoint recebe um `TransacaoRequestDTO`, portanto os novos valores passam pel
 Durante a atualização:
 
 1. a transação é buscada pelo ID e pelo usuário autenticado;
-2. o novo ticker é validado;
+2. o novo ticker é normalizado e validado;
 3. uma transação candidata independente é criada;
 4. o ID original é preservado;
 5. a data original é preservada;
@@ -550,7 +574,7 @@ A alteração produziria uma venda superior ao saldo disponível. Nesse caso, na
 409 Conflict
 ```
 
-Um ID inexistente ou pertencente a outro usuário retorna `404 Not Found`. A operação é executada em método `@Transactional`.
+Um ID inexistente ou pertencente a outro usuário retorna `404 Not Found`. A validação do ticker na Binance ocorre antes da transação no banco; a simulação e a gravação ocorrem numa transação com o histórico do usuário bloqueado.
 
 ---
 
@@ -578,7 +602,7 @@ Excluir a compra deixaria uma venda sem saldo correspondente. Nesse caso, nenhum
 409 Conflict
 ```
 
-Um ID inexistente ou pertencente a outro usuário retorna `404 Not Found`. A operação é executada em método `@Transactional`.
+Um ID inexistente ou pertencente a outro usuário retorna `404 Not Found`. A operação é executada numa transação com o histórico do usuário bloqueado.
 
 ---
 
@@ -645,7 +669,7 @@ Caso o custo da posição seja zero, a porcentagem retornada é zero.
 
 ## 18. Valor atual da carteira
 
-No resumo da carteira, o valor atual é calculado somando o valor de mercado dos ativos com saldo positivo.
+No resumo da carteira, o valor atual é calculado somando o valor de mercado dos ativos com saldo positivo e com cotação disponível (atual ou de fallback).
 
 Para cada ativo:
 
@@ -716,7 +740,27 @@ precoMedio
 valorTotalUSD
 porcentagemPNL
 variacao24h
+cotacaoDisponivel
+cotacaoDesatualizada
+cotacaoAtualizadaEm
 ```
+
+### Cotações usadas no resumo
+
+As cotações são obtidas pelo `CotacaoService`:
+
+- uma cotação com até 60 segundos (`cotacoes.cache.ttl`) é reutilizada do cache;
+- as demais são consultadas em lote na Binance;
+- se a Binance estiver indisponível, é usada a última cotação com até 15 minutos (`cotacoes.cache.max-stale`), e o ativo fica com `cotacaoDesatualizada = true`;
+- se não houver cotação nem fallback, o ativo continua no resumo com `cotacaoDisponivel = false`, e `precoAtual`, `valorTotalUSD`, `porcentagemPNL`, `variacao24h` e `cotacaoAtualizadaEm` ficam nulos.
+
+Uma cotação nunca é substituída por preço zero.
+
+Além dos ativos, o resumo informa:
+
+- `cotacoesAtualizadasEm`: horário da cotação mais antiga utilizada;
+- `cotacoesParciais`: verdadeiro quando algum ativo está sem cotação ou usa fallback;
+- `ativosSemCotacao`: tickers sem cotação nem fallback.
 
 ### Valor total do ativo
 
@@ -739,7 +783,7 @@ porcentagemPNL =
 
 ## 21. PNL total da carteira
 
-O PNL total é a soma do PNL não realizado de todos os ativos com saldo positivo.
+O PNL total é a soma do PNL não realizado de todos os ativos com saldo positivo e com cotação disponível. Ativos sem cotação ficam fora dessa soma.
 
 ```text
 PNL total =
@@ -782,6 +826,8 @@ A métrica considera o peso atual de cada ativo e a variação de 24 horas receb
 
 Ela é uma estimativa e não utiliza snapshots históricos próprios da carteira.
 
+Somente ativos com cotação disponível participam do cálculo. Quando o patrimônio anterior estimado é zero, a variação retornada é zero.
+
 ---
 
 ## 23. Simulação de DCA
@@ -795,6 +841,8 @@ ticker
 valor do aporte
 preço de mercado usado na simulação
 ```
+
+O preço de mercado é informado pelo cliente; a simulação não consulta a Binance nem valida a existência do ticker.
 
 ### Quantidade comprada
 
@@ -857,7 +905,7 @@ Ainda não há validação explícita para:
 * ativo sem posição anterior;
 * preço médio atual igual a zero.
 
-Esses casos podem produzir divisão por zero ou resultados sem significado financeiro.
+Como o cálculo usa `double`, esses casos não lançam erro: produzem valores sem significado financeiro, como infinito ou `NaN`.
 
 ---
 
@@ -870,7 +918,9 @@ ticker
 preço-alvo
 ```
 
-O sistema reconstrói a carteira do usuário autenticado, consulta o preço atual e calcula quanto a posição valeria no preço-alvo.
+O sistema reconstrói a carteira do usuário autenticado, consulta o preço atual pelo `CotacaoService` (com cache e fallback) e calcula quanto a posição valeria no preço-alvo.
+
+Se não houver cotação atual nem de fallback, a simulação retorna `503 Service Unavailable`. Um ticker rejeitado pela Binance retorna `400 Bad Request`.
 
 ### Lucro simulado
 
@@ -905,6 +955,8 @@ saldo × preço atual de mercado
 A simulação considera a venda de todo o saldo.
 
 Ainda não é possível informar uma quantidade parcial para a simulação.
+
+O preço-alvo não é validado, e o cálculo usa `double`. Para um ativo sem posição, o custo é zero e o percentual simulado resulta em `NaN`.
 
 ---
 
@@ -959,18 +1011,20 @@ Também não existe conversão consistente de todos os valores para BRL.
 
 ## 27. Precisão numérica
 
-O núcleo das entidades `Transacao` e `Moeda` utiliza `BigDecimal`.
+As entidades `Transacao` e `Moeda` utilizam `BigDecimal`. No banco, quantidade e preço unitário são armazenados como `DECIMAL(38, 18)`.
 
-O cálculo do preço médio também utiliza `BigDecimal`.
+Também utilizam `BigDecimal`:
 
-Porém, vários cálculos posteriores convertem os valores para `double`, incluindo:
+* o cálculo do preço médio (escala 8, `HALF_UP`);
+* as cotações recebidas da Binance;
+* o resumo da carteira: valor dos ativos, PNL, percentuais e variação de 24 horas;
+* o total aportado por moeda.
 
-* PNL;
-* patrimônio;
-* resumos;
-* simulações;
-* preços recebidos da Binance;
-* variações percentuais.
+Ainda convertem valores para `double`:
+
+* a simulação de DCA;
+* a simulação de venda;
+* o endpoint `/carteira/total`.
 
 Assim, a aplicação ainda não utiliza `BigDecimal` de ponta a ponta.
 

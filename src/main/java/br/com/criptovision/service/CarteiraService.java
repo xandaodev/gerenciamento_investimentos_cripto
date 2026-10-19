@@ -11,13 +11,16 @@ import br.com.criptovision.exception.SaldoInsuficienteException;
 import br.com.criptovision.exception.TransacaoNaoEncontradaException;
 import br.com.criptovision.model.*;
 import br.com.criptovision.repository.TransacaoRepository;
+import br.com.criptovision.repository.UsuarioRepository;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.*;
+import java.util.function.Supplier;
 
 // uma das classes mais importantes, aqui são feitos todos os calculos usando os dados que as outras classes fornecem
 
@@ -40,14 +43,21 @@ public class CarteiraService {
         BigDecimal.valueOf(100);
 
     private final TransacaoRepository transacaoRepo;
+    private final UsuarioRepository usuarioRepo;
     private final CotacaoService cotacaoService;
+    private final TransactionTemplate transactionTemplate;
 
     public CarteiraService(
         TransacaoRepository transacaoRepo,
-        CotacaoService cotacaoService
+        UsuarioRepository usuarioRepo,
+        CotacaoService cotacaoService,
+        PlatformTransactionManager transactionManager
     ) {
         this.transacaoRepo = transacaoRepo;
+        this.usuarioRepo = usuarioRepo;
         this.cotacaoService = cotacaoService;
+        this.transactionTemplate =
+            new TransactionTemplate(transactionManager);
     }
 
     // nesse metodo é atualizado o estado de uma moeda baseado numa transacao
@@ -387,12 +397,49 @@ public class CarteiraService {
     }
 
 
-    @Transactional
-    public Transacao atualizarTransacao(Long id, TransacaoRequestDTO dados, Usuario usuario){
-        Transacao transacaoExistente = buscarTransacaoPorId(id, usuario);
+    // executa a ação numa transação que começa bloqueando a linha do usuário.
+    // assim, criação, alteração e exclusão do mesmo usuário rodam uma de cada vez
+    // e cada uma valida o histórico já com as mudanças das anteriores.
+    // o bloqueio precisa ser a primeira consulta da transação: no MySQL (REPEATABLE READ)
+    // o snapshot de leitura é criado na primeira leitura comum, que então ocorre depois do bloqueio
+    private <T> T executarComHistoricoBloqueado(
+        Usuario usuario,
+        Supplier<T> acao
+    ) {
+        return transactionTemplate.execute(status -> {
+            usuarioRepo.bloquearPorId(usuario.getId())
+                .orElseThrow(() -> new IllegalStateException(
+                    "Usuário autenticado não encontrado."
+                ));
 
+            return acao.get();
+        });
+    }
+
+    public Transacao atualizarTransacao(Long id, TransacaoRequestDTO dados, Usuario usuario){
+        // verificação antecipada para responder 404 sem consultar a Binance.
+        // usa exists para não carregar a entidade antes do bloqueio
+        if (!transacaoRepo.existsByIdAndUsuario(id, usuario)) {
+            throw new TransacaoNaoEncontradaException(id);
+        }
+
+        // a chamada HTTP acontece fora da transação para não segurar o bloqueio
         String tickerNormalizado =
             validarTicker(dados.ticker());
+
+        return executarComHistoricoBloqueado(
+            usuario,
+            () -> aplicarAtualizacao(id, dados, tickerNormalizado, usuario)
+        );
+    }
+
+    private Transacao aplicarAtualizacao(
+        Long id,
+        TransacaoRequestDTO dados,
+        String tickerNormalizado,
+        Usuario usuario
+    ) {
+        Transacao transacaoExistente = buscarTransacaoPorId(id, usuario);
 
         Transacao transacaoCandidata = dados.toEntity();
         transacaoCandidata.setTicker(tickerNormalizado);
@@ -457,8 +504,14 @@ public class CarteiraService {
     }
 
 
-    @Transactional
     public void excluirTransacao(Long id, Usuario usuario){
+        executarComHistoricoBloqueado(usuario, () -> {
+            aplicarExclusao(id, usuario);
+            return null;
+        });
+    }
+
+    private void aplicarExclusao(Long id, Usuario usuario){
         Transacao transacaoExistente = buscarTransacaoPorId(id, usuario);
 
         List<Transacao> historicoSemTransacao =
@@ -487,21 +540,25 @@ public class CarteiraService {
     public Transacao registrarNovaTransacao(Transacao novaTransacao, Usuario usuario){
         novaTransacao.setUsuario(usuario);
 
+        // a chamada HTTP acontece fora da transação para não segurar o bloqueio
         String tickerNormalizado =
             validarTicker(novaTransacao.getTicker());
         novaTransacao.setTicker(tickerNormalizado);
-        Carteira carteiraTemporaria = new Carteira();
-        List<Transacao> historico = carregarHistoricoDeTransacoes(usuario);
-        reconstruirCarteira(carteiraTemporaria, historico);
 
-        Moeda moedaDaOperacao = carteiraTemporaria.obterMoeda(
-            tickerNormalizado,
-            tickerNormalizado
-        );
+        return executarComHistoricoBloqueado(usuario, () -> {
+            Carteira carteiraTemporaria = new Carteira();
+            List<Transacao> historico = carregarHistoricoDeTransacoes(usuario);
+            reconstruirCarteira(carteiraTemporaria, historico);
 
-        processarTransacao(moedaDaOperacao, novaTransacao, true);
+            Moeda moedaDaOperacao = carteiraTemporaria.obterMoeda(
+                tickerNormalizado,
+                tickerNormalizado
+            );
 
-        return novaTransacao;
+            processarTransacao(moedaDaOperacao, novaTransacao, true);
+
+            return novaTransacao;
+        });
     }
 
     public SimulacaoDCADTO executarSimulacaoDCA(String ticker, double valorAporte, double precoMercado, Usuario usuario){

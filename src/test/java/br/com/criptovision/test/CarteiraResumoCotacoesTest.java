@@ -49,7 +49,7 @@ class CarteiraResumoCotacoesTest {
             );
 
         CarteiraService service =
-            new CarteiraService(null, null);
+            new CarteiraService(null, null, null, null);
 
         ResumoCarteiraDTO resumo =
             service.gerarResumoCompleto(

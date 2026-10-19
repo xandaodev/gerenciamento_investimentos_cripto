@@ -28,40 +28,103 @@ O desenvolvimento deste sistema foi marcado por ciclos de melhoria contínua e r
 * **V3 (API REST e Padrões do Mercado - Atual):** A grande revolução do projeto. Migrei a aplicação para o ecossistema **Spring Boot**, transformando-a em uma API RESTful completa.
     * 🧮 **Precisão Financeira:** Substituição de tipos primitivos por `BigDecimal`, blindando o motor de cálculos contra imprecisões de arredondamento.
     * 🛡️ **Resiliência:** Implementação de um `@ControllerAdvice` (Global Exception Handler) para interceptar regras de negócio violadas (ex: Saldo Insuficiente) e retornar JSONs padronizados (HTTP 400).
-    * 🔒 **Segurança e ORM:** Adoção do Spring Data JPA (Hibernate) para mapeamento objeto-relacional e Spring Security para proteção dos endpoints.
+    * 🔒 **Segurança e ORM:** Adoção do Spring Data JPA (Hibernate) para mapeamento objeto-relacional e Spring Security com JWT para proteção dos endpoints.
+    * 👥 **Multiusuário:** Cadastro de contas e isolamento completo do histórico, dos cálculos e das análises de cada usuário.
+    * 🗃️ **Migrations:** Schema do banco versionado com Flyway.
+    * 📡 **Cotações resilientes:** Cache, consulta em lote e fallback para que uma instabilidade da Binance não derrube a carteira.
 
 ## 🚀 Funcionalidades Principais
 
-* **📈 Cotações em Tempo Real:** Integração assíncrona (via `HttpClient` nativo do Java) com a API da Binance para buscar preços atualizados de qualquer par de moedas.
-* **📊 Dashboard e DTOs:** Resumo consolidado mapeado em DTOs, entregando saldo por ativo, preço médio e valor total da carteira em USD/BRL no formato JSON.
-* **💰 Motor de Cálculo de PNL e DCA:** Monitoramento automatizado de Lucro/Prejuízo e simulador integrado para prever o impacto de novos aportes no *break-even*.
-* **📖 Documentação Interativa:** Interface visual gerada dinamicamente com **Swagger/OpenAPI** para testar as rotas da API em tempo real.
-* **🔄 Normalização Inteligente:** Tradutor de strings que reconhece nomes comuns (ex: "Bitcoin") e converte para tickers ("BTC").
+* **👤 Contas e Autenticação:** Cadastro de usuários com senha criptografada (BCrypt) e login que devolve um token JWT válido por 2 horas.
+* **🧾 Histórico de Transações:** Cadastro, consulta, edição e exclusão de compras e vendas. Edições e exclusões que deixariam o histórico inconsistente (ex: uma venda sem saldo) são bloqueadas.
+* **📈 Cotações da Binance:** Preço e variação de 24 horas consultados em lote, com timeout, cache de 60 segundos e uso da última cotação conhecida (até 15 minutos) quando a Binance está fora do ar.
+* **📊 Resumo da Carteira:** Saldo, preço médio, valor atual, PNL e variação de 24 horas por ativo e da carteira inteira, em USD (pares com USDT). Ativos sem cotação continuam aparecendo, e a resposta indica quando os dados são parciais.
+* **💰 Simuladores:** Impacto de um novo aporte (DCA) no preço médio e no *break-even*, e resultado de vender a posição a um preço-alvo.
+* **📖 Documentação Interativa:** Interface gerada com **Swagger/OpenAPI** para testar as rotas da API.
+* **🔄 Normalização de Tickers:** Nomes comuns (ex: "Bitcoin") são convertidos para o ticker oficial ("BTC").
+* **⚠️ Erros Padronizados:** Todas as respostas de erro seguem o formato Problem Details (RFC 7807).
 
 ## 🛠️ Tecnologias e Stack
 
-Este projeto demonstra a aplicação de práticas sólidas de desenvolvimento Back-End moderno:
-
-* **Linguagem:** Java (JDK 17+)
-* **Framework Principal:** Spring Boot 3
+* **Linguagem:** Java 25
+* **Framework Principal:** Spring Boot 4 (Web MVC, `RestClient`, Validation)
 * **Persistência:** Spring Data JPA / Hibernate
-* **Banco de Dados:** MySQL
-* **Segurança:** Spring Security (Basic Auth)
+* **Banco de Dados:** MySQL 8, com migrations do Flyway
+* **Segurança:** Spring Security com JWT (stateless)
+* **Cotações:** Binance Public API (`data-api.binance.vision`)
 * **Documentação:** Springdoc OpenAPI (Swagger)
-* **Qualidade:** Testes de Unidade focados em regras de negócio críticas.
+* **Infraestrutura:** Docker e Docker Compose
+* **Qualidade:** Testes de unidade, de persistência (H2) e de integração HTTP (MockMvc), executados no GitHub Actions
+
+## 🔌 Endpoints
+
+| Método | Rota | Descrição |
+| --- | --- | --- |
+| `POST` | `/auth/register` | Cria uma conta |
+| `POST` | `/auth/login` | Retorna o token JWT |
+| `GET` | `/transacoes` | Lista as transações do usuário |
+| `POST` | `/transacoes` | Registra uma compra ou venda |
+| `GET` | `/transacoes/{id}` | Busca uma transação |
+| `PUT` | `/transacoes/{id}` | Altera uma transação |
+| `DELETE` | `/transacoes/{id}` | Exclui uma transação |
+| `GET` | `/carteira/resumo` | Resumo da carteira com cotações atuais |
+| `GET` | `/carteira/total` | Total líquido de compras e vendas |
+| `GET` | `/carteira/simulador/dca` | Simulação de aporte |
+| `GET` | `/carteira/simulador/venda` | Simulação de venda a um preço-alvo |
+| `GET` | `/analise/aportes-por-moeda` | Total comprado por ativo |
+
+Com exceção de `/auth/*` e do Swagger, todas as rotas exigem o cabeçalho `Authorization: Bearer <token>`.
+
+Mais detalhes em [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) e [`docs/BUSINESS_RULES.md`](docs/BUSINESS_RULES.md).
 
 ## 📋 Como Executar e Testar
 
-1.  **Pré-requisitos:** JDK 17+, Maven e um servidor MySQL rodando localmente.
-2.  **Configuração do Banco:** Configure as credenciais no arquivo `src/main/resources/application.properties`. O Hibernate cuidará da criação das tabelas automaticamente (`ddl-auto=update`).
-3.  **Execução:**
-    Na raiz do projeto, rode o comando:
+### Variáveis de ambiente
+
+A aplicação lê as credenciais de variáveis de ambiente. O arquivo [`.env.example`](.env.example) serve de modelo:
+
+| Variável | Obrigatória | Descrição |
+| --- | --- | --- |
+| `DB_USER` / `DB_PASSWORD` | Sim | Credenciais do MySQL |
+| `JWT_SECRET` | Sim | Segredo para assinar os tokens (use um valor longo e aleatório) |
+| `MYSQL_ROOT_PASSWORD` | Só no Docker | Senha do root do container MySQL |
+| `BINANCE_API_BASE_URL` | Não | URL da API de mercado da Binance |
+| `COTACOES_CONNECT_TIMEOUT`, `COTACOES_READ_TIMEOUT`, `COTACOES_CACHE_TTL`, `COTACOES_CACHE_MAX_STALE` | Não | Timeouts e cache das cotações |
+
+### Com Docker
+
+1.  Copie `.env.example` para `.env` e preencha os valores, incluindo `MYSQL_ROOT_PASSWORD`. Use em `DB_USER` um usuário diferente de `root`, pois a imagem do MySQL não aceita `root` como usuário adicional.
+2.  Gere o JAR (o `Dockerfile` copia o arquivo de `target/`) e suba os containers:
+    ```bash
+    ./mvnw clean package
+    docker compose up --build
+    ```
+3.  A API fica em `http://localhost:8080` e o MySQL em `localhost:3307`. O Flyway cria as tabelas na primeira execução.
+
+### Localmente
+
+1.  **Pré-requisitos:** JDK 25 e um MySQL rodando em `localhost:3306` com um banco chamado `criptovision`.
+2.  Exporte `DB_USER`, `DB_PASSWORD` e `JWT_SECRET` no terminal (o Spring não lê o arquivo `.env` automaticamente).
+3.  Na raiz do projeto, rode:
     ```bash
     ./mvnw spring-boot:run
     ```
-4.  **Acessando a API:**
-    Abra o navegador e acesse a documentação do Swagger para testar todos os endpoints interativamente:
-    👉 `http://localhost:8080/swagger-ui.html`
+    No Windows, use `.\mvnw.cmd spring-boot:run`.
+
+### Acessando a API
+
+Abra a documentação do Swagger para testar os endpoints:
+👉 `http://localhost:8080/swagger-ui.html`
+
+Crie uma conta em `/auth/register`, faça login em `/auth/login` e clique em **Authorize** para informar o token.
+
+### Testes
+
+```bash
+./mvnw clean test
+```
+
+Os testes usam um banco H2 em memória e não acessam a Binance, então não precisam de MySQL rodando.
 
 ---
 ⭐ *Desenvolvido por **Alexandre Vital** - Estudante de Ciência da Computação na UFSJ, em busca de desafios como Desenvolvedor Back-End.*
