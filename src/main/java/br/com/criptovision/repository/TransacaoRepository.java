@@ -24,6 +24,11 @@ public interface TransacaoRepository extends JpaRepository<Transacao, Long> {
         Usuario usuario
     );
 
+    boolean existsByIdAndUsuario(
+        Long id,
+        Usuario usuario
+    );
+
     // calcula o total de dólares aportados, agrupado por moeda
     @Query("""
         SELECT
