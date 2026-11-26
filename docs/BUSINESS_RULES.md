@@ -56,15 +56,17 @@ LINK
 
 ### Preço médio
 
-É o custo médio unitário das unidades que permanecem na carteira.
+É o custo médio unitário das unidades que permanecem na carteira. Ele não é armazenado: é calculado a partir do custo da posição sempre que é lido.
+
+```text
+preço médio = custo da posição ÷ saldo atual
+```
+
+Sem saldo, o preço médio é zero.
 
 ### Custo da posição
 
-É o custo atribuído ao saldo atual.
-
-```text
-custo da posição = saldo atual × preço médio
-```
+É o custo de aquisição atribuído ao saldo atual. Ele é acumulado transação a transação, sem arredondamento nas compras (veja as seções 6 e 8).
 
 ### Valor atual da posição
 
@@ -229,21 +231,15 @@ Uma indisponibilidade do provedor não é mais confundida com ticker inexistente
 
 ## 6. Regra de compra
 
-Uma compra aumenta o saldo e recalcula o preço médio.
+Uma compra aumenta o saldo e o custo da posição. O preço médio muda como consequência.
 
 Considere:
 
 ```text
 SA = saldo atual
-PMA = preço médio atual
+CA = custo da posição atual
 QC = quantidade comprada
 PC = preço unitário da compra
-```
-
-### Custo anterior
-
-```text
-custo anterior = SA × PMA
 ```
 
 ### Custo da nova compra
@@ -258,19 +254,30 @@ custo da nova compra = QC × PC
 novo saldo = SA + QC
 ```
 
+### Novo custo da posição
+
+```text
+novo custo = CA + custo da nova compra
+```
+
 ### Novo preço médio
 
 ```text
-novo preço médio =
-(custo anterior + custo da nova compra) ÷ novo saldo
+novo preço médio = novo custo ÷ novo saldo
 ```
 
-O código utiliza `BigDecimal` e arredondamento:
+### Precisão
+
+Multiplicação e soma em `BigDecimal` são exatas, então o custo da posição é acumulado sem nenhum arredondamento.
+
+O preço médio só é arredondado quando é lido:
 
 ```text
-escala = 8 casas decimais
+escala = 18 casas decimais (a mesma do preço unitário no banco)
 modo = HALF_UP
 ```
+
+Esse valor arredondado serve apenas para exibição e nunca volta para o cálculo da transação seguinte. Por isso, o erro de arredondamento não se acumula de uma compra para outra, o que é decisivo em moedas de preço muito baixo.
 
 ### Exemplo
 
@@ -278,6 +285,7 @@ Posição atual:
 
 ```text
 Saldo: 1 BTC
+Custo da posição: 50.000 USDT
 Preço médio: 50.000 USDT
 ```
 
@@ -291,9 +299,9 @@ Preço: 60.000 USDT
 Cálculo:
 
 ```text
-Custo anterior = 1 × 50.000 = 50.000
 Custo da compra = 1 × 60.000 = 60.000
 Novo saldo = 1 + 1 = 2
+Novo custo = 50.000 + 60.000 = 110.000
 Novo preço médio = 110.000 ÷ 2 = 55.000
 ```
 
@@ -301,8 +309,19 @@ Resultado:
 
 ```text
 Saldo: 2 BTC
+Custo da posição: 110.000 USDT
 Preço médio: 55.000 USDT
 ```
+
+### Exemplo com preço muito baixo
+
+```text
+Compra: 1.000.000 PEPE a 0,0000012345 USDT
+Custo da posição = 1.000.000 × 0,0000012345 = 1,2345
+Preço médio = 1,2345 ÷ 1.000.000 = 0,0000012345
+```
+
+Com apenas 8 casas decimais, esse preço médio seria exibido como `0,00000123`.
 
 ---
 
@@ -318,13 +337,13 @@ Essa duplicação de proteção no núcleo financeiro ainda pode ser adicionada 
 
 ## 8. Regra de venda
 
-Uma venda reduz o saldo do ativo.
+Uma venda reduz o saldo do ativo e o custo da posição.
 
 Considere:
 
 ```text
 SA = saldo atual
-PM = preço médio
+CA = custo da posição atual
 QV = quantidade vendida
 PV = preço unitário da venda
 ```
@@ -335,15 +354,26 @@ PV = preço unitário da venda
 novo saldo = SA - QV
 ```
 
+### Novo custo da posição
+
+O custo é reduzido na mesma proporção do saldo:
+
+```text
+novo custo = CA × novo saldo ÷ SA
+```
+
+Essa é a única divisão do motor financeiro. Ela é feita com 34 dígitos significativos e `HALF_UP`, então o erro dela é desprezível. Quando todo o saldo é vendido, o novo custo é exatamente zero (veja a seção 11).
+
 ### Preço médio após a venda
 
-O preço médio das unidades restantes não é alterado.
+Como saldo e custo diminuem na mesma proporção, o preço médio das unidades restantes não é alterado.
 
 Exemplo:
 
 ```text
 Antes da venda:
 Saldo = 2 BTC
+Custo da posição = 100.000 USDT
 Preço médio = 50.000 USDT
 
 Venda:
@@ -351,7 +381,8 @@ Quantidade = 0,5 BTC
 
 Depois da venda:
 Saldo = 1,5 BTC
-Preço médio = 50.000 USDT
+Custo da posição = 100.000 × 1,5 ÷ 2 = 75.000 USDT
+Preço médio = 75.000 ÷ 1,5 = 50.000 USDT
 ```
 
 Essa é a regra utilizada atualmente pelo sistema.
@@ -396,8 +427,10 @@ Durante o processamento da venda, o sistema calcula:
 ### Custo da parte vendida
 
 ```text
-custo da parte vendida = quantidade vendida × preço médio
+custo da parte vendida = custo da posição antes da venda - novo custo
 ```
+
+Isso equivale a quantidade vendida × preço médio, mas sem usar o preço médio arredondado.
 
 ### Valor recebido
 
@@ -446,11 +479,11 @@ Quando todo o saldo é vendido:
 
 ```text
 novo saldo = 0
+novo custo = 0
+preço médio = 0
 ```
 
-O preço médio permanece armazenado no objeto `Moeda`, mas o ativo deixa de aparecer no resumo porque somente moedas com saldo maior que zero são incluídas.
-
-Uma regra explícita para zerar o preço médio quando o saldo chegar a zero ainda não foi implementada.
+O ativo deixa de aparecer no resumo, porque somente moedas com saldo maior que zero são incluídas. Uma compra posterior começa uma posição nova, sem herdar o custo nem o preço médio da anterior.
 
 ---
 
@@ -619,7 +652,7 @@ lucro potencial = 0
 Caso exista saldo:
 
 ```text
-valor investido = saldo × preço médio
+valor investido = custo da posição
 valor atual = saldo × preço atual
 lucro potencial = valor atual - valor investido
 ```
@@ -855,7 +888,7 @@ valor do aporte ÷ preço de mercado
 
 ```text
 custo atual =
-saldo atual × preço médio atual
+custo da posição atual
 ```
 
 ### Novo saldo
@@ -902,7 +935,7 @@ Ainda não há validação explícita para:
 * aporte negativo;
 * preço igual a zero;
 * preço negativo;
-* ativo sem posição anterior;
+* ativo sem posição anterior (nunca comprado ou totalmente vendido);
 * preço médio atual igual a zero.
 
 Como o cálculo usa `double`, esses casos não lançam erro: produzem valores sem significado financeiro, como infinito ou `NaN`.
@@ -1015,7 +1048,8 @@ As entidades `Transacao` e `Moeda` utilizam `BigDecimal`. No banco, quantidade e
 
 Também utilizam `BigDecimal`:
 
-* o cálculo do preço médio (escala 8, `HALF_UP`);
+* o custo da posição, acumulado sem arredondamento nas compras;
+* o preço médio, derivado do custo só na leitura (escala 18, `HALF_UP`);
 * as cotações recebidas da Binance;
 * o resumo da carteira: valor dos ativos, PNL, percentuais e variação de 24 horas;
 * o total aportado por moeda.

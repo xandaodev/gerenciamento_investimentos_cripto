@@ -24,11 +24,11 @@ class CarteiraResumoCotacoesTest {
 
         Moeda btc = carteira.obterMoeda("BTC", "BTC");
         btc.setSaldo(new BigDecimal("0.001"));
-        btc.setPrecoMedio(new BigDecimal("60000"));
+        btc.setCustoTotal(new BigDecimal("60")); // preço médio 60000
 
         Moeda eth = carteira.obterMoeda("ETH", "ETH");
         eth.setSaldo(new BigDecimal("1.5"));
-        eth.setPrecoMedio(new BigDecimal("3000"));
+        eth.setCustoTotal(new BigDecimal("4500")); // preço médio 3000
 
         Instant atualizadaEm =
             Instant.parse("2026-08-06T14:30:00Z");

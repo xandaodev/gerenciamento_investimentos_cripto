@@ -17,6 +17,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
 import java.math.BigDecimal;
+import java.math.MathContext;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.*;
@@ -41,6 +42,10 @@ public class CarteiraService {
 
     private static final BigDecimal CEM =
         BigDecimal.valueOf(100);
+
+    // precisão da divisão do custo na venda parcial (a mesma do IEEE 754 decimal128)
+    private static final MathContext PRECISAO_CUSTO =
+        new MathContext(34, RoundingMode.HALF_UP);
 
     private final TransacaoRepository transacaoRepo;
     private final UsuarioRepository usuarioRepo;
@@ -72,19 +77,12 @@ public class CarteiraService {
     public void processarTransacao(Moeda moeda, Transacao transacao, boolean salvarNoBanco) throws SaldoInsuficienteException {
 
         if (transacao.getTipo() == TipoTransacao.COMPRA) {
-            BigDecimal custoTotalAntigo = moeda.getSaldo().multiply(moeda.getPrecoMedio());
-
-            // custoNovaCompra = quantidade * precoUnitario
+            // custoNovaCompra = quantidade * precoUnitario (multiplicação exata, sem arredondar)
             BigDecimal custoNovaCompra = transacao.getQuantidade().multiply(transacao.getPrecoUnitario());
 
-            // novoSaldo = saldo + quantidade
-            BigDecimal novoSaldo = moeda.getSaldo().add(transacao.getQuantidade());
-
-            // novoPrecoMedio = (custoTotalAntigo + custoNovaCompra) / novoSaldo
-            BigDecimal novoPrecoMedio = custoTotalAntigo.add(custoNovaCompra).divide(novoSaldo, 8, RoundingMode.HALF_UP);
-
-            moeda.setSaldo(novoSaldo);
-            moeda.setPrecoMedio(novoPrecoMedio);
+            // o custo acumulado também é exato; o preço médio é derivado dele em Moeda.getPrecoMedio
+            moeda.setSaldo(moeda.getSaldo().add(transacao.getQuantidade()));
+            moeda.setCustoTotal(moeda.getCustoTotal().add(custoNovaCompra));
 
         } else if (transacao.getTipo() == TipoTransacao.VENDA) {
             if (transacao.getQuantidade().compareTo(BigDecimal.ZERO) <= 0){
@@ -98,11 +96,23 @@ public class CarteiraService {
                 );
             }
 
-            BigDecimal custoParteVendida = transacao.getQuantidade().multiply(moeda.getPrecoMedio());
+            BigDecimal novoSaldo = moeda.getSaldo().subtract(transacao.getQuantidade());
+
+            // a venda não muda o preço médio: o custo que fica é proporcional ao saldo que fica.
+            // é a única divisão do motor, feita com 34 dígitos significativos.
+            // a venda total zera o custo, sem deixar resíduo para a próxima compra
+            BigDecimal custoRestante = novoSaldo.signum() == 0
+                ? BigDecimal.ZERO
+                : moeda.getCustoTotal()
+                    .multiply(novoSaldo)
+                    .divide(moeda.getSaldo(), PRECISAO_CUSTO);
+
+            BigDecimal custoParteVendida = moeda.getCustoTotal().subtract(custoRestante);
             BigDecimal valorRecebidoNaVenda = transacao.getQuantidade().multiply(transacao.getPrecoUnitario());
             BigDecimal lucroOperacao = valorRecebidoNaVenda.subtract(custoParteVendida);
 
-            moeda.setSaldo(moeda.getSaldo().subtract(transacao.getQuantidade()));
+            moeda.setSaldo(novoSaldo);
+            moeda.setCustoTotal(custoRestante);
         }
 
         if (salvarNoBanco){
@@ -121,7 +131,7 @@ public class CarteiraService {
         if(moeda.getSaldo().compareTo(BigDecimal.ZERO) <= 0){
             return 0;
         }
-        double valorInvestido = moeda.getSaldo().multiply(moeda.getPrecoMedio()).doubleValue();
+        double valorInvestido = moeda.getCustoTotal().doubleValue();
         double valorAtual = moeda.getSaldo().multiply(BigDecimal.valueOf(precoAtual)).doubleValue();
         return valorAtual - valorInvestido;
     }
@@ -130,7 +140,7 @@ public class CarteiraService {
     public SimulacaoDCADTO simularDCA(Moeda moeda, double valorAporteUSD, double precoMercado){
         double saldoAtual = moeda.getSaldo().doubleValue();
         double pmAtual = moeda.getPrecoMedio().doubleValue();
-        double custoTotalAtual = saldoAtual * pmAtual;
+        double custoTotalAtual = moeda.getCustoTotal().doubleValue();
 
         // quantidade que o novo aporte compraria
         double qtdComprada = valorAporteUSD / precoMercado;
@@ -190,7 +200,7 @@ public class CarteiraService {
 
         // calcula o lucro e a porcentagem
         double lucroSimulado = calcularLucroPotencial(moeda, precoFicticio);
-        double custoBase = moeda.getSaldo().multiply(moeda.getPrecoMedio()).doubleValue();
+        double custoBase = moeda.getCustoTotal().doubleValue();
         double porcSimulada = (lucroSimulado / custoBase) * 100;
 
         // calcula os totais
@@ -238,8 +248,7 @@ public class CarteiraService {
             BigDecimal valorNoAtivo = moeda.getSaldo()
                 .multiply(preco);
 
-            BigDecimal custoBase = moeda.getSaldo()
-                .multiply(moeda.getPrecoMedio());
+            BigDecimal custoBase = moeda.getCustoTotal();
 
             BigDecimal lucroDestaMoeda =
                 valorNoAtivo.subtract(custoBase);

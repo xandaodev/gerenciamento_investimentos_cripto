@@ -18,7 +18,7 @@ Prioridade das fases:
 
 ## Fase 1 — Confiabilidade financeira
 
-- [ ] **#1 — O preço médio perde precisão e o erro se acumula**
+- [x] **#1 — O preço médio perde precisão e o erro se acumula**
   - **Problema:** o preço médio é arredondado para 8 casas e esse valor arredondado volta para o cálculo da compra seguinte (`saldo × precoMedio`). Em moedas de preço baixo isso distorce o resultado: PEPE a `0.0000012345` vira `0.00000123`, um erro de cerca de 0,4% no custo, que cresce a cada compra. O banco guarda 18 casas, mas o cálculo usa 8.
   - **Arquivo:** `src/main/java/br/com/criptovision/service/CarteiraService.java` (`processarTransacao`), `src/main/java/br/com/criptovision/model/Moeda.java`
   - **Correção:** acumular o custo total em `BigDecimal` sem arredondar e calcular o preço médio só na hora de exibir. Cobrir com testes de moedas de preço muito baixo e de várias compras seguidas.
