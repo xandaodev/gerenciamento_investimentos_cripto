@@ -42,9 +42,7 @@ public class SecurityFilter extends OncePerRequestFilter {
                 tokenService.validarToken(tokenJWT);
 
             if (subject != null && !subject.isBlank()) {
-                var usuario = repository.findByLogin(subject);
-
-                if (usuario != null) {
+                repository.findByLogin(subject).ifPresent(usuario -> {
                     var authentication =
                         new UsernamePasswordAuthenticationToken(
                             usuario,
@@ -55,7 +53,7 @@ public class SecurityFilter extends OncePerRequestFilter {
                     SecurityContextHolder
                         .getContext()
                         .setAuthentication(authentication);
-                }
+                });
             }
         }
 
