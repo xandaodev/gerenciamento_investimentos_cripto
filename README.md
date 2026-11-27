@@ -62,6 +62,8 @@ O desenvolvimento deste sistema foi marcado por ciclos de melhoria contínua e r
 | --- | --- | --- |
 | `POST` | `/auth/register` | Cria uma conta |
 | `POST` | `/auth/login` | Retorna o token JWT |
+| `POST` | `/auth/logout` | Encerra as sessões em todos os dispositivos |
+| `PUT` | `/auth/senha` | Troca a senha e revoga os tokens antigos |
 | `GET` | `/transacoes` | Lista as transações do usuário |
 | `POST` | `/transacoes` | Registra uma compra ou venda |
 | `GET` | `/transacoes/{id}` | Busca uma transação |
@@ -73,7 +75,7 @@ O desenvolvimento deste sistema foi marcado por ciclos de melhoria contínua e r
 | `GET` | `/carteira/simulador/venda` | Simulação de venda a um preço-alvo |
 | `GET` | `/analise/aportes-por-moeda` | Total comprado por ativo |
 
-Com exceção de `/auth/*` e do Swagger, todas as rotas exigem o cabeçalho `Authorization: Bearer <token>`.
+Com exceção de `/auth/register`, `/auth/login` e do Swagger, todas as rotas exigem o cabeçalho `Authorization: Bearer <token>`.
 
 Mais detalhes em [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) e [`docs/BUSINESS_RULES.md`](docs/BUSINESS_RULES.md).
 
@@ -86,7 +88,7 @@ A aplicação lê as credenciais de variáveis de ambiente. O arquivo [`.env.exa
 | Variável | Obrigatória | Descrição |
 | --- | --- | --- |
 | `DB_USER` / `DB_PASSWORD` | Sim | Credenciais do MySQL |
-| `JWT_SECRET` | Sim | Segredo para assinar os tokens (use um valor longo e aleatório) |
+| `JWT_SECRET` | Sim | Segredo para assinar os tokens, com ao menos 32 bytes (gere com `openssl rand -base64 48`). A aplicação não sobe com um segredo menor nem com o valor de exemplo |
 | `MYSQL_ROOT_PASSWORD` | Só no Docker | Senha do root do container MySQL |
 | `CORS_ALLOWED_ORIGINS` | Em produção | Origens do frontend autorizadas pelo CORS, separadas por vírgula (padrão: `http://localhost:5173,http://localhost:5174`) |
 | `DOMINIO` | Em produção | Domínio público da API, para o qual o Caddy emite o certificado HTTPS (perfil `producao`) |

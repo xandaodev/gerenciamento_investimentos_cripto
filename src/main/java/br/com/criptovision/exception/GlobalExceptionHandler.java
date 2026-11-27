@@ -261,6 +261,26 @@ public class GlobalExceptionHandler {
             .body(problema);
     }
 
+    @ExceptionHandler({
+        SenhaAtualIncorretaException.class,
+        NovaSenhaInvalidaException.class
+    })
+    public ResponseEntity<ProblemDetail> tratarTrocaDeSenhaInvalida(
+        RuntimeException ex,
+        HttpServletRequest request
+    ) {
+        ProblemDetail problema = criarProblema(
+            HttpStatus.BAD_REQUEST,
+            "Troca de senha inválida",
+            ex.getMessage(),
+            request
+        );
+
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(problema);
+    }
+
     @ExceptionHandler(LoginJaCadastradoException.class)
     public ResponseEntity<ProblemDetail> tratarLoginJaCadastrado(
         LoginJaCadastradoException ex,

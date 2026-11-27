@@ -134,7 +134,9 @@ class PadronizacaoErrosHttpTest {
 
     @Test
     void devePadronizar401ComTokenDeUsuarioInexistente() throws Exception {
-        String token = tokenService.gerarToken("usuario.removido");
+        String token = tokenService.gerarToken(
+            new Usuario("usuario.removido", "hash-qualquer")
+        );
 
         mockMvc.perform(get("/transacoes")
                 .header(
@@ -184,9 +186,7 @@ class PadronizacaoErrosHttpTest {
 
     @Test
     void devePadronizarParametroComTipoInvalido() throws Exception {
-        String token = tokenService.gerarToken(
-            usuario.getLogin()
-        );
+        String token = tokenService.gerarToken(usuario);
 
         mockMvc.perform(get("/transacoes/abc")
                 .header(

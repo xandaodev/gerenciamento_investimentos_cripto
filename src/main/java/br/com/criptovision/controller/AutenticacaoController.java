@@ -1,10 +1,13 @@
 package br.com.criptovision.controller;
 
+import br.com.criptovision.config.OpenApiConfiguration;
 import br.com.criptovision.dto.DadosAutenticacao;
 import br.com.criptovision.dto.DadosCadastroUsuario;
+import br.com.criptovision.dto.DadosTrocaSenha;
 import br.com.criptovision.dto.ProblemaApiDTO;
 import br.com.criptovision.dto.TokenJwtDTO;
 import br.com.criptovision.dto.UsuarioCadastradoDTO;
+import br.com.criptovision.exception.SenhaAtualIncorretaException;
 import br.com.criptovision.model.Usuario;
 import br.com.criptovision.security.ProtecaoForcaBruta;
 import br.com.criptovision.security.TokenService;
@@ -15,6 +18,7 @@ import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
@@ -25,7 +29,9 @@ import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -151,7 +157,7 @@ public class AutenticacaoController {
             (Usuario) authentication.getPrincipal();
 
         var tokenJWT =
-            tokenService.gerarToken(usuario.getLogin());
+            tokenService.gerarToken(usuario);
 
         return ResponseEntity.ok(
             new TokenJwtDTO(tokenJWT)
@@ -237,5 +243,103 @@ public class AutenticacaoController {
         return ResponseEntity
             .status(HttpStatus.CREATED)
             .body(new UsuarioCadastradoDTO(usuario));
+    }
+
+    @PostMapping("/logout")
+    @SecurityRequirement(name = OpenApiConfiguration.BEARER_AUTH)
+    @Operation(
+        summary = "Encerrar as sessões",
+        description = "Revoga todos os tokens do usuário, em todos os dispositivos. "
+            + "Para voltar a usar a API, é preciso fazer login de novo.",
+        operationId = "encerrarSessoes"
+    )
+    @ApiResponses({
+        @ApiResponse(
+            responseCode = "204",
+            description = "Sessões encerradas. Nenhum token emitido antes continua válido."
+        ),
+        @ApiResponse(
+            responseCode = "401",
+            description = "Token ausente, inválido, expirado ou já revogado.",
+            content = @Content(
+                mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                schema = @Schema(implementation = ProblemaApiDTO.class)
+            )
+        )
+    })
+    public ResponseEntity<Void> encerrarSessoes(
+        @AuthenticationPrincipal Usuario usuario
+    ) {
+        usuarioService.encerrarSessoes(usuario);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PutMapping("/senha")
+    @SecurityRequirement(name = OpenApiConfiguration.BEARER_AUTH)
+    @Operation(
+        summary = "Trocar a senha",
+        description = "Confere a senha atual, troca a senha e revoga todos os tokens "
+            + "emitidos antes, em todos os dispositivos. Devolve um token novo para "
+            + "a sessão atual continuar.",
+        operationId = "trocarSenha"
+    )
+    @ApiResponses({
+        @ApiResponse(
+            responseCode = "200",
+            description = "Senha trocada. O token devolvido substitui o anterior.",
+            content = @Content(
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = TokenJwtDTO.class)
+            )
+        ),
+        @ApiResponse(
+            responseCode = "400",
+            description = "Senha atual incorreta, nova senha igual à atual ou fora das regras.",
+            content = @Content(
+                mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                schema = @Schema(implementation = ProblemaApiDTO.class)
+            )
+        ),
+        @ApiResponse(
+            responseCode = "401",
+            description = "Token ausente, inválido, expirado ou já revogado.",
+            content = @Content(
+                mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                schema = @Schema(implementation = ProblemaApiDTO.class)
+            )
+        ),
+        @ApiResponse(
+            responseCode = "429",
+            description = "Muitas tentativas com a senha atual errada. "
+                + "O cabeçalho Retry-After informa em quantos segundos tentar de novo.",
+            content = @Content(
+                mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                schema = @Schema(implementation = ProblemaApiDTO.class)
+            )
+        )
+    })
+    public ResponseEntity<TokenJwtDTO> trocarSenha(
+        @AuthenticationPrincipal Usuario usuario,
+        @Valid @RequestBody DadosTrocaSenha dados,
+        HttpServletRequest request
+    ) {
+        // a senha atual errada conta como falha de login: quem roubar um token
+        // não consegue descobrir a senha testando-a aqui à vontade
+        protecaoForcaBruta.verificarLogin(request.getRemoteAddr(), usuario.getLogin());
+
+        Usuario atualizado;
+
+        try {
+            atualizado = usuarioService.trocarSenha(usuario, dados);
+        } catch (SenhaAtualIncorretaException ex) {
+            protecaoForcaBruta.registrarFalhaDeLogin(usuario.getLogin());
+            throw ex;
+        }
+
+        protecaoForcaBruta.registrarLoginComSucesso(usuario.getLogin());
+
+        return ResponseEntity.ok(
+            new TokenJwtDTO(tokenService.gerarToken(atualizado))
+        );
     }
 }

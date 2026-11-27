@@ -40,6 +40,9 @@ class BackupMysqlIT {
 
     private static final Network REDE = Network.newNetwork();
 
+    // versão do schema depois das migrations, por exemplo "4"
+    private static String versaoDoSchema;
+
     private static final MySQLContainer MYSQL = new MySQLContainer("mysql:8.0")
         .withNetwork(REDE)
         .withNetworkAliases("db")
@@ -80,11 +83,13 @@ class BackupMysqlIT {
         S3.start();
         MYSQL.start();
 
-        Flyway.configure()
+        // a versão vem do próprio Flyway: o teste não quebra a cada migration nova
+        versaoDoSchema = Flyway.configure()
             .dataSource(MYSQL.getJdbcUrl(), MYSQL.getUsername(), MYSQL.getPassword())
             .locations("classpath:db/migration")
             .load()
-            .migrate();
+            .migrate()
+            .targetSchemaVersion;
 
         BACKUP.start();
     }
@@ -134,7 +139,8 @@ class BackupMysqlIT {
 
         assertThat(teste.getExitCode()).as(teste.getStderr()).isZero();
         assertThat(teste.getStdout())
-            .contains("Restauração testada com sucesso: 1 usuários, 2 transações, migrations até a versão 3");
+            .contains("Restauração testada com sucesso: 1 usuários, 2 transações, "
+                + "migrations até a versão " + versaoDoSchema);
     }
 
     @Test

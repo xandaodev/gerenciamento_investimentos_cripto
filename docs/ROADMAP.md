@@ -72,10 +72,11 @@ Prioridade das fases:
 
 ## Fase 3 — Antes de abrir para usuários
 
-- [ ] **#9 — O JWT não tem revogação**
+- [x] **#9 — O JWT não tem revogação**
   - **Problema:** não há logout, refresh nem troca de senha. O tamanho do `JWT_SECRET` não é validado na subida (o HMAC256 aceita segredos curtos) e o token não tem `audience`.
   - **Arquivo:** `src/main/java/br/com/criptovision/security/TokenService.java`, `src/main/java/br/com/criptovision/security/SecurityFilter.java`, `src/main/java/br/com/criptovision/model/Usuario.java`
   - **Correção:** validar o tamanho mínimo do segredo na inicialização, adicionar `audience` e um mecanismo de invalidação (por exemplo, um `tokenVersion` no usuário verificado no filtro). Avaliar refresh token e criar troca de senha.
+  - **Feito:** a aplicação não sobe com `JWT_SECRET` menor que 32 bytes nem com o valor de exemplo. O token tem `audience` e a versão dos tokens do usuário (`versao_token`, migration `V4`), que o `SecurityFilter` compara com a do banco. `POST /auth/logout` encerra as sessões em todos os dispositivos. `PUT /auth/senha` troca a senha, revoga os tokens antigos e devolve um novo, e a senha atual errada conta para a proteção contra força bruta. O refresh token foi avaliado e não adotado por enquanto: exigiria armazenamento, rotação e detecção de reuso, e os tokens duram 2 horas (veja o ARCHITECTURE, seção 6).
 
 - [ ] **#10 — Requisitos mínimos da LGPD**
   - **Problema:** não existe exclusão de conta, a FK `fk_transacoes_usuario` não tem `ON DELETE`, e não há política de privacidade nem exportação de dados.
