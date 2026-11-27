@@ -77,7 +77,7 @@ public class CarteiraServiceTest {
         Moeda eth = new Moeda("ETH", "Ethereum");
 
         eth.setSaldo(BigDecimal.valueOf(2.0));
-        eth.setPrecoMedio(BigDecimal.valueOf(3000.0));
+        eth.setCustoTotal(BigDecimal.valueOf(6000.0)); // preço médio 3000
 
         SimulacaoDCADTO simulacao = service.simularDCA(eth, 3000.0, 1500.0);
 
@@ -92,7 +92,7 @@ public class CarteiraServiceTest {
         Moeda btc = new Moeda("BTC", "Bitcoin");
 
         btc.setSaldo(BigDecimal.valueOf(0.5));
-        btc.setPrecoMedio(BigDecimal.valueOf(50000.0));
+        btc.setCustoTotal(BigDecimal.valueOf(25000.0)); // preço médio 50000
 
         double lucroPotencial = service.calcularLucroPotencial(btc, 70000.0);
 

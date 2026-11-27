@@ -346,7 +346,7 @@ ETH → objeto Moeda do Ethereum
 SOL → objeto Moeda da Solana
 ```
 
-Quando uma moeda ainda não existe na carteira, o método `obterMoeda` cria um novo objeto com saldo e preço médio iguais a zero.
+Quando uma moeda ainda não existe na carteira, o método `obterMoeda` cria um novo objeto com saldo e custo total iguais a zero, e portanto preço médio zero.
 
 ---
 
@@ -362,11 +362,15 @@ Campos atuais:
 nome
 ticker
 saldo
-precoMedio
+custoTotal
 variacao24h
 ```
 
-O saldo e o preço médio utilizam `BigDecimal`. O campo `variacao24h` não é utilizado pelo resumo atual, que lê a variação diretamente da `CotacaoMercado`.
+O saldo e o custo total utilizam `BigDecimal`. O `custoTotal` é o custo de aquisição do saldo atual, acumulado sem arredondamento nas compras e reduzido proporcionalmente nas vendas.
+
+O preço médio não é armazenado. `getPrecoMedio()` o calcula como `custoTotal ÷ saldo`, com 18 casas decimais e `HALF_UP`, e devolve zero quando não há saldo. Esse valor arredondado é só para leitura e nunca volta para o processamento das transações seguintes. As regras completas estão nas seções 6, 8 e 11 de `docs/BUSINESS_RULES.md`.
+
+O campo `variacao24h` não é utilizado pelo resumo atual, que lê a variação diretamente da `CotacaoMercado`.
 
 A carteira é reconstruída processando o histórico de transações sobre os objetos `Moeda`.
 
@@ -665,7 +669,7 @@ Cria uma Carteira vazia
         ↓
 Processa as transações individualmente
         ↓
-Atualiza saldo e preço médio de cada Moeda
+Atualiza saldo e custo total de cada Moeda
         ↓
 Produz o resultado solicitado
 ```
@@ -956,6 +960,7 @@ Os testes executados por `mvn test` usam o perfil `test` (`application-test.prop
 Principais grupos:
 
 * testes de unidade do motor financeiro e da criação, atualização e exclusão de transações no `CarteiraService`;
+* `CarteiraServicePrecoMedioTest`, que verifica que o custo da posição não acumula erro de arredondamento: moedas de preço muito baixo, compras seguidas, venda parcial com divisão não exata, venda total e o PNL do resumo;
 * `CotacaoServiceTest` para cache, lote, fallback e tickers indisponíveis;
 * `BinanceCotacaoClientTest` com `MockRestServiceServer` para o mapeamento das respostas e dos erros da Binance;
 * `CarteiraResumoCotacoesTest` para o resumo com cotações parciais;

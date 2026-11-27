@@ -51,7 +51,7 @@ Base package `br.com.criptovision`: controller → service → repository, plus 
 - Never turn provider failures into a zero price. Unknown ticker → 400; provider down with no fallback → 503.
 - A `Clock` bean (`CotacaoConfiguration`) is injected for time-dependent logic, so tests can control time.
 
-**Money.** Use `BigDecimal` (average price uses scale 8, `HALF_UP`). Migration `V3` widened the DB precision. Some simulation and total methods still use `double`, which is known debt, so don't add new `double` math.
+**Money.** Use `BigDecimal`. `Moeda` keeps the exact `custoTotal` (buys add `quantidade × preço` with no rounding; a partial sale scales it by the remaining balance at 34 significant digits; a full sale zeroes it). The average price is derived on read (`custoTotal ÷ saldo`, scale 18, `HALF_UP`) and must never be fed back into the next transaction. Migration `V3` widened the DB precision. Some simulation and total methods still use `double`, which is known debt, so don't add new `double` math.
 
 **Errors.** `GlobalExceptionHandler` returns RFC 7807 `ProblemDetail` responses (with field errors for validation). `AutenticacaoEntryPoint` handles 401s. New business exceptions should get a handler there.
 
