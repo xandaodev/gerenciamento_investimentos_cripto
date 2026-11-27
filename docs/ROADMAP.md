@@ -60,7 +60,7 @@ Prioridade das fases:
   - **Arquivo:** `docker-compose.yml` (volume `mysql_data`)
   - **Correção:** configurar backups automáticos (dump agendado ou backup gerenciado do provedor), guardá-los fora do servidor, definir retenção e testar a restauração periodicamente.
 
-- [ ] **#7 — O CORS está fixo em `localhost`**
+- [x] **#7 — O CORS está fixo em `localhost`**
   - **Problema:** as origens permitidas são só `localhost:5173` e `localhost:5174`, então o frontend de produção não funciona.
   - **Arquivo:** `src/main/java/br/com/criptovision/security/SecurityConfigurations.java` (`corsConfigurationSource`)
   - **Correção:** ler as origens permitidas de uma propriedade alimentada por variável de ambiente (por exemplo `CORS_ALLOWED_ORIGINS`) e documentá-la no `.env.example`.

@@ -527,14 +527,18 @@ A aplicação utiliza sessões stateless, portanto o servidor não mantém uma s
 
 ### CORS
 
-A configuração atual permite requisições das seguintes origens locais:
+As origens autorizadas vêm da propriedade `cors.allowed-origins`, alimentada pela variável de ambiente `CORS_ALLOWED_ORIGINS` (origens separadas por vírgula). Sem a variável, só o frontend local do React com Vite é aceito:
 
 ```text
 http://localhost:5173
 http://localhost:5174
 ```
 
-Essas portas são utilizadas pelo frontend React com Vite. Os métodos permitidos são `GET`, `POST`, `PUT`, `DELETE` e `OPTIONS`.
+Em produção, a variável deve conter só o domínio do frontend. As origens informadas substituem as locais, em vez de se somarem a elas.
+
+O record `CorsProperties` valida a lista na inicialização. Ele remove espaços, barras finais e repetições, e impede a aplicação de subir quando a lista está vazia ou quando uma origem não tem o formato do cabeçalho `Origin` (esquema `http` ou `https`, host e porta opcional): sem esquema, com caminho, com query ou com o curinga `*`. A mensagem de erro mostra a origem inválida como foi digitada. Sem essa validação, uma origem mal escrita não casaria com nenhuma requisição, e o frontend falharia sem explicação.
+
+Os métodos permitidos são `GET`, `POST`, `PUT`, `DELETE` e `OPTIONS`. As respostas de erro, como o `401`, também levam o cabeçalho `Access-Control-Allow-Origin`, para que o frontend consiga ler o Problem Details. Requisições de origens não autorizadas recebem `403`.
 
 ---
 
@@ -968,6 +972,7 @@ Principais grupos:
 * `IsolamentoTransacoesHttpTest`, que inicializa o contexto Spring Boot, autentica dois usuários com JWT e verifica por `MockMvc` que um usuário não lista, consulta, altera ou exclui transações do outro, nem acessa a carteira e as análises do outro;
 * `ConcorrenciaTransacoesTest`, que usa duas threads para verificar que uma venda aguarda o bloqueio de outra venda em andamento e é rejeitada por saldo insuficiente depois do commit;
 * `AutenticacaoServiceTest`, que verifica que um login inexistente lança `UsernameNotFoundException` e que o `DaoAuthenticationProvider` ainda compara a senha com o hash fictício, sem deixar o tempo de resposta revelar quais logins existem;
+* `CorsPropertiesTest`, para a leitura e a validação de `CORS_ALLOWED_ORIGINS`, inclusive a falha na inicialização com uma origem inválida, e `CorsOrigensPadraoHttpTest` e `CorsOrigensConfiguradasHttpTest`, que verificam por `MockMvc` o preflight de origens permitidas e recusadas, com as origens padrão e com origens configuradas;
 * `CadastroUsuarioHttpTest`, `PadronizacaoErrosHttpTest` e `OpenApiDocumentationTest` para o cadastro, o login, o formato dos erros e a documentação.
 
 Essa suíte rápida, que não precisa de banco externo nem de Docker, pode ser executada com:

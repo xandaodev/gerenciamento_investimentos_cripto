@@ -1,5 +1,6 @@
 package br.com.criptovision.security;
 
+import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -19,17 +20,21 @@ import java.util.Arrays;
 
 @Configuration
 @EnableWebSecurity
+@EnableConfigurationProperties(CorsProperties.class)
 public class SecurityConfigurations {
 
     private final SecurityFilter securityFilter;
     private final AutenticacaoEntryPoint autenticacaoEntryPoint;
+    private final CorsProperties corsProperties;
 
     public SecurityConfigurations(
         SecurityFilter securityFilter,
-        AutenticacaoEntryPoint autenticacaoEntryPoint
+        AutenticacaoEntryPoint autenticacaoEntryPoint,
+        CorsProperties corsProperties
     ) {
         this.securityFilter = securityFilter;
         this.autenticacaoEntryPoint = autenticacaoEntryPoint;
+        this.corsProperties = corsProperties;
     }
 
     @Bean
@@ -89,10 +94,10 @@ public class SecurityConfigurations {
         CorsConfiguration configuration =
             new CorsConfiguration();
 
-        configuration.setAllowedOrigins(Arrays.asList(
-            "http://localhost:5173",
-            "http://localhost:5174"
-        ));
+        // origens vindas de CORS_ALLOWED_ORIGINS, já validadas por CorsProperties
+        configuration.setAllowedOrigins(
+            corsProperties.allowedOrigins()
+        );
 
         configuration.setAllowedMethods(Arrays.asList(
             "GET",
