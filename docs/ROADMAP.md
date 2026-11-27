@@ -46,11 +46,11 @@ Prioridade das fases:
   - **Correção:** colocar um proxy reverso com TLS (Caddy/Nginx ou o do provedor) na frente da API e configurar `server.forward-headers-strategy`. A API não deve ficar acessível diretamente pela internet.
   - **Feito:** o perfil `producao` do Compose sobe o Caddy com HTTPS automático no domínio de `DOMINIO`, e as portas da API e do MySQL ficam presas a `127.0.0.1`. A API roda com `SERVER_FORWARD_HEADERS_STRATEGY=native`, que só aceita os cabeçalhos `X-Forwarded-*` de IPs internos, então os limites por IP do #4 usam o IP do cliente e o HSTS é enviado. Fora do Compose, a propriedade continua `none`, para que um cliente não forje o IP. O passo a passo de deploy está no README.
 
-- [ ] **#3 — O MySQL fica exposto e sem TLS**
+- [x] **#3 — O MySQL fica exposto e sem TLS**
   - **Problema:** a porta `3307` é publicada em todas as interfaces, e a URL do datasource usa `useSSL=false&allowPublicKeyRetrieval=true`.
   - **Arquivo:** `docker-compose.yml`
   - **Correção:** não publicar a porta do MySQL em produção (ou prendê-la a `127.0.0.1`), habilitar TLS na conexão e remover `allowPublicKeyRetrieval`.
-  - **Parcial:** no #2, a porta do MySQL passou a aceitar só conexões de `127.0.0.1`. Faltam o TLS na conexão e a remoção do `allowPublicKeyRetrieval`.
+  - **Feito:** no #2, a porta do MySQL passou a aceitar só conexões de `127.0.0.1`. Agora o MySQL roda com `--require-secure-transport=ON`, e a API conecta com `sslMode=REQUIRED`, sem `allowPublicKeyRetrieval`. O `useSSL=false` antigo virava `sslMode=DISABLED`, então a conexão em produção não era cifrada. O modo `REQUIRED` não verifica o certificado, o que basta com a API e o banco no mesmo servidor. Se o banco for para outro servidor ou para um serviço gerenciado, troque por `VERIFY_IDENTITY` com o certificado do provedor.
 
 - [x] **#4 — Não há proteção contra força bruta**
   - **Problema:** `/auth/login` e `/auth/register` não têm rate limit nem bloqueio de conta.

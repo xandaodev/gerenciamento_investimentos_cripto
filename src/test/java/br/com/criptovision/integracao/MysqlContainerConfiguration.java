@@ -21,7 +21,14 @@ public class MysqlContainerConfiguration {
     // Spring diferentes compartilham o mesmo banco em vez de subir um MySQL cada
     private static final MySQLContainer MYSQL =
         new MySQLContainer(IMAGEM_MYSQL)
-            .withDatabaseName("criptovision");
+            .withDatabaseName("criptovision")
+            // como no docker-compose: o servidor só aceita conexões com TLS...
+            .withCommand("--require-secure-transport=ON")
+            // ...e a aplicação conecta exigindo TLS, sem buscar a chave pública
+            // do servidor. Sem estes parâmetros, o Testcontainers acrescentaria
+            // allowPublicKeyRetrieval=true à URL
+            .withUrlParam("sslMode", "REQUIRED")
+            .withUrlParam("allowPublicKeyRetrieval", "false");
 
     @Bean
     @ServiceConnection

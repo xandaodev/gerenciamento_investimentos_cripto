@@ -104,6 +104,8 @@ A aplicação lê as credenciais de variáveis de ambiente. O arquivo [`.env.exa
     ```
 3.  A API fica em `http://localhost:8080` e o MySQL em `localhost:3307`, sem HTTPS. As duas portas só aceitam conexões da própria máquina. O Flyway cria as tabelas na primeira execução.
 
+O MySQL só aceita conexões cifradas com TLS. Ao abrir o banco numa ferramenta como DBeaver ou MySQL Workbench, mantenha o SSL ativado, que costuma ser o padrão. O certificado é gerado pelo próprio MySQL, então a ferramenta não deve exigir a verificação dele.
+
 Para produção, com HTTPS, veja [Deploy em produção](#-deploy-em-produção-vps-com-https).
 
 ### Localmente
@@ -212,7 +214,7 @@ docker compose up -d --build
 
 ### Ainda não incluído
 
-O [roadmap](docs/ROADMAP.md) lista o que falta para produção, em especial TLS na conexão com o MySQL (#3) e backups automáticos do banco (#5).
+O [roadmap](docs/ROADMAP.md) lista o que falta para produção, em especial os backups automáticos do banco (#5).
 
 ---
 ⭐ *Desenvolvido por **Alexandre Vital** - Estudante de Ciência da Computação na UFSJ, em busca de desafios como Desenvolvedor Back-End.*
