@@ -980,6 +980,19 @@ O Caddy repassa para a API o IP real do cliente em `X-Forwarded-For` e o protoco
 
 Fora do Compose, a propriedade `server.forward-headers-strategy` fica em `none` por padrão. Sem um proxy na frente, aceitar esses cabeçalhos permitiria a um cliente forjar o próprio IP. O `ProxyReversoHttpTest` e o `SemProxyReversoHttpTest` cobrem os dois casos num Tomcat real. O passo a passo de deploy numa VPS está no README.
 
+### Conexão da API com o MySQL
+
+A conexão entre a API e o MySQL é cifrada com TLS:
+
+* o MySQL roda com `--require-secure-transport=ON` e recusa qualquer conexão de rede sem TLS, inclusive de ferramentas locais em `localhost:3307`. A maioria dos clientes (o `mysql` de linha de comando, DBeaver, MySQL Workbench) já usa TLS por padrão. Conexões pelo socket local dentro do próprio container, como `docker compose exec db mysql`, continuam permitidas, porque não passam pela rede;
+* a API conecta com `sslMode=REQUIRED`. Se o TLS não puder ser estabelecido, a conexão falha, em vez de seguir sem criptografia;
+* o certificado do servidor é gerado pelo próprio MySQL 8 ao inicializar o banco e fica no volume `mysql_data`, então não há certificados para criar ou distribuir;
+* sem `allowPublicKeyRetrieval`. O login padrão do MySQL 8 (`caching_sha2_password`) envia a senha dentro do TLS. Sem TLS, ele exigiria buscar a chave pública do servidor, e um servidor falso poderia entregar a própria chave e capturar a senha.
+
+O modo `REQUIRED` cifra a conexão, mas não verifica o certificado do servidor. Aqui isso basta: a API e o MySQL estão no mesmo servidor e se falam pela rede interna do Docker, onde só um atacante que já controla a máquina conseguiria se passar pelo banco. Se o banco passar para outro servidor ou para um serviço gerenciado, use `sslMode=VERIFY_IDENTITY` com o certificado da autoridade do provedor num truststore.
+
+Fora do Compose, a URL de `application.properties` não define `sslMode`, e o driver usa o padrão `PREFERRED` (TLS quando o servidor oferece). O `ConexaoSeguraMysqlIT` verifica, num MySQL que exige TLS, que o pool da aplicação conecta com TLS e que uma conexão sem TLS é recusada.
+
 O Dockerfile usa a imagem `eclipse-temurin:25-jdk-alpine` e espera que o JAR já tenha sido gerado em `target/`.
 
 O ambiente utiliza um arquivo `.env`, ignorado pelo Git, para fornecer `MYSQL_ROOT_PASSWORD`, `DB_USER`, `DB_PASSWORD` e `JWT_SECRET`, além de `CORS_ALLOWED_ORIGINS` e `DOMINIO` em produção e das variáveis opcionais `BINANCE_API_BASE_URL` e `COTACOES_*`. O arquivo `.env.example` serve de modelo. Dentro da rede do Compose, a API acessa o banco pelo hostname `db` e pela porta interna `3306`.
@@ -1041,6 +1054,7 @@ Os testes com sufixo `IT`, no pacote `br.com.criptovision.integracao`, rodam con
 
 Grupos atuais:
 
+* `ConexaoSeguraMysqlIT`, que verifica que o pool da aplicação conecta com TLS num MySQL que exige transporte seguro e que uma conexão sem TLS é recusada. O container dos testes roda com `--require-secure-transport=ON`, e a aplicação conecta com `sslMode=REQUIRED` e sem `allowPublicKeyRetrieval`, como no `docker-compose.yml`;
 * `MigracoesMysqlIT`, que verifica que todas as migrations foram aplicadas, que `quantidade` e `preco_unitario` são `DECIMAL(38, 18)` (o `validate` do Hibernate não confere precisão nem escala) e que valores no limite da validação são gravados e lidos sem perda;
 * `ConcorrenciaTransacoesMysqlIT`, que executa o mesmo cenário do `ConcorrenciaTransacoesTest` (os dois herdam de `CenarioConcorrenciaTransacoes`) sob o REPEATABLE READ do InnoDB. Só ele detecta uma leitura comum feita antes do `SELECT ... FOR UPDATE`, porque o H2 não reproduz o snapshot de leitura do MySQL.
 

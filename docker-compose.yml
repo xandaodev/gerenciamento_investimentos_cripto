@@ -17,6 +17,9 @@ services:
     image: mysql:8.0
     container_name: cripto-mysql
     restart: always
+    # recusa qualquer conexão sem TLS. O MySQL 8 gera o próprio certificado
+    # ao inicializar o banco, então não há certificados para criar ou distribuir
+    command: --require-secure-transport=ON
     environment:
       MYSQL_DATABASE: criptovision
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
@@ -36,7 +39,11 @@ services:
     depends_on:
       - db
     environment:
-      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/criptovision?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+      # sslMode=REQUIRED: a conexão com o banco é sempre cifrada, e a senha do
+      # login (caching_sha2_password) viaja dentro do TLS. Por isso não é preciso
+      # allowPublicKeyRetrieval, que deixaria o driver aceitar a chave pública
+      # de qualquer servidor que respondesse no lugar do MySQL
+      SPRING_DATASOURCE_URL: jdbc:mysql://db:3306/criptovision?sslMode=REQUIRED&serverTimezone=UTC
       SPRING_DATASOURCE_USERNAME: ${DB_USER}
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
       SPRING_JPA_HIBERNATE_DDL_AUTO: validate
