@@ -20,7 +20,10 @@ import java.util.Arrays;
 
 @Configuration
 @EnableWebSecurity
-@EnableConfigurationProperties(CorsProperties.class)
+@EnableConfigurationProperties({
+    CorsProperties.class,
+    TentativasProperties.class
+})
 public class SecurityConfigurations {
 
     private final SecurityFilter securityFilter;

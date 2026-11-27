@@ -112,6 +112,29 @@ Uma conta é criada por `POST /auth/register` com login e senha:
 
 Um login inexistente e uma senha incorreta recebem exatamente a mesma resposta, `401 Unauthorized` com a mensagem "Login ou senha inválidos.", e levam um tempo de resposta equivalente. Assim, não é possível descobrir quais logins estão cadastrados tentando entrar.
 
+### Limite de tentativas
+
+Para frear ataques de força bruta, o login e o cadastro têm limites de tentativas. Os valores padrão são:
+
+| Limite | Padrão | O que conta |
+| --- | --- | --- |
+| Login por IP | 20 por minuto | toda tentativa de login vinda do IP |
+| Falhas por login | 5 em 15 minutos | só as senhas erradas para aquele login |
+| Cadastro por IP | 10 por hora | toda tentativa de cadastro vinda do IP, inclusive as recusadas com `409` |
+
+Regras:
+
+- depois de 5 senhas erradas, o login fica bloqueado até a janela de 15 minutos fechar, **mesmo que a senha certa seja informada**;
+- um login com sucesso zera a contagem de falhas daquele login;
+- `Alexandre`, ` alexandre ` e `ALEXANDRE` contam como o mesmo login, como no cadastro;
+- um login inexistente é bloqueado do mesmo jeito que um existente, para que o bloqueio não revele quais contas existem;
+- a janela começa na primeira tentativa, e tentativas recusadas não estendem o bloqueio;
+- requisições recusadas pela validação (`400`) não contam.
+
+Quando um limite é atingido, a API responde `429 Too Many Requests` com a mensagem "Muitas tentativas. Tente novamente em N minutos." (ou segundos) e o cabeçalho `Retry-After` em segundos. A resposta é a mesma para qualquer limite: ela não diz se o bloqueio veio do IP ou do login.
+
+Os limites podem ser ajustados pelas propriedades `seguranca.tentativas.*`.
+
 ### Associação obrigatória
 
 Cada transação possui um proprietário obrigatório:

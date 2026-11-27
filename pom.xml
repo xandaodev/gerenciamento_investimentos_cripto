@@ -121,6 +121,12 @@
             <version>${springdoc.version}</version>
         </dependency>
 
+        <!-- Cache em memória com tamanho limitado (contadores de tentativas de login) -->
+        <dependency>
+            <groupId>com.github.ben-manes.caffeine</groupId>
+            <artifactId>caffeine</artifactId>
+        </dependency>
+
         <!-- Geração e validação de tokens JWT -->
         <dependency>
             <groupId>com.auth0</groupId>

@@ -4,6 +4,7 @@ import br.com.criptovision.dto.ErroCampoDTO;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
@@ -208,6 +209,27 @@ public class GlobalExceptionHandler {
 
         return ResponseEntity
             .status(HttpStatus.UNAUTHORIZED)
+            .body(problema);
+    }
+
+    @ExceptionHandler(TentativasExcedidasException.class)
+    public ResponseEntity<ProblemDetail> tratarTentativasExcedidas(
+        TentativasExcedidasException ex,
+        HttpServletRequest request
+    ) {
+        ProblemDetail problema = criarProblema(
+            HttpStatus.TOO_MANY_REQUESTS,
+            "Muitas tentativas",
+            ex.getMessage(),
+            request
+        );
+
+        return ResponseEntity
+            .status(HttpStatus.TOO_MANY_REQUESTS)
+            .header(
+                HttpHeaders.RETRY_AFTER,
+                String.valueOf(ex.getSegundosParaNovaTentativa())
+            )
             .body(problema);
     }
 

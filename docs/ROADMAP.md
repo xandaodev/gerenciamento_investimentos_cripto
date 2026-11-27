@@ -44,13 +44,14 @@ Prioridade das fases:
   - **Problema:** o Compose expõe a porta 8080 em HTTP puro, então o JWT e a senha trafegam em texto claro.
   - **Arquivo:** `docker-compose.yml`, `src/main/resources/application.properties`
   - **Correção:** colocar um proxy reverso com TLS (Caddy/Nginx ou o do provedor) na frente da API e configurar `server.forward-headers-strategy`. A API não deve ficar acessível diretamente pela internet.
+  - **Atenção:** os limites por IP do #4 dependem do `server.forward-headers-strategy`. Sem ele, atrás do proxy todos os clientes têm o IP do proxy e compartilham o mesmo limite. Configure só se a API estiver atrás do proxy, para que um cliente não forje o IP pelo cabeçalho `X-Forwarded-For`.
 
 - [ ] **#3 — O MySQL fica exposto e sem TLS**
   - **Problema:** a porta `3307` é publicada em todas as interfaces, e a URL do datasource usa `useSSL=false&allowPublicKeyRetrieval=true`.
   - **Arquivo:** `docker-compose.yml`
   - **Correção:** não publicar a porta do MySQL em produção (ou prendê-la a `127.0.0.1`), habilitar TLS na conexão e remover `allowPublicKeyRetrieval`.
 
-- [ ] **#4 — Não há proteção contra força bruta**
+- [x] **#4 — Não há proteção contra força bruta**
   - **Problema:** `/auth/login` e `/auth/register` não têm rate limit nem bloqueio de conta.
   - **Arquivo:** `src/main/java/br/com/criptovision/security/SecurityConfigurations.java`, `src/main/java/br/com/criptovision/controller/AutenticacaoController.java`
   - **Correção:** limitar tentativas por IP e por login (Bucket4j ou no proxy reverso), responder 429 com `ProblemDetail` e registrar as tentativas bloqueadas.

@@ -35,7 +35,7 @@ O desenvolvimento deste sistema foi marcado por ciclos de melhoria contínua e r
 
 ## 🚀 Funcionalidades Principais
 
-* **👤 Contas e Autenticação:** Cadastro de usuários com senha criptografada (BCrypt) e login que devolve um token JWT válido por 2 horas.
+* **👤 Contas e Autenticação:** Cadastro de usuários com senha criptografada (BCrypt) e login que devolve um token JWT válido por 2 horas, com limite de tentativas por IP e por login contra ataques de força bruta.
 * **🧾 Histórico de Transações:** Cadastro, consulta, edição e exclusão de compras e vendas. Edições e exclusões que deixariam o histórico inconsistente (ex: uma venda sem saldo) são bloqueadas.
 * **📈 Cotações da Binance:** Preço e variação de 24 horas consultados em lote, com timeout, cache de 60 segundos e uso da última cotação conhecida (até 15 minutos) quando a Binance está fora do ar.
 * **📊 Resumo da Carteira:** Saldo, preço médio, valor atual, PNL e variação de 24 horas por ativo e da carteira inteira, em USD (pares com USDT). Ativos sem cotação continuam aparecendo, e a resposta indica quando os dados são parciais.
