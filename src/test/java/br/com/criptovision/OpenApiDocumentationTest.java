@@ -50,6 +50,12 @@ class OpenApiDocumentationTest {
                 "$.paths['/auth/register'].post.responses['201']"
             ).exists())
             .andExpect(jsonPath(
+                "$.paths['/auth/login'].post.responses['429']"
+            ).exists())
+            .andExpect(jsonPath(
+                "$.paths['/auth/register'].post.responses['429']"
+            ).exists())
+            .andExpect(jsonPath(
                 "$.paths['/transacoes'].get.security[0].bearerAuth"
             ).isArray())
             .andExpect(jsonPath(

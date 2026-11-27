@@ -497,6 +497,37 @@ Token é devolvido ao cliente
 
 Quando o login não existe, o `AutenticacaoService` lança `UsernameNotFoundException` (ele nunca devolve `null`). Antes de recusar, o `DaoAuthenticationProvider` compara a senha enviada com um hash BCrypt fictício. Por isso, um login inexistente leva praticamente o mesmo tempo para responder que uma senha errada, e as duas falhas devolvem a mesma resposta: `401 Unauthorized` com a mensagem genérica "Login ou senha inválidos.". Nem o conteúdo nem o tempo da resposta revelam quais logins estão cadastrados.
 
+### Proteção contra força bruta
+
+O `AutenticacaoController` consulta o `ProtecaoForcaBruta` antes de autenticar ou cadastrar:
+
+```text
+POST /auth/login
+        ↓
+Limite de login por IP (conta a tentativa)
+        ↓
+Limite de falhas do login (só consulta)
+        ↓
+AuthenticationManager
+        ↓
+Senha errada → registra uma falha do login → 401
+Sucesso      → zera as falhas do login     → token
+```
+
+No cadastro, só o limite de cadastro por IP é consultado. Quando um limite é atingido, o controller lança `TentativasExcedidasException`, que o `GlobalExceptionHandler` transforma em `429 Too Many Requests` com Problem Details e o cabeçalho `Retry-After`. As regras e os valores padrão estão em `docs/BUSINESS_RULES.md`. Os limites vêm do record `TentativasProperties` (`seguranca.tentativas.*`), que impede a aplicação de subir se algum valor estiver ausente ou inválido.
+
+Cada limite é um `LimiteDeTentativas`: um contador por chave (IP ou login normalizado) em janela fixa, com o tempo vindo do `Clock`. Detalhes de implementação:
+
+* a atualização de cada contador é atômica (`compute` do mapa do Caffeine), então requisições simultâneas não passam juntas pela última vaga;
+* os contadores ficam num cache Caffeine limitado a 100.000 chaves por limite, e a chave do login é cortada em 100 caracteres, para que um ataque com muitos IPs ou logins diferentes não esgote a memória;
+* o log registra um aviso quando uma chave atinge o limite, e não um por tentativa recusada, para que um ataque não lote o log. A chave vai para o log só com caracteres seguros.
+
+Limitações atuais:
+
+* os contadores são locais à instância e se perdem quando ela reinicia. Com mais de uma instância, cada uma teria os próprios limites, e seria preciso um armazenamento compartilhado, como Redis;
+* o IP é o `request.getRemoteAddr()`. Atrás de um proxy reverso, ele só é o do cliente se `server.forward-headers-strategy` estiver configurado (item #2 do roadmap). Sem isso, todos os clientes compartilhariam o limite do IP do proxy;
+* o bloqueio por login permite que alguém bloqueie temporariamente a conta de outra pessoa errando a senha de propósito. É a troca usual para impedir a adivinhação de senhas, e o bloqueio dura no máximo a janela configurada.
+
 O token é assinado com HMAC256 usando o segredo `JWT_SECRET`, possui o emissor `CriptoVision API`, o login como `subject` e expira em 2 horas.
 
 O cliente deve enviar o token nas próximas requisições:
@@ -972,6 +1003,7 @@ Principais grupos:
 * `IsolamentoTransacoesHttpTest`, que inicializa o contexto Spring Boot, autentica dois usuários com JWT e verifica por `MockMvc` que um usuário não lista, consulta, altera ou exclui transações do outro, nem acessa a carteira e as análises do outro;
 * `ConcorrenciaTransacoesTest`, que usa duas threads para verificar que uma venda aguarda o bloqueio de outra venda em andamento e é rejeitada por saldo insuficiente depois do commit;
 * `AutenticacaoServiceTest`, que verifica que um login inexistente lança `UsernameNotFoundException` e que o `DaoAuthenticationProvider` ainda compara a senha com o hash fictício, sem deixar o tempo de resposta revelar quais logins existem;
+* `LimiteDeTentativasTest`, para a janela fixa com relógio ajustável e para a atomicidade com tentativas simultâneas; `ProtecaoForcaBrutaTest`, para a normalização da chave do login, o tempo do `Retry-After` e a validação dos limites; e `ProtecaoForcaBrutaHttpTest`, que verifica por `MockMvc` os bloqueios por login e por IP, o reset depois de um login com sucesso e a resposta `429`;
 * `CorsPropertiesTest`, para a leitura e a validação de `CORS_ALLOWED_ORIGINS`, inclusive a falha na inicialização com uma origem inválida, e `CorsOrigensPadraoHttpTest` e `CorsOrigensConfiguradasHttpTest`, que verificam por `MockMvc` o preflight de origens permitidas e recusadas, com as origens padrão e com origens configuradas;
 * `CadastroUsuarioHttpTest`, `PadronizacaoErrosHttpTest` e `OpenApiDocumentationTest` para o cadastro, o login, o formato dos erros e a documentação.
 

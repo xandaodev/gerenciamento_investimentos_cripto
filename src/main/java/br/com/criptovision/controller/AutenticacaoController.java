@@ -6,6 +6,7 @@ import br.com.criptovision.dto.ProblemaApiDTO;
 import br.com.criptovision.dto.TokenJwtDTO;
 import br.com.criptovision.dto.UsuarioCadastradoDTO;
 import br.com.criptovision.model.Usuario;
+import br.com.criptovision.security.ProtecaoForcaBruta;
 import br.com.criptovision.security.TokenService;
 import br.com.criptovision.service.UsuarioService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -15,12 +16,15 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -37,15 +41,18 @@ public class AutenticacaoController {
     private final AuthenticationManager manager;
     private final TokenService tokenService;
     private final UsuarioService usuarioService;
+    private final ProtecaoForcaBruta protecaoForcaBruta;
 
     public AutenticacaoController(
         AuthenticationManager manager,
         TokenService tokenService,
-        UsuarioService usuarioService
+        UsuarioService usuarioService,
+        ProtecaoForcaBruta protecaoForcaBruta
     ) {
         this.manager = manager;
         this.tokenService = tokenService;
         this.usuarioService = usuarioService;
+        this.protecaoForcaBruta = protecaoForcaBruta;
     }
 
     @PostMapping("/login")
@@ -102,19 +109,43 @@ public class AutenticacaoController {
                 mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                 schema = @Schema(implementation = ProblemaApiDTO.class)
             )
+        ),
+        @ApiResponse(
+            responseCode = "429",
+            description = "Muitas tentativas a partir deste IP ou para este login. "
+                + "O cabeçalho Retry-After informa em quantos segundos tentar de novo.",
+            content = @Content(
+                mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                schema = @Schema(implementation = ProblemaApiDTO.class)
+            )
         )
     })
     public ResponseEntity<TokenJwtDTO> efetuarLogin(
-        @Valid @RequestBody DadosAutenticacao dados
+        @Valid @RequestBody DadosAutenticacao dados,
+        HttpServletRequest request
     ) {
+        protecaoForcaBruta.verificarLogin(
+            request.getRemoteAddr(),
+            dados.login()
+        );
+
         var authenticationToken =
             new UsernamePasswordAuthenticationToken(
                 dados.login(),
                 dados.senha()
             );
 
-        var authentication =
-            manager.authenticate(authenticationToken);
+        Authentication authentication;
+
+        try {
+            authentication = manager.authenticate(authenticationToken);
+        } catch (BadCredentialsException ex) {
+            // login inexistente também chega aqui (o Spring esconde a diferença)
+            protecaoForcaBruta.registrarFalhaDeLogin(dados.login());
+            throw ex;
+        }
+
+        protecaoForcaBruta.registrarLoginComSucesso(dados.login());
 
         var usuario =
             (Usuario) authentication.getPrincipal();
@@ -182,11 +213,25 @@ public class AutenticacaoController {
                 mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                 schema = @Schema(implementation = ProblemaApiDTO.class)
             )
+        ),
+        @ApiResponse(
+            responseCode = "429",
+            description = "Muitos cadastros a partir deste IP. "
+                + "O cabeçalho Retry-After informa em quantos segundos tentar de novo.",
+            content = @Content(
+                mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                schema = @Schema(implementation = ProblemaApiDTO.class)
+            )
         )
     })
     public ResponseEntity<UsuarioCadastradoDTO> cadastrar(
-        @Valid @RequestBody DadosCadastroUsuario dados
+        @Valid @RequestBody DadosCadastroUsuario dados,
+        HttpServletRequest request
     ) {
+        // conta também os cadastros recusados com 409, que revelariam
+        // quais logins existem se pudessem ser feitos à vontade
+        protecaoForcaBruta.verificarCadastro(request.getRemoteAddr());
+
         Usuario usuario = usuarioService.cadastrar(dados);
 
         return ResponseEntity
