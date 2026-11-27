@@ -19,6 +19,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -151,19 +152,30 @@ class BackupMysqlIT {
     void naoDeveSobrescreverUmBackupComOMesmoNome() throws Exception {
         // ocupa os nomes dos próximos segundos com arquivos vazios: o backup novo
         // precisa escolher outro nome, sem tocar em nenhum deles. Sem essa proteção,
-        // o backup de segurança do "restaurar" podia destruir o backup a ser restaurado
+        // o backup de segurança do "restaurar" podia destruir o backup a ser restaurado.
+        // Começa com a pasta vazia: um backup de outro teste feito no mesmo segundo
+        // ocuparia um desses nomes com conteúdo e confundiria a verificação
         ExecResult ocupados = BACKUP.execInContainer("sh", "-c", """
+            rm -f /backups/criptovision-*.sql.gz.gpg
             for i in 0 1 2 3 4 5 6 7 8 9; do
-              touch /backups/criptovision-$(date -u -d "+$i seconds" +%Y%m%dT%H%M%SZ).sql.gz.gpg
+              nome=criptovision-$(date -u -d "+$i seconds" +%Y%m%dT%H%M%SZ).sql.gz.gpg
+              touch /backups/$nome
+              echo $nome
             done""");
         assertThat(ocupados.getExitCode()).isZero();
+        List<String> nomesOcupados = ocupados.getStdout().lines().toList();
+        assertThat(nomesOcupados).hasSize(10).doesNotHaveDuplicates();
 
         try {
             String nome = fazerBackup();
 
-            ExecResult intactos = BACKUP.execInContainer("sh", "-c",
-                "find /backups -name 'criptovision-*.sql.gz.gpg' -empty | wc -l");
-            assertThat(intactos.getStdout().trim()).isEqualTo("10");
+            assertThat(nomesOcupados).doesNotContain(nome);
+            for (String ocupado : nomesOcupados) {
+                assertThat(BACKUP.execInContainer("test", "-f", "/backups/" + ocupado, "-a",
+                        "!", "-s", "/backups/" + ocupado).getExitCode())
+                    .as("%s continua existindo e vazio", ocupado)
+                    .isZero();
+            }
             assertThat(BACKUP.execInContainer("test", "-s", "/backups/" + nome).getExitCode())
                 .as("o backup novo tem conteúdo").isZero();
         } finally {
