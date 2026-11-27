@@ -54,7 +54,7 @@ O desenvolvimento deste sistema foi marcado por ciclos de melhoria contínua e r
 * **Cotações:** Binance Public API (`data-api.binance.vision`)
 * **Documentação:** Springdoc OpenAPI (Swagger)
 * **Infraestrutura:** Docker e Docker Compose
-* **Qualidade:** Testes de unidade, de persistência (H2) e de integração HTTP (MockMvc), executados no GitHub Actions
+* **Qualidade:** Testes de unidade, de persistência (H2), de integração HTTP (MockMvc) e de integração com MySQL real (Testcontainers), executados no GitHub Actions
 
 ## 🔌 Endpoints
 
@@ -121,10 +121,13 @@ Crie uma conta em `/auth/register`, faça login em `/auth/login` e clique em **A
 ### Testes
 
 ```bash
-./mvnw clean test
+./mvnw clean test     # testes de unidade e HTTP, com H2 em memória
+./mvnw clean verify   # também roda os testes de integração contra um MySQL 8 real
 ```
 
-Os testes usam um banco H2 em memória e não acessam a Binance, então não precisam de MySQL rodando.
+O `clean test` usa um banco H2 em memória e não acessa a Binance, então não precisa de MySQL nem de Docker.
+
+O `clean verify` sobe um MySQL 8 em container com o Testcontainers, aplica as migrations do Flyway e roda os testes `*IT.java`. Ele precisa do Docker rodando e é o que o GitHub Actions executa.
 
 ---
 ⭐ *Desenvolvido por **Alexandre Vital** - Estudante de Ciência da Computação na UFSJ, em busca de desafios como Desenvolvedor Back-End.*

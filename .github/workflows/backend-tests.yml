@@ -34,5 +34,8 @@ jobs:
       - name: Permitir execução do Maven Wrapper
         run: chmod +x mvnw
 
-      - name: Executar os testes
-        run: ./mvnw --batch-mode --no-transfer-progress clean test
+      # verify roda os testes unitários (surefire, com H2) e depois os testes
+      # de integração (*IT.java, failsafe) contra um MySQL 8 real via Testcontainers.
+      # O runner ubuntu-latest já tem Docker disponível.
+      - name: Executar os testes unitários e de integração
+        run: ./mvnw --batch-mode --no-transfer-progress clean verify

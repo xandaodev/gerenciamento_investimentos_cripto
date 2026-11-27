@@ -942,9 +942,9 @@ Flyway aplica as migrations pendentes
 
 ## 13. Testes automatizados
 
-A aplicação possui testes de unidade, persistência e integração HTTP.
+A aplicação possui testes de unidade, persistência e integração HTTP, além de testes de integração contra um MySQL real (veja "Testes de integração com MySQL" abaixo).
 
-Os testes de integração usam o perfil `test` (`application-test.properties`):
+Os testes executados por `mvn test` usam o perfil `test` (`application-test.properties`):
 
 * banco H2 em memória no modo MySQL;
 * schema criado pelo Hibernate (`ddl-auto=create-drop`), com o Flyway desativado;
@@ -962,13 +962,33 @@ Principais grupos:
 * `ConcorrenciaTransacoesTest`, que usa duas threads para verificar que uma venda aguarda o bloqueio de outra venda em andamento e é rejeitada por saldo insuficiente depois do commit;
 * `CadastroUsuarioHttpTest`, `PadronizacaoErrosHttpTest` e `OpenApiDocumentationTest` para o cadastro, o formato dos erros e a documentação.
 
-A suíte completa pode ser executada com:
+Essa suíte rápida, que não precisa de banco externo nem de Docker, pode ser executada com:
 
 ```powershell
 .\mvnw.cmd clean test
 ```
 
-O GitHub Actions executa a mesma suíte com JDK 25 em cada push e pull request para a branch `main`.
+### Testes de integração com MySQL
+
+Os testes com sufixo `IT`, no pacote `br.com.criptovision.integracao`, rodam contra um MySQL 8 real, criado pelo Testcontainers com a mesma imagem do `docker-compose.yml` (`mysql:8.0`). Eles usam o perfil `integracao` (`application-integracao.properties`):
+
+* o schema é criado pelas migrations do Flyway, como em produção;
+* o Hibernate roda com `ddl-auto=validate`, então uma migration que divirja das entidades faz o teste falhar;
+* a conexão vem do container por `@ServiceConnection` (`MysqlContainerConfiguration`), e um único container é compartilhado por todos os testes da execução.
+
+Grupos atuais:
+
+* `MigracoesMysqlIT`, que verifica que todas as migrations foram aplicadas, que `quantidade` e `preco_unitario` são `DECIMAL(38, 18)` (o `validate` do Hibernate não confere precisão nem escala) e que valores no limite da validação são gravados e lidos sem perda;
+* `ConcorrenciaTransacoesMysqlIT`, que executa o mesmo cenário do `ConcorrenciaTransacoesTest` (os dois herdam de `CenarioConcorrenciaTransacoes`) sob o REPEATABLE READ do InnoDB. Só ele detecta uma leitura comum feita antes do `SELECT ... FOR UPDATE`, porque o H2 não reproduz o snapshot de leitura do MySQL.
+
+Esses testes exigem Docker e rodam na fase `verify` do Maven, pelo plugin failsafe:
+
+```powershell
+.\mvnw.cmd clean verify            # testes unitários e de integração (precisa de Docker)
+.\mvnw.cmd clean verify -DskipITs  # somente os testes unitários
+```
+
+O GitHub Actions executa `clean verify` com JDK 25 em cada push e pull request para a branch `main`. O runner já tem Docker disponível.
 
 ---
 
@@ -1005,7 +1025,7 @@ Os principais pontos identificados são:
 8. não há suporte a taxas;
 9. `spring.jpa.open-in-view` ainda utiliza a configuração padrão;
 10. as colunas de dados da tabela `transacoes` ainda aceitam `NULL` no banco;
-11. os testes usam schema gerado pelo Hibernate, então as migrations do Flyway não são exercitadas na suíte;
+11. ~~os testes usam schema gerado pelo Hibernate, então as migrations do Flyway não são exercitadas na suíte~~ (resolvida: os testes `*IT.java` aplicam as migrations num MySQL real; o `mvn test` continua usando o schema do Hibernate no H2);
 12. o cache de cotações é local à instância;
 13. `/carteira/total` retorna texto simples com o rótulo "R$", embora os valores não sejam convertidos para reais.
 

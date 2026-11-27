@@ -21,9 +21,11 @@ O CriptoVision é o principal projeto pessoal do autor. O objetivo é transform�
 Use the Maven wrapper (`.\mvnw.cmd` on Windows, `./mvnw` elsewhere):
 
 ```bash
-./mvnw clean test                                   # full suite (what CI runs, on JDK 25)
+./mvnw clean verify                                 # full suite: unit + MySQL integration tests (what CI runs, on JDK 25; needs Docker)
+./mvnw clean test                                   # fast suite: unit/H2 tests only, no Docker needed
 ./mvnw test -Dtest=CarteiraServiceTest              # single test class
 ./mvnw test -Dtest=CarteiraServiceTest#nomeDoMetodo # single test method
+./mvnw verify -Dit.test=MigracoesMysqlIT -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false  # single integration test class
 ./mvnw spring-boot:run                              # run locally (needs MySQL + env vars)
 ./mvnw clean package && docker compose up --build   # Dockerfile copies target/*.jar, so package first
 ```
@@ -36,7 +38,7 @@ Base package `br.com.criptovision`: controller → service → repository, plus 
 
 **Transaction history is the single source of truth.** Balances and average prices are never persisted. `Carteira` (a `Map<String, Moeda>`) and `Moeda` are in-memory objects. `CarteiraService.reconstruirCarteira` rebuilds them on every request by replaying the user's transactions, sorted by `data` and then `id` (it sorts a copy defensively). Consequences:
 - `atualizarTransacao` and `excluirTransacao` first simulate the change on a *copy* of the history. They touch the managed entity only if the replay stays valid. Otherwise they throw `AlteracaoHistoricoInvalidaException` → 409.
-- **Concurrency:** create, update and delete run their DB phase through `executarComHistoricoBloqueado`, a `TransactionTemplate` whose first query is `UsuarioRepository.bloquearPorId`, a `SELECT ... FOR UPDATE` on the user's row. This serializes writes per user, so two simultaneous sells can't both pass the balance check. The lock must stay the first query of the transaction, because under MySQL REPEATABLE READ the read snapshot is taken at the first plain read. Binance ticker validation runs *before* the transaction so the lock is never held during an HTTP call. `ConcorrenciaTransacoesTest` covers this with real threads on H2.
+- **Concurrency:** create, update and delete run their DB phase through `executarComHistoricoBloqueado`, a `TransactionTemplate` whose first query is `UsuarioRepository.bloquearPorId`, a `SELECT ... FOR UPDATE` on the user's row. This serializes writes per user, so two simultaneous sells can't both pass the balance check. The lock must stay the first query of the transaction, because under MySQL REPEATABLE READ the read snapshot is taken at the first plain read. Binance ticker validation runs *before* the transaction so the lock is never held during an HTTP call. The two-sells scenario lives in `CenarioConcorrenciaTransacoes` and runs twice with real threads: `ConcorrenciaTransacoesTest` on H2 and `ConcorrenciaTransacoesMysqlIT` on real MySQL. Only the MySQL run catches a plain read placed before the lock.
 - A sale larger than the balance throws `SaldoInsuficienteException`. A replay failure on persisted data throws `HistoricoInconsistenteException` → 500. Invalid transactions must never be skipped silently.
 - Create, update and delete must go through `CarteiraService`, never straight to the repository from controllers.
 
@@ -57,7 +59,9 @@ Base package `br.com.criptovision`: controller → service → repository, plus 
 
 ## Tests
 
-- Tests use the `test` profile (`src/test/resources/application-test.properties`): H2 in MySQL mode with `ddl-auto=create-drop`, **Flyway disabled** (so migrations are not exercised in tests), a fixed JWT secret, and the Binance URL pointed at `http://localhost`.
+- Two kinds of tests:
+  - `*Test.java` (surefire, `mvn test`) use the `test` profile (`src/test/resources/application-test.properties`): H2 in MySQL mode with `ddl-auto=create-drop`, **Flyway disabled**, a fixed JWT secret, and the Binance URL pointed at `http://localhost`.
+  - `*IT.java` (failsafe, `mvn verify`, package `integracao`) use the `integracao` profile against a real MySQL 8 started by Testcontainers (`MysqlContainerConfiguration`, a single `mysql:8.0` container shared via `@ServiceConnection`), with **Flyway enabled** and `ddl-auto=validate`, like production. `MigracoesMysqlIT` checks the migrations and column precision. Anything that depends on real MySQL behavior (migrations, locking, isolation, collation) belongs here, not in H2.
 - Test styles in use:
   - pure Mockito unit tests (`@ExtendWith(MockitoExtension.class)`)
   - `@DataJpaTest` for repositories
