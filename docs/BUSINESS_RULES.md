@@ -249,9 +249,24 @@ Os endpoints `POST /transacoes` e `PUT /transacoes/{id}` utilizam `TransacaoRequ
 - quantidade obrigatória e maior que zero, com no máximo 20 dígitos inteiros e 18 casas decimais;
 - preço unitário obrigatório e maior que zero, com no máximo 20 dígitos inteiros e 18 casas decimais;
 - tipo obrigatório;
-- tipo restrito a `COMPRA` ou `VENDA`.
+- tipo restrito a `COMPRA` ou `VENDA`;
+- data opcional, com as regras da seção "Data da operação" abaixo.
 
-O ID e a data não são recebidos pelo DTO. Na criação, esses campos são controlados pela aplicação. Na atualização, o ID e a data originais são preservados.
+O ID não é recebido pelo DTO: na criação ele é gerado pelo banco, e na atualização o original é preservado.
+
+### Data da operação
+
+O campo `data` permite lançar uma operação com a data real em que ela aconteceu, como uma compra antiga:
+
+- o formato é ISO 8601 **com fuso**, como `2025-03-10T14:00:00-03:00` ou `2025-03-10T17:00:00Z`. Uma data sem fuso responde `400`, porque valeria horários diferentes conforme o lugar;
+- a data é convertida e guardada em **UTC**, com precisão de microssegundos. As respostas mostram a data em UTC;
+- na criação, sem `data`, vale o momento do cadastro, também em UTC;
+- na alteração, sem `data`, a transação **mantém a data que já tinha**. Uma edição nunca move uma compra antiga para o momento atual sem querer;
+- a data não pode estar no futuro, com 1 minuto de tolerância para a diferença entre o relógio do cliente e o do servidor;
+- a data não pode ser anterior a 2009-01-03, quando o Bitcoin foi criado. Isso pega erros de digitação, como o ano 0202;
+- uma data fora dessas regras responde `400 Data inválida`.
+
+A carteira é sempre reconstruída na ordem dessas datas (seção 12), então uma operação lançada depois, mas com data anterior, entra no meio do histórico.
 
 ### Validação externa do ticker
 
@@ -586,14 +601,28 @@ Antes de registrar uma nova transação, o sistema:
 1. identifica o usuário autenticado;
 2. associa a nova transação a esse usuário;
 3. normaliza o ticker e valida sua existência na Binance;
-4. cria uma carteira temporária;
+4. define a data: a informada, validada e convertida para UTC, ou o momento do cadastro;
 5. busca somente o histórico do usuário;
-6. reconstrói a carteira;
-7. obtém o ativo correspondente;
-8. processa a nova transação;
-9. salva a transação no banco.
+6. reconstrói a carteira **até a data da nova transação** e a processa nesse ponto;
+7. reproduz o histórico inteiro com a nova transação na posição da data dela;
+8. salva a transação no banco.
 
-Esse fluxo evita que uma nova venda seja registrada quando não existe saldo suficiente.
+O passo 6 recusa uma venda sem saldo **naquela data** com `400 Saldo insuficiente`, como antes. O passo 7 existe por causa das datas retroativas: uma venda antiga pode caber no saldo da data dela e ainda assim deixar uma venda posterior sem saldo. Nesse caso, nada é salvo e a API responde `409 Conflict`, como na alteração e na exclusão.
+
+Exemplo rejeitado:
+
+```text
+Histórico:
+1. 2025-01-01  compra de 1 BTC
+2. 2025-03-01  venda de 1 BTC
+
+Tentativa:
+2025-02-01  venda de 0,5 BTC
+```
+
+Em fevereiro havia 1 BTC, mas a venda de março ficaria sem saldo.
+
+Exemplo aceito: lançar hoje uma compra com data de janeiro e, depois, uma venda com data de junho. A compra entra antes da venda no histórico, mesmo cadastrada depois.
 
 ### Operações simultâneas
 
@@ -619,9 +648,9 @@ Durante a atualização:
 2. o novo ticker é normalizado e validado;
 3. uma transação candidata independente é criada;
 4. o ID original é preservado;
-5. a data original é preservada;
+5. a data muda se uma nova for informada (validada e convertida para UTC) e, caso contrário, é preservada;
 6. o proprietário original é preservado;
-7. somente ticker, quantidade, preço unitário e tipo podem mudar;
+7. somente ticker, quantidade, preço unitário, tipo e data podem mudar;
 8. a candidata substitui a original somente em uma cópia do histórico do usuário;
 9. a carteira temporária é reconstruída;
 10. a entidade persistida só é modificada e salva quando a simulação é válida.
@@ -637,7 +666,7 @@ Tentativa:
 Alterar a compra para 0,5 BTC
 ```
 
-A alteração produziria uma venda superior ao saldo disponível. Nesse caso, nada é salvo e a API retorna:
+A alteração produziria uma venda superior ao saldo disponível. O mesmo acontece ao mover a data da compra para depois da venda. Nesse caso, nada é salvo e a API retorna:
 
 ```text
 409 Conflict

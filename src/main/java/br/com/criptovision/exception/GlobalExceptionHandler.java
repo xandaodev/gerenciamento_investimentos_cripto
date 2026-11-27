@@ -104,6 +104,23 @@ public class GlobalExceptionHandler {
             .body(problema);
     }
 
+    @ExceptionHandler(DataTransacaoInvalidaException.class)
+    public ResponseEntity<ProblemDetail> tratarDataTransacaoInvalida(
+        DataTransacaoInvalidaException ex,
+        HttpServletRequest request
+    ) {
+        ProblemDetail problema = criarProblema(
+            HttpStatus.BAD_REQUEST,
+            "Data inválida",
+            ex.getMessage(),
+            request
+        );
+
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(problema);
+    }
+
     @ExceptionHandler(SemSaldoParaSimularException.class)
     public ResponseEntity<ProblemDetail> tratarSemSaldoParaSimular(
         SemSaldoParaSimularException ex,

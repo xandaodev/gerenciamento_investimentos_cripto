@@ -15,7 +15,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class CarteiraServiceSimulacaoTest {
 
-    private final CarteiraService service = new CarteiraService(null, null, null, null);
+    private final CarteiraService service = new CarteiraService(null, null, null, null, null);
 
     // --- DCA ----------------------------------------------------------------
 

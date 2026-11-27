@@ -83,10 +83,11 @@ Prioridade das fases:
   - **Arquivo:** `src/main/resources/db/migration/V1__cria_schema_inicial.sql` (FK), `src/main/java/br/com/criptovision/controller/AutenticacaoController.java`, `src/main/java/br/com/criptovision/service/UsuarioService.java`
   - **Correção:** criar endpoints de exclusão de conta e de exportação dos dados do usuário, ajustar a FK em nova migration (ou excluir as transações explicitamente no serviço) e publicar uma política de privacidade.
 
-- [ ] **#11 — A data da transação é sempre o momento do cadastro**
+- [x] **#11 — A data da transação é sempre o momento do cadastro**
   - **Problema:** `Transacao.data` usa `@CreationTimestamp`, então o usuário não consegue lançar compras antigas com a data real. Se lançar o histórico fora de ordem, uma venda legítima pode ser rejeitada por saldo insuficiente.
   - **Arquivo:** `src/main/java/br/com/criptovision/model/Transacao.java`, `src/main/java/br/com/criptovision/dto/TransacaoRequestDTO.java`, `src/main/java/br/com/criptovision/service/CarteiraService.java`
   - **Correção:** aceitar a data da operação no DTO (validada, sem datas futuras) e deixar a reconstrução e as validações de alteração usarem essa data. Atualizar `docs/BUSINESS_RULES.md`.
+  - **Feito:** o `TransacaoRequestDTO` aceita uma `data` opcional em ISO 8601 com fuso obrigatório, convertida para UTC. Sem data, vale o momento do cadastro na criação e a data atual na alteração. Datas no futuro (além de 1 minuto) ou anteriores a 2009-01-03 respondem `400 Data inválida`. Saiu o `@CreationTimestamp`. A criação passou a reproduzir o histórico com a nova transação na posição da data dela: uma venda sem saldo naquela data responde 400, e uma venda antiga que deixaria uma venda posterior sem saldo responde 409. A alteração também pode mover a data, com a mesma validação do histórico.
 
 - [x] **#12 — Os simuladores aceitam qualquer entrada**
   - **Problema:** os parâmetros `double` aceitam `NaN`, `Infinity`, zero e valores negativos, sem `@Positive`. Uma moeda sem saldo faz `pmAtual = 0` ou `custoBase = 0` e o resultado sai como divisão por zero, devolvendo `NaN`/`Infinity` no JSON. Só o caminho feliz do DCA tem teste; a simulação de venda não tem nenhum.
@@ -166,6 +167,7 @@ Prioridade das fases:
   - **Problema:** o container roda em UTC, mas uma máquina local não, então a mesma operação pode ganhar horários diferentes.
   - **Arquivo:** `src/main/java/br/com/criptovision/model/Transacao.java`
   - **Correção:** usar `Instant` (ou `OffsetDateTime` em UTC) de ponta a ponta, com migration se o tipo da coluna mudar.
+  - **Parcial (#11):** as datas novas já são gravadas em UTC, a informada convertida pelo DTO e a automática vinda do `Clock` UTC, e não dependem mais do fuso da JVM. Faltam o tipo `Instant` na entidade, a resposta com a marcação do fuso (`Z`) e a correção das transações antigas gravadas por uma máquina fora de UTC.
 
 ---
 

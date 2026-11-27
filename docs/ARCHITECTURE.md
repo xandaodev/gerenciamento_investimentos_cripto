@@ -277,7 +277,7 @@ usuario
 
 O identificador é gerado automaticamente pelo banco.
 
-A data é inicializada no construtor da entidade e o campo também utiliza `@CreationTimestamp` para o preenchimento durante a persistência.
+A data é a da operação, sempre em UTC. O cliente pode informá-la no `TransacaoRequestDTO` (`OffsetDateTime`, com fuso obrigatório), e o DTO a converte para UTC. O `CarteiraService.resolverData` completa a data ausente (o momento atual, vindo do `Clock` em UTC, ou a data anterior na alteração), recusa datas no futuro além de 1 minuto e anteriores a 2009-01-03, e trunca em microssegundos, a precisão da coluna `DATETIME(6)`. Não há mais `@CreationTimestamp`, que gravava o momento da persistência no fuso da JVM e ignorava qualquer data informada.
 
 Os valores de quantidade e preço unitário utilizam `BigDecimal` e são armazenados como `DECIMAL(38, 18)`.
 
@@ -645,18 +645,20 @@ Fluxo:
 1. recebe um `TransacaoRequestDTO`;
 2. obtém o usuário autenticado pelo Spring Security;
 3. normaliza o ticker para maiúsculas e valida os campos com Bean Validation;
-4. converte o DTO para `Transacao`;
+4. converte o DTO para `Transacao`, com a data informada já em UTC;
 5. associa a nova transação ao usuário autenticado;
 6. normaliza o ticker com o `TickerNormalizer` e valida sua existência por meio do `CotacaoService`;
-7. inicia a transação e bloqueia o histórico do usuário;
-8. busca somente o histórico desse usuário em ordem cronológica;
-9. reconstrói uma carteira temporária;
-10. processa a nova transação;
-11. valida o saldo em caso de venda;
+7. completa e valida a data (`resolverData`);
+8. inicia a transação e bloqueia o histórico do usuário;
+9. busca somente o histórico desse usuário em ordem cronológica;
+10. reconstrói uma carteira temporária **com as transações anteriores à data da nova** e processa a nova nesse ponto. Uma venda sem saldo naquela data lança `SaldoInsuficienteException` (400);
+11. reproduz o histórico inteiro com a nova transação na posição da data dela. Se uma transação posterior ficar inválida, lança `AlteracaoHistoricoInvalidaException` (409);
 12. persiste a transação;
 13. retorna `201 Created`.
 
-O cliente não pode definir diretamente o ID, a data ou o proprietário da transação. O `TransacaoRequestDTO` não possui `usuarioId`.
+A etapa 11 é necessária porque a data pode ser retroativa: a nova transação não é necessariamente a última do histórico. As transações com a mesma data são ordenadas pelo `id`, e a nova, que ainda não tem `id`, fica depois das que já existiam com a mesma data.
+
+O cliente pode informar a data, mas não o ID nem o proprietário da transação. O `TransacaoRequestDTO` não possui `usuarioId`.
 
 Um ticker inexistente na Binance retorna `400 Bad Request`. Se a Binance estiver indisponível e não houver cotação recente do ticker em cache, a criação retorna `503 Service Unavailable`.
 
@@ -1097,6 +1099,7 @@ Principais grupos:
 * `IsolamentoTransacoesHttpTest`, que inicializa o contexto Spring Boot, autentica dois usuários com JWT e verifica por `MockMvc` que um usuário não lista, consulta, altera ou exclui transações do outro, nem acessa a carteira e as análises do outro;
 * `ConcorrenciaTransacoesTest`, que usa duas threads para verificar que uma venda aguarda o bloqueio de outra venda em andamento e é rejeitada por saldo insuficiente depois do commit;
 * `AutenticacaoServiceTest`, que verifica que um login inexistente lança `UsernameNotFoundException` e que o `DaoAuthenticationProvider` ainda compara a senha com o hash fictício, sem deixar o tempo de resposta revelar quais logins existem;
+* `CarteiraServiceDataTest`, para as bordas da validação da data com relógio fixo (1 minuto de tolerância no futuro, o dia 2009-01-03, a data automática e a precisão de microssegundos); e `DataTransacaoHttpTest`, que verifica por `MockMvc` a conversão para UTC, a compra antiga lançada depois da venda, a venda antiga recusada com 409 por deixar uma venda posterior sem saldo, as datas recusadas (futuro, antes de 2009, sem fuso) e a alteração que move, mantém ou recusa a data;
 * `CarteiraServiceTotaisTest`, para os totais de `/carteira/total` (custo das posições, total aportado e total recebido em vendas) com vários ativos, posição totalmente vendida, valores de 18 casas e histórico inconsistente; e `TotalCarteiraHttpTest`, que verifica o JSON com a moeda `USDT` e que o custo das posições não fica negativo depois de uma venda com lucro;
 * `CarteiraServiceSimulacaoTest`, para as simulações de DCA e de venda com valores exatos em `BigDecimal`: moeda de preço muito baixo, primeira compra sem posição, posição totalmente vendida, venda com lucro e prejuízo, arredondamento do percentual e venda sem saldo; e `SimuladoresHttpTest`, que verifica por `MockMvc` que os simuladores recusam valores zero, negativos, `NaN`, `Infinity` e parâmetros ausentes com `400`, e nunca devolvem `NaN`;
 * `TokenServiceTest`, para a validação do `JWT_SECRET` na subida, a audiência, a versão, a assinatura e a expiração com relógio fixo; e `SessaoHttpTest`, que verifica por `MockMvc` que o logout revoga os tokens de todos os dispositivos, que a troca de senha revoga os tokens antigos e devolve um novo, os erros da troca de senha e o bloqueio por força bruta pela troca de senha;
