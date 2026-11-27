@@ -31,7 +31,7 @@ Prioridade das fases:
   - **Arquivo:** `src/test/resources/application-test.properties`, `src/test/java/br/com/criptovision/test/ConcorrenciaTransacoesTest.java`, `pom.xml`, `.github/workflows/backend-tests.yml`
   - **Correção:** adicionar Testcontainers com MySQL 8, Flyway ligado e `ddl-auto=validate`, ao menos num perfil de integração rodando no CI. Executar o teste de concorrência também contra o MySQL.
 
-- [ ] **#8 — `AutenticacaoService` retorna `null` para login inexistente**
+- [x] **#8 — `AutenticacaoService` retorna `null` para login inexistente**
   - **Problema:** `loadUserByUsername` retorna `null` em vez de lançar `UsernameNotFoundException`. Isso quebra o contrato do Spring e pula a mitigação de timing do `DaoAuthenticationProvider`: um login inexistente responde visivelmente mais rápido que um existente, o que permite enumerar usuários.
   - **Arquivo:** `src/main/java/br/com/criptovision/security/AutenticacaoService.java`
   - **Correção:** lançar `UsernameNotFoundException` quando o usuário não existir e ajustar `UsuarioRepository.findByLogin` para devolver `Optional`. Adicionar um teste garantindo que a resposta continua sendo 401 genérico.

@@ -421,7 +421,7 @@ O `TransacaoRepository` oferece:
 O `UsuarioRepository` oferece:
 
 * operações CRUD de usuários;
-* busca de usuário pelo login;
+* busca de usuário pelo login, que devolve `Optional<Usuario>`;
 * verificação de existência de um login.
 
 ### Ordenação do histórico
@@ -491,6 +491,8 @@ TokenService gera o JWT
 Token é devolvido ao cliente
 ```
 
+Quando o login não existe, o `AutenticacaoService` lança `UsernameNotFoundException` (ele nunca devolve `null`). Antes de recusar, o `DaoAuthenticationProvider` compara a senha enviada com um hash BCrypt fictício. Por isso, um login inexistente leva praticamente o mesmo tempo para responder que uma senha errada, e as duas falhas devolvem a mesma resposta: `401 Unauthorized` com a mensagem genérica "Login ou senha inválidos.". Nem o conteúdo nem o tempo da resposta revelam quais logins estão cadastrados.
+
 O token é assinado com HMAC256 usando o segredo `JWT_SECRET`, possui o emissor `CriptoVision API`, o login como `subject` e expira em 2 horas.
 
 O cliente deve enviar o token nas próximas requisições:
@@ -517,7 +519,7 @@ Controller recebe o Usuario autenticado
 Requisição continua
 ```
 
-A aplicação utiliza sessões stateless, portanto o servidor não mantém uma sessão HTTP para o usuário. Tokens ausentes, expirados, malformados ou com assinatura inválida não autenticam a requisição e resultam em `401 Unauthorized`, respondido pelo `AutenticacaoEntryPoint` no formato Problem Details.
+A aplicação utiliza sessões stateless, portanto o servidor não mantém uma sessão HTTP para o usuário. Tokens ausentes, expirados, malformados, com assinatura inválida ou emitidos para um login que não existe mais não autenticam a requisição e resultam em `401 Unauthorized`, respondido pelo `AutenticacaoEntryPoint` no formato Problem Details.
 
 ### CORS
 
@@ -960,7 +962,8 @@ Principais grupos:
 * `TransacaoRepositoryUsuarioTest` (`@DataJpaTest`) para as consultas restritas ao proprietário;
 * `IsolamentoTransacoesHttpTest`, que inicializa o contexto Spring Boot, autentica dois usuários com JWT e verifica por `MockMvc` que um usuário não lista, consulta, altera ou exclui transações do outro, nem acessa a carteira e as análises do outro;
 * `ConcorrenciaTransacoesTest`, que usa duas threads para verificar que uma venda aguarda o bloqueio de outra venda em andamento e é rejeitada por saldo insuficiente depois do commit;
-* `CadastroUsuarioHttpTest`, `PadronizacaoErrosHttpTest` e `OpenApiDocumentationTest` para o cadastro, o formato dos erros e a documentação.
+* `AutenticacaoServiceTest`, que verifica que um login inexistente lança `UsernameNotFoundException` e que o `DaoAuthenticationProvider` ainda compara a senha com o hash fictício, sem deixar o tempo de resposta revelar quais logins existem;
+* `CadastroUsuarioHttpTest`, `PadronizacaoErrosHttpTest` e `OpenApiDocumentationTest` para o cadastro, o login, o formato dos erros e a documentação.
 
 Essa suíte rápida, que não precisa de banco externo nem de Docker, pode ser executada com:
 

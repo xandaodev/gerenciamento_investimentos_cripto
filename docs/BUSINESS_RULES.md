@@ -104,6 +104,12 @@ Uma conta é criada por `POST /auth/register` com login e senha:
 - a senha é armazenada somente como hash BCrypt;
 - um login já cadastrado é rejeitado com `409 Conflict`.
 
+### Login
+
+`POST /auth/login` recebe login e senha e devolve um token JWT válido por 2 horas.
+
+Um login inexistente e uma senha incorreta recebem exatamente a mesma resposta, `401 Unauthorized` com a mensagem "Login ou senha inválidos.", e levam um tempo de resposta equivalente. Assim, não é possível descobrir quais logins estão cadastrados tentando entrar.
+
 ### Associação obrigatória
 
 Cada transação possui um proprietário obrigatório:

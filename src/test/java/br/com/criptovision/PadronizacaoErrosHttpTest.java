@@ -110,6 +110,43 @@ class PadronizacaoErrosHttpTest {
     }
 
     @Test
+    void deveResponderLoginInexistenteIgualASenhaErrada() throws Exception {
+        mockMvc.perform(post("/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "login": "usuario.inexistente",
+                      "senha": "SenhaSegura@2026"
+                    }
+                    """))
+            .andExpect(status().isUnauthorized())
+            .andExpect(content().contentTypeCompatibleWith(
+                MediaType.APPLICATION_PROBLEM_JSON
+            ))
+            .andExpect(jsonPath("$.type").value("about:blank"))
+            .andExpect(jsonPath("$.title").value("Não autorizado"))
+            .andExpect(jsonPath("$.status").value(401))
+            .andExpect(jsonPath("$.detail").value(
+                "Login ou senha inválidos."
+            ))
+            .andExpect(jsonPath("$.instance").value("/auth/login"));
+    }
+
+    @Test
+    void devePadronizar401ComTokenDeUsuarioInexistente() throws Exception {
+        String token = tokenService.gerarToken("usuario.removido");
+
+        mockMvc.perform(get("/transacoes")
+                .header(
+                    HttpHeaders.AUTHORIZATION,
+                    "Bearer " + token
+                ))
+            .andExpect(status().isUnauthorized())
+            .andExpect(jsonPath("$.title").value("Não autorizado"))
+            .andExpect(jsonPath("$.status").value(401));
+    }
+
+    @Test
     void devePadronizarErrosDeValidacao() throws Exception {
         mockMvc.perform(post("/auth/register")
                 .contentType(MediaType.APPLICATION_JSON)

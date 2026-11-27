@@ -57,11 +57,10 @@ class CadastroUsuarioHttpTest {
             .andExpect(jsonPath("$.senha").doesNotExist())
             .andExpect(jsonPath("$.password").doesNotExist());
 
-        Usuario usuario = (Usuario) usuarioRepository.findByLogin(
+        Usuario usuario = usuarioRepository.findByLogin(
             "novo.usuario"
-        );
+        ).orElseThrow();
 
-        assertThat(usuario).isNotNull();
         assertThat(usuario.getSenha()).isNotEqualTo("SenhaSegura@2026");
         assertThat(
             passwordEncoder.matches(
