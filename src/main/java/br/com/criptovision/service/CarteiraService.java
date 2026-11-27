@@ -54,6 +54,9 @@ public class CarteiraService {
     // quantidades com 18 casas, a mesma escala do banco
     private static final int ESCALA_QUANTIDADE = 18;
 
+    // os preços das operações e as cotações estão em USDT; não há conversão para reais
+    public static final String MOEDA_DE_REFERENCIA = "USDT";
+
     private final TransacaoRepository transacaoRepo;
     private final UsuarioRepository usuarioRepo;
     private final CotacaoService cotacaoService;
@@ -377,19 +380,34 @@ public class CarteiraService {
         );
     }
 
-    public double calcularPatrimonioTotal(Usuario usuario){
-        List<Transacao> todasAsTransacoes = carregarHistoricoDeTransacoes(usuario);
+    // totais pelos preços das operações. O custo das posições vem da carteira
+    // reconstruída (o mesmo custo exato do PNL do resumo), e a reconstrução também
+    // valida o histórico, como nos outros endpoints
+    public TotaisCarteiraDTO calcularTotais(Usuario usuario) {
+        List<Transacao> historico = carregarHistoricoDeTransacoes(usuario);
 
-        double total = 0;
-        for (Transacao t : todasAsTransacoes) {
-            double valorTrans = t.getQuantidade().multiply(t.getPrecoUnitario()).doubleValue();
-            if (t.getTipo() == TipoTransacao.COMPRA) {
-                total += valorTrans;
-            } else if (t.getTipo() == TipoTransacao.VENDA) {
-                total -= valorTrans;
-            }
-        }
-        return total;
+        Carteira carteira = new Carteira();
+        reconstruirCarteira(carteira, historico);
+
+        BigDecimal custoDasPosicoes = carteira.getMoedas()
+            .values()
+            .stream()
+            .map(Moeda::getCustoTotal)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        return new TotaisCarteiraDTO(
+            custoDasPosicoes,
+            somarOperacoes(historico, TipoTransacao.COMPRA),
+            somarOperacoes(historico, TipoTransacao.VENDA),
+            MOEDA_DE_REFERENCIA
+        );
+    }
+
+    private static BigDecimal somarOperacoes(List<Transacao> historico, TipoTransacao tipo) {
+        return historico.stream()
+            .filter(transacao -> transacao.getTipo() == tipo)
+            .map(transacao -> transacao.getQuantidade().multiply(transacao.getPrecoUnitario()))
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
 
     public ResumoCarteiraDTO obterResumoGeral(Usuario usuario){

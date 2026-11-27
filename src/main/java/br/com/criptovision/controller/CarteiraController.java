@@ -5,6 +5,7 @@ import br.com.criptovision.dto.ProblemaApiDTO;
 import br.com.criptovision.dto.ResumoCarteiraDTO;
 import br.com.criptovision.dto.SimulacaoDCADTO;
 import br.com.criptovision.dto.SimulacaoVendaDTO;
+import br.com.criptovision.dto.TotaisCarteiraDTO;
 import br.com.criptovision.model.Usuario;
 import br.com.criptovision.service.CarteiraService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -43,18 +44,28 @@ public class CarteiraController {
 
     @GetMapping("/total")
     @Operation(
-        summary = "Consultar patrimônio total investido",
-        description = "Calcula o total líquido das compras e vendas registradas.",
-        operationId = "obterPatrimonioTotal"
+        summary = "Consultar os totais da carteira",
+        description = "Calcula, pelos preços das operações, o custo das posições abertas, "
+            + "o total aportado em compras e o total recebido em vendas, em USDT. "
+            + "O valor atual de mercado está em /carteira/resumo.",
+        operationId = "obterTotaisDaCarteira"
     )
     @ApiResponses({
         @ApiResponse(
             responseCode = "200",
-            description = "Patrimônio calculado com sucesso.",
+            description = "Totais calculados com sucesso.",
             content = @Content(
-                mediaType = MediaType.TEXT_PLAIN_VALUE,
+                mediaType = MediaType.APPLICATION_JSON_VALUE,
+                schema = @Schema(implementation = TotaisCarteiraDTO.class),
                 examples = @ExampleObject(
-                    value = "Patrimônio Total Investido: R$ 12500.0"
+                    value = """
+                        {
+                          "custoDasPosicoes": 25000.00,
+                          "totalAportado": 50000.00,
+                          "totalRecebidoEmVendas": 20000.00,
+                          "moeda": "USDT"
+                        }
+                        """
                 )
             )
         ),
@@ -65,15 +76,20 @@ public class CarteiraController {
                 mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                 schema = @Schema(implementation = ProblemaApiDTO.class)
             )
+        ),
+        @ApiResponse(
+            responseCode = "500",
+            description = "O histórico da carteira está inconsistente.",
+            content = @Content(
+                mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                schema = @Schema(implementation = ProblemaApiDTO.class)
+            )
         )
     })
-    public String obterTotal(
+    public TotaisCarteiraDTO obterTotal(
         @AuthenticationPrincipal Usuario usuario
     ) {
-        double total =
-            carteiraService.calcularPatrimonioTotal(usuario);
-
-        return "Patrimônio Total Investido: R$ " + total;
+        return carteiraService.calcularTotais(usuario);
     }
 
     @GetMapping("/resumo")
