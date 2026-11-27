@@ -16,6 +16,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -62,6 +63,58 @@ public class GlobalExceptionHandler {
         );
 
         problema.setProperty("erros", erros);
+
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(problema);
+    }
+
+    // validação dos parâmetros da URL (@RequestParam com @Positive, por exemplo).
+    // Sem este handler, cairia no tratamento genérico e responderia 500
+    @ExceptionHandler(HandlerMethodValidationException.class)
+    public ResponseEntity<ProblemDetail> tratarValidacaoDeParametros(
+        HandlerMethodValidationException ex,
+        HttpServletRequest request
+    ) {
+        Map<String, String> errosUnicos = new LinkedHashMap<>();
+
+        ex.getParameterValidationResults().forEach(resultado ->
+            resultado.getResolvableErrors().forEach(erro -> errosUnicos.putIfAbsent(
+                resultado.getMethodParameter().getParameterName(),
+                erro.getDefaultMessage()
+            ))
+        );
+
+        List<ErroCampoDTO> erros = new ArrayList<>();
+        errosUnicos.forEach((campo, mensagem) ->
+            erros.add(new ErroCampoDTO(campo, mensagem))
+        );
+
+        ProblemDetail problema = criarProblema(
+            HttpStatus.BAD_REQUEST,
+            "Dados inválidos",
+            "Um ou mais parâmetros possuem valores inválidos.",
+            request
+        );
+
+        problema.setProperty("erros", erros);
+
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(problema);
+    }
+
+    @ExceptionHandler(SemSaldoParaSimularException.class)
+    public ResponseEntity<ProblemDetail> tratarSemSaldoParaSimular(
+        SemSaldoParaSimularException ex,
+        HttpServletRequest request
+    ) {
+        ProblemDetail problema = criarProblema(
+            HttpStatus.BAD_REQUEST,
+            "Sem saldo para simular",
+            ex.getMessage(),
+            request
+        );
 
         return ResponseEntity
             .status(HttpStatus.BAD_REQUEST)

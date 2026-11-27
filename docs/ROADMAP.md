@@ -88,10 +88,11 @@ Prioridade das fases:
   - **Arquivo:** `src/main/java/br/com/criptovision/model/Transacao.java`, `src/main/java/br/com/criptovision/dto/TransacaoRequestDTO.java`, `src/main/java/br/com/criptovision/service/CarteiraService.java`
   - **Correção:** aceitar a data da operação no DTO (validada, sem datas futuras) e deixar a reconstrução e as validações de alteração usarem essa data. Atualizar `docs/BUSINESS_RULES.md`.
 
-- [ ] **#12 — Os simuladores aceitam qualquer entrada**
+- [x] **#12 — Os simuladores aceitam qualquer entrada**
   - **Problema:** os parâmetros `double` aceitam `NaN`, `Infinity`, zero e valores negativos, sem `@Positive`. Uma moeda sem saldo faz `pmAtual = 0` ou `custoBase = 0` e o resultado sai como divisão por zero, devolvendo `NaN`/`Infinity` no JSON. Só o caminho feliz do DCA tem teste; a simulação de venda não tem nenhum.
   - **Arquivo:** `src/main/java/br/com/criptovision/controller/CarteiraController.java` (`simularAporteDCA`, `simularVendaFutura`), `src/main/java/br/com/criptovision/service/CarteiraService.java` (`simularDCA`, `simularVendaFutura`)
   - **Correção:** migrar para `BigDecimal` (dívida #4 do §15), validar os parâmetros com `@Positive` e `@Validated`, tratar explicitamente o caso sem saldo e cobrir os casos de borda com testes.
+  - **Feito:** os simuladores usam `BigDecimal` e o custo exato da posição. Os parâmetros são validados com `@Positive` e `@Digits` pela validação de métodos do Spring, sem `@Validated`, e um handler novo para `HandlerMethodValidationException` responde `400 Dados inválidos`, em vez de cair no 500 genérico. `NaN` e `Infinity` nem convertem para `BigDecimal` e também respondem 400. O DCA sem posição simula a primeira compra, com `pmAtual` e `diferencaPM` nulos, e a venda sem saldo responde `400 Sem saldo para simular` antes de consultar a cotação. Os dois simuladores ganharam testes de unidade e HTTP.
 
 - [ ] **#13 — `/carteira/total` está semanticamente errado**
   - **Problema:** o cálculo é compras menos vendas ao preço de venda, então depois de uma venda com lucro o "patrimônio investido" fica menor ou até negativo. Além disso usa `double`, mostra o rótulo "R$" embora os valores estejam em USDT (dívidas #4 e #13 do §15) e responde texto puro em vez de JSON.

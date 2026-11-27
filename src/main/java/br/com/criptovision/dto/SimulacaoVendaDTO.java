@@ -2,6 +2,8 @@ package br.com.criptovision.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
+import java.math.BigDecimal;
+
 @Schema(
     name = "SimulacaoVenda",
     description = "Resultado de uma simulação de venda de toda a posição."
@@ -9,22 +11,22 @@ import io.swagger.v3.oas.annotations.media.Schema;
 public class SimulacaoVendaDTO {
 
     @Schema(description = "Lucro ou prejuízo estimado em USD.", example = "325.00")
-    private double lucroEstimado;
+    private final BigDecimal lucroEstimado;
 
-    @Schema(description = "Lucro ou prejuízo estimado em percentual.", example = "22.03")
-    private double porcentagemLucro;
+    @Schema(description = "Lucro ou prejuízo estimado em percentual do custo da posição.", example = "22.03389831")
+    private final BigDecimal porcentagemLucro;
 
     @Schema(description = "Valor da posição no preço-alvo.", example = "1800.00")
-    private double valorTotalFicticio;
+    private final BigDecimal valorTotalFicticio;
 
     @Schema(description = "Valor atual da posição.", example = "1625.00")
-    private double valorTotalAtual;
+    private final BigDecimal valorTotalAtual;
 
     public SimulacaoVendaDTO(
-        double lucroEstimado,
-        double porcentagemLucro,
-        double valorTotalFicticio,
-        double valorTotalAtual
+        BigDecimal lucroEstimado,
+        BigDecimal porcentagemLucro,
+        BigDecimal valorTotalFicticio,
+        BigDecimal valorTotalAtual
     ) {
         this.lucroEstimado = lucroEstimado;
         this.porcentagemLucro = porcentagemLucro;
@@ -32,19 +34,19 @@ public class SimulacaoVendaDTO {
         this.valorTotalAtual = valorTotalAtual;
     }
 
-    public double getLucroEstimado() {
+    public BigDecimal getLucroEstimado() {
         return lucroEstimado;
     }
 
-    public double getPorcentagemLucro() {
+    public BigDecimal getPorcentagemLucro() {
         return porcentagemLucro;
     }
 
-    public double getValorTotalFicticio() {
+    public BigDecimal getValorTotalFicticio() {
         return valorTotalFicticio;
     }
 
-    public double getValorTotalAtual() {
+    public BigDecimal getValorTotalAtual() {
         return valorTotalAtual;
     }
 }

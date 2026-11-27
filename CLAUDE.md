@@ -59,9 +59,9 @@ Base package `br.com.criptovision`: controller → service → repository, plus 
 - Never turn provider failures into a zero price. Unknown ticker → 400; provider down with no fallback → 503.
 - A `Clock` bean (`CotacaoConfiguration`) is injected for time-dependent logic, so tests can control time.
 
-**Money.** Use `BigDecimal`. `Moeda` keeps the exact `custoTotal` (buys add `quantidade × preço` with no rounding; a partial sale scales it by the remaining balance at 34 significant digits; a full sale zeroes it). The average price is derived on read (`custoTotal ÷ saldo`, scale 18, `HALF_UP`) and must never be fed back into the next transaction. Migration `V3` widened the DB precision. Some simulation and total methods still use `double`, which is known debt, so don't add new `double` math.
+**Money.** Use `BigDecimal`. `Moeda` keeps the exact `custoTotal` (buys add `quantidade × preço` with no rounding; a partial sale scales it by the remaining balance at 34 significant digits; a full sale zeroes it). The average price is derived on read (`custoTotal ÷ saldo`, scale 18, `HALF_UP`) and must never be fed back into the next transaction. Migration `V3` widened the DB precision. The DCA and sale simulators are `BigDecimal` and validate their `@RequestParam`s with `@Positive`/`@Digits`. A DCA with no position returns `null` for `pmAtual`/`diferencaPM`, and a sale with no balance throws `SemSaldoParaSimularException` (400). Only `/carteira/total` still uses `double` (roadmap #13), so don't add new `double` math.
 
-**Errors.** `GlobalExceptionHandler` returns RFC 7807 `ProblemDetail` responses (with field errors for validation). `AutenticacaoEntryPoint` handles 401s. New business exceptions should get a handler there.
+**Errors.** `GlobalExceptionHandler` returns RFC 7807 `ProblemDetail` responses (with field errors for validation). `AutenticacaoEntryPoint` handles 401s. New business exceptions should get a handler there. Constraint violations on `@RequestParam`s raise `HandlerMethodValidationException`, which has its own handler (400 with `erros`). Without it, they would fall into the catch-all 500.
 
 **Database.** Flyway migrations live in `src/main/resources/db/migration` (`V<n>__descricao.sql`), with `ddl-auto=validate`. Schema changes need a new migration, and the entity must match it.
 
