@@ -57,10 +57,11 @@ Prioridade das fases:
   - **Arquivo:** `src/main/java/br/com/criptovision/security/SecurityConfigurations.java`, `src/main/java/br/com/criptovision/controller/AutenticacaoController.java`
   - **Correção:** limitar tentativas por IP e por login (Bucket4j ou no proxy reverso), responder 429 com `ProblemDetail` e registrar as tentativas bloqueadas.
 
-- [ ] **#5 — Não há estratégia de backup**
+- [x] **#5 — Não há estratégia de backup**
   - **Problema:** o histórico de transações é a única fonte da verdade, e o volume `mysql_data` não tem backup nem teste de restauração.
   - **Arquivo:** `docker-compose.yml` (volume `mysql_data`)
   - **Correção:** configurar backups automáticos (dump agendado ou backup gerenciado do provedor), guardá-los fora do servidor, definir retenção e testar a restauração periodicamente.
+  - **Feito:** o serviço `backup` faz um `mysqldump` diário, cifrado com `gpg` (AES-256) antes de sair do servidor e conferido antes de ser aceito. Os backups ficam 14 dias no servidor e 30 dias num bucket S3 (R2, B2 ou S3), configurado pelo `.env` com uma credencial restrita ao bucket. A restauração é testada toda semana num MySQL temporário, e o `backup restaurar` também baixa do bucket numa VPS nova. Limitações: perda de até 24 horas numa falha total (sem *point-in-time recovery*), e a credencial de leitura e escrita permite apagar o bucket; o README descreve a alternativa com ciclo de vida.
 
 - [x] **#7 — O CORS está fixo em `localhost`**
   - **Problema:** as origens permitidas são só `localhost:5173` e `localhost:5174`, então o frontend de produção não funciona.

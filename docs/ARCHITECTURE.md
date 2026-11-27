@@ -993,6 +993,43 @@ O modo `REQUIRED` cifra a conexão, mas não verifica o certificado do servidor.
 
 Fora do Compose, a URL de `application.properties` não define `sslMode`, e o driver usa o padrão `PREFERRED` (TLS quando o servidor oferece). O `ConexaoSeguraMysqlIT` verifica, num MySQL que exige TLS, que o pool da aplicação conecta com TLS e que uma conexão sem TLS é recusada.
 
+### Backup do MySQL
+
+O serviço `backup` (perfis `producao` e `backup`) é construído a partir de `backup/Dockerfile`. A imagem parte da `mysql:8.0`, para que o `mysqldump` seja da mesma versão do servidor, e recebe o binário do rclone da imagem oficial `rclone/rclone`. Toda a lógica está em `backup/backup.sh`.
+
+```text
+todo dia em BACKUP_HORARIO (UTC)
+        ↓
+mysqldump --single-transaction (TLS, usuário da aplicação)
+        ↓
+gzip → gpg simétrico AES-256 com BACKUP_SENHA
+        ↓
+confere: decifra, descompacta e exige a linha final "-- Dump completed"
+        ↓
+volume mysql_backups (retenção BACKUP_RETENCAO_DIAS)
+        ↓
+rclone → bucket S3 (retenção BACKUP_RETENCAO_REMOTA_DIAS), se BACKUP_S3_BUCKET estiver definido
+```
+
+Decisões:
+
+* **cifra antes de sair do servidor**: o bucket só recebe arquivos cifrados. A `BACKUP_SENHA` existe só no ambiente do container e nunca é enviada. O formato é OpenPGP padrão, então um backup pode ser decifrado com qualquer `gpg`, sem depender do rclone nem deste projeto;
+* **nenhum backup é aceito sem conferência**: o arquivo é gerado com nome temporário e só ganha o nome final depois de ser decifrado e de mostrar que o dump terminou. Um `mysqldump` interrompido nunca vira um backup válido;
+* **nenhuma falha silenciosa**: sem `BACKUP_SENHA`, o serviço não roda. Sem bucket, cada backup registra um aviso. Falhas aparecem no log como `ERRO`, e o `HEALTHCHECK` deixa o container `unhealthy` se o último backup tiver mais de 26 horas;
+* **credencial mínima no bucket**: o rclone é configurado só por variáveis de ambiente, sem arquivo com as chaves, e com `no_check_bucket`, para que a credencial precise apenas ler e escrever no bucket;
+* **a senha do banco vai por `MYSQL_PWD`**, e não por um arquivo de opções do MySQL, cujo leitor corta valores com `#`;
+* **teste de restauração real**: `backup testar` cria um MySQL temporário dentro do container, restaura o backup, confere as tabelas `usuarios`, `transacoes` e `flyway_schema_history` e descarta tudo. Roda sozinho todo domingo;
+* **restauração segura**: `backup restaurar` exige `--confirmar` e, antes de substituir os dados, faz um backup do estado atual. Se o arquivo não estiver no servidor, ele é baixado do bucket, como numa VPS nova.
+
+Limitações atuais:
+
+* o backup é diário: numa perda total, podem ficar de fora até 24 horas de transações. Não há recuperação até um instante qualquer (*point-in-time recovery*) com o binlog;
+* o backup usa o usuário da aplicação, que também pode apagar dados. Um usuário só de leitura para o backup exigiria criá-lo no banco;
+* com a credencial de leitura e escrita, quem invadir a VPS também pode apagar os backups do bucket. O README descreve a alternativa sem permissão de apagar, usando uma regra de ciclo de vida do bucket;
+* a imagem do MySQL descarta `\` nas senhas ao criar o usuário (`MYSQL_PASSWORD`), então as senhas do banco não devem ter `\` nem `'`. O `.env.example` recomenda gerá-las com `openssl rand -hex`.
+
+O `BackupMysqlIT` cobre o serviço com containers de verdade: um MySQL que exige TLS, com as migrations do Flyway, e um bucket S3 servido pelo `rclone serve s3`.
+
 O Dockerfile usa a imagem `eclipse-temurin:25-jdk-alpine` e espera que o JAR já tenha sido gerado em `target/`.
 
 O ambiente utiliza um arquivo `.env`, ignorado pelo Git, para fornecer `MYSQL_ROOT_PASSWORD`, `DB_USER`, `DB_PASSWORD` e `JWT_SECRET`, além de `CORS_ALLOWED_ORIGINS` e `DOMINIO` em produção e das variáveis opcionais `BINANCE_API_BASE_URL` e `COTACOES_*`. O arquivo `.env.example` serve de modelo. Dentro da rede do Compose, a API acessa o banco pelo hostname `db` e pela porta interna `3306`.
@@ -1054,6 +1091,7 @@ Os testes com sufixo `IT`, no pacote `br.com.criptovision.integracao`, rodam con
 
 Grupos atuais:
 
+* `BackupMysqlIT`, que constrói a imagem de `backup/Dockerfile` e verifica, contra um MySQL que exige TLS e um bucket S3 de teste (`rclone serve s3`): que o backup chega cifrado ao servidor e ao bucket, sem nenhum texto do banco legível; o teste de restauração num MySQL temporário; a restauração com os valores de 18 casas exatos; a exigência de `--confirmar`; a recusa de uma senha errada; a restauração a partir do bucket quando o servidor perdeu os arquivos; e a recusa de rodar sem `BACKUP_SENHA`;
 * `ConexaoSeguraMysqlIT`, que verifica que o pool da aplicação conecta com TLS num MySQL que exige transporte seguro e que uma conexão sem TLS é recusada. O container dos testes roda com `--require-secure-transport=ON`, e a aplicação conecta com `sslMode=REQUIRED` e sem `allowPublicKeyRetrieval`, como no `docker-compose.yml`;
 * `MigracoesMysqlIT`, que verifica que todas as migrations foram aplicadas, que `quantidade` e `preco_unitario` são `DECIMAL(38, 18)` (o `validate` do Hibernate não confere precisão nem escala) e que valores no limite da validação são gravados e lidos sem perda;
 * `ConcorrenciaTransacoesMysqlIT`, que executa o mesmo cenário do `ConcorrenciaTransacoesTest` (os dois herdam de `CenarioConcorrenciaTransacoes`) sob o REPEATABLE READ do InnoDB. Só ele detecta uma leitura comum feita antes do `SELECT ... FOR UPDATE`, porque o H2 não reproduz o snapshot de leitura do MySQL.

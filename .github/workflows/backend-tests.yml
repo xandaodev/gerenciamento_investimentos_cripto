@@ -31,13 +31,15 @@ jobs:
           java-version: "25"
           cache: maven
 
-      # falha cedo se o docker-compose ou o Caddyfile tiverem erro de sintaxe
-      - name: Validar o docker-compose e o Caddyfile
+      # falha cedo se o docker-compose, o Caddyfile ou o script de backup tiverem erro
+      - name: Validar o docker-compose, o Caddyfile e o script de backup
         run: |
           docker compose --profile producao config --quiet
           docker run --rm -e DOMINIO=api.exemplo.com.br \
             -v "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2 \
             caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+          docker run --rm -v "$PWD/backup:/src:ro" koalaman/shellcheck:stable \
+            -S warning /src/backup.sh
 
       - name: Permitir execução do Maven Wrapper
         run: chmod +x mvnw
