@@ -3,6 +3,7 @@ package br.com.criptovision.integracao;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.Container.ExecResult;
 import org.testcontainers.containers.GenericContainer;
@@ -84,14 +85,20 @@ class BackupMysqlIT {
             .load()
             .migrate();
 
+        BACKUP.start();
+    }
+
+    // cada teste começa com os mesmos dados, para que a falha de um não contamine os outros
+    @BeforeEach
+    void restaurarDadosIniciais() throws Exception {
         executarSql("""
+            DELETE FROM transacoes;
+            DELETE FROM usuarios;
             INSERT INTO usuarios (id, login, senha) VALUES (1, 'alexandre', 'hash-bcrypt');
             INSERT INTO transacoes (ticker, quantidade, preco_unitario, tipo, usuario_id)
                 VALUES ('PEPE', 1000000, 0.000001234500000001, 'COMPRA', 1),
                        ('BTC', 0.5, 65000, 'COMPRA', 1);
             """);
-
-        BACKUP.start();
     }
 
     @AfterAll
@@ -138,6 +145,31 @@ class BackupMysqlIT {
 
         assertThat(restauracao.getExitCode()).as(restauracao.getStderr()).isZero();
         assertThat(consultarPrecoDoPepe()).isEqualByComparingTo(PRECO_PEPE);
+    }
+
+    @Test
+    void naoDeveSobrescreverUmBackupComOMesmoNome() throws Exception {
+        // ocupa os nomes dos próximos segundos com arquivos vazios: o backup novo
+        // precisa escolher outro nome, sem tocar em nenhum deles. Sem essa proteção,
+        // o backup de segurança do "restaurar" podia destruir o backup a ser restaurado
+        ExecResult ocupados = BACKUP.execInContainer("sh", "-c", """
+            for i in 0 1 2 3 4 5 6 7 8 9; do
+              touch /backups/criptovision-$(date -u -d "+$i seconds" +%Y%m%dT%H%M%SZ).sql.gz.gpg
+            done""");
+        assertThat(ocupados.getExitCode()).isZero();
+
+        try {
+            String nome = fazerBackup();
+
+            ExecResult intactos = BACKUP.execInContainer("sh", "-c",
+                "find /backups -name 'criptovision-*.sql.gz.gpg' -empty | wc -l");
+            assertThat(intactos.getStdout().trim()).isEqualTo("10");
+            assertThat(BACKUP.execInContainer("test", "-s", "/backups/" + nome).getExitCode())
+                .as("o backup novo tem conteúdo").isZero();
+        } finally {
+            // os arquivos vazios atrapalhariam os testes que usam o backup mais recente
+            BACKUP.execInContainer("sh", "-c", "find /backups -name '*.gpg' -empty -delete");
+        }
     }
 
     @Test

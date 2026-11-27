@@ -166,11 +166,12 @@ conferir() {
 
 fazer_backup() {
     local nome temporario
-    nome="${PREFIXO}-$(date -u +%Y%m%dT%H%M%SZ)${EXTENSAO}"
-    temporario="$PASTA/.${nome}.parcial"
-    rm -f "$PASTA"/.*.parcial
+    # nome temporário único por processo: dois backups simultâneos (o agendado e
+    # um "backup agora") não apagam o arquivo um do outro
+    temporario=$(mktemp "$PASTA/.backup-em-andamento.XXXXXX.parcial")
+    find "$PASTA" -maxdepth 1 -name '.backup-em-andamento.*.parcial' -mmin +60 -delete
 
-    log "Gerando $nome"
+    log "Gerando backup"
 
     # --single-transaction: cópia consistente sem travar as tabelas (InnoDB)
     # --no-tablespaces: dispensa o privilégio PROCESS, que o usuário da aplicação não tem
@@ -185,7 +186,7 @@ fazer_backup() {
     fi
 
     conferir "$temporario"
-    mv "$temporario" "$PASTA/$nome"
+    nome=$(publicar "$temporario")
     log "Backup conferido: $nome ($(du -h "$PASTA/$nome" | cut -f1))"
 
     aplicar_retencao_local
@@ -195,6 +196,23 @@ fazer_backup() {
     else
         log "AVISO: BACKUP_S3_BUCKET não está definido. O backup ficou só neste servidor e se perde junto com ele."
     fi
+}
+
+# Dá ao backup conferido o nome definitivo sem nunca sobrescrever outro backup.
+# O nome tem precisão de segundos: sem esta proteção, o backup de segurança que o
+# "restaurar" faz poderia sair no mesmo segundo e destruir o backup a ser restaurado.
+# O ln é atômico e falha se o nome já existir; nesse caso, tenta o segundo seguinte
+publicar() {
+    local temporario=$1 nome
+    while true; do
+        nome="${PREFIXO}-$(date -u +%Y%m%dT%H%M%SZ)${EXTENSAO}"
+        if ln "$temporario" "$PASTA/$nome" 2> /dev/null; then
+            rm -f "$temporario"
+            printf '%s\n' "$nome"
+            return
+        fi
+        sleep 1
+    done
 }
 
 aplicar_retencao_local() {
