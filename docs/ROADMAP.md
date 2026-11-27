@@ -23,7 +23,7 @@ Prioridade das fases:
   - **Arquivo:** `src/main/java/br/com/criptovision/service/CarteiraService.java` (`processarTransacao`), `src/main/java/br/com/criptovision/model/Moeda.java`
   - **Correção:** acumular o custo total em `BigDecimal` sem arredondar e calcular o preço médio só na hora de exibir. Cobrir com testes de moedas de preço muito baixo e de várias compras seguidas.
 
-- [ ] **#6 — As migrations não são testadas, e a garantia de concorrência também não é testada no banco real**
+- [x] **#6 — As migrations não são testadas, e a garantia de concorrência também não é testada no banco real**
   - **Problema:** os testes rodam em H2 com `create-drop` e Flyway desligado. Por isso:
     - divergências entre as migrations e as entidades só aparecem no boot em produção (o `ddl-auto=validate` derruba a aplicação);
     - o `ConcorrenciaTransacoesTest` prova o lock no H2, mas a premissa do lock (`SELECT ... FOR UPDATE` sob REPEATABLE READ do MySQL) nunca é exercitada;
