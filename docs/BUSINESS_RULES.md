@@ -761,39 +761,36 @@ Portanto, o valor resultante é atualmente denominado principalmente em USDT, tr
 
 ## 19. Endpoint `/carteira/total`
 
-O método utilizado por esse endpoint considera somente as transações do usuário autenticado e não calcula o valor atual de mercado da carteira.
+O endpoint devolve, em JSON, três totais calculados pelos preços das operações do usuário autenticado. Ele não usa o preço atual de mercado: o valor atual da carteira está no resumo (seção 20).
 
-Ele realiza:
-
-```text
-total das compras - total das vendas
+```json
+{
+  "custoDasPosicoes": 25000.00,
+  "totalAportado": 50000.00,
+  "totalRecebidoEmVendas": 20000.00,
+  "moeda": "USDT"
+}
 ```
 
-Para cada transação:
+| Campo | Regra |
+| --- | --- |
+| `custoDasPosicoes` | soma do custo da posição (seção 2) de cada ativo ainda na carteira: quanto do dinheiro está aplicado hoje, pelo preço pago |
+| `totalAportado` | soma de quantidade × preço unitário de todas as compras desde o início |
+| `totalRecebidoEmVendas` | soma de quantidade × preço unitário de todas as vendas |
+| `moeda` | sempre `USDT`, a moeda dos preços (seção 26). Não há conversão para reais |
 
-```text
-COMPRA → soma quantidade × preço unitário
-VENDA  → subtrai quantidade × preço unitário
-```
+Exemplo: comprar 1 BTC por 50.000 USDT e depois vender 0,5 BTC por 40.000 USDT dá custo das posições de 25.000 (o custo do 0,5 BTC restante), total aportado de 50.000 e total recebido em vendas de 20.000.
 
-Portanto, essa métrica representa aproximadamente um fluxo financeiro líquido histórico, e não o patrimônio atual.
+Regras:
 
-### Inconsistência atual
+* o custo das posições nunca é negativo, e é zero depois de vender toda a posição, mesmo que a venda tenha dado lucro;
+* o total aportado não diminui com as vendas;
+* o custo das posições vem da carteira reconstruída. Por isso, um histórico inconsistente responde `500`, como nos outros endpoints da carteira;
+* todos os valores são exatos (`BigDecimal`), sem arredondamento.
 
-A resposta apresenta:
+O cálculo antigo era compras menos vendas ao preço de venda, chamado de "Patrimônio Total Investido: R$". Ele ficava menor, ou até negativo, depois de uma venda com lucro, e mostrava "R$" para valores em USDT.
 
-```text
-Patrimônio Total Investido: R$
-```
-
-Porém:
-
-* não é utilizado o preço atual dos ativos;
-* não existe conversão obrigatória para reais;
-* os preços das operações podem estar em USDT;
-* o significado da métrica não corresponde exatamente a “patrimônio”.
-
-Esse endpoint será renomeado ou substituído posteriormente.
+O lucro realizado nas vendas ainda não é calculado (item #26 do roadmap).
 
 ---
 
@@ -1103,9 +1100,10 @@ Também utilizam `BigDecimal`:
 * as cotações recebidas da Binance;
 * o resumo da carteira: valor dos ativos, PNL, percentuais e variação de 24 horas;
 * as simulações de DCA e de venda;
+* os totais de `/carteira/total`;
 * o total aportado por moeda.
 
-Ainda converte valores para `double` só o endpoint `/carteira/total` (item #13 do roadmap).
+Todo o cálculo financeiro usa `BigDecimal` de ponta a ponta. Nenhum valor passa por `double`.
 
 ---
 

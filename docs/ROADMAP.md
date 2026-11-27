@@ -94,10 +94,11 @@ Prioridade das fases:
   - **Correção:** migrar para `BigDecimal` (dívida #4 do §15), validar os parâmetros com `@Positive` e `@Validated`, tratar explicitamente o caso sem saldo e cobrir os casos de borda com testes.
   - **Feito:** os simuladores usam `BigDecimal` e o custo exato da posição. Os parâmetros são validados com `@Positive` e `@Digits` pela validação de métodos do Spring, sem `@Validated`, e um handler novo para `HandlerMethodValidationException` responde `400 Dados inválidos`, em vez de cair no 500 genérico. `NaN` e `Infinity` nem convertem para `BigDecimal` e também respondem 400. O DCA sem posição simula a primeira compra, com `pmAtual` e `diferencaPM` nulos, e a venda sem saldo responde `400 Sem saldo para simular` antes de consultar a cotação. Os dois simuladores ganharam testes de unidade e HTTP.
 
-- [ ] **#13 — `/carteira/total` está semanticamente errado**
+- [x] **#13 — `/carteira/total` está semanticamente errado**
   - **Problema:** o cálculo é compras menos vendas ao preço de venda, então depois de uma venda com lucro o "patrimônio investido" fica menor ou até negativo. Além disso usa `double`, mostra o rótulo "R$" embora os valores estejam em USDT (dívidas #4 e #13 do §15) e responde texto puro em vez de JSON.
   - **Arquivo:** `src/main/java/br/com/criptovision/controller/CarteiraController.java` (`obterTotal`), `src/main/java/br/com/criptovision/service/CarteiraService.java` (`calcularPatrimonioTotal`)
   - **Correção:** definir a regra correta (por exemplo, custo da posição atual a partir da carteira reconstruída), calcular em `BigDecimal`, devolver um DTO JSON com a moeda explícita e documentar a regra.
+  - **Feito:** o endpoint devolve JSON com três totais exatos em `BigDecimal`: o custo das posições abertas (a partir da carteira reconstruída, o mesmo custo do PNL), o total aportado em compras e o total recebido em vendas, mais a moeda `USDT`. O custo das posições nunca fica negativo e é zero depois de vender tudo. A regra está no `BUSINESS_RULES`, seção 19. Com isso, nenhum cálculo financeiro usa mais `double`.
 
 - [ ] **#14 — Não há observabilidade**
   - **Problema:** faltam Actuator (health/readiness), métricas, logs estruturados e alertas para `HistoricoInconsistenteException` (dívida #3 do §15). O `spring.jpa.show-sql=true` está ligado em produção.

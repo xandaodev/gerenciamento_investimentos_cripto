@@ -1097,6 +1097,7 @@ Principais grupos:
 * `IsolamentoTransacoesHttpTest`, que inicializa o contexto Spring Boot, autentica dois usuários com JWT e verifica por `MockMvc` que um usuário não lista, consulta, altera ou exclui transações do outro, nem acessa a carteira e as análises do outro;
 * `ConcorrenciaTransacoesTest`, que usa duas threads para verificar que uma venda aguarda o bloqueio de outra venda em andamento e é rejeitada por saldo insuficiente depois do commit;
 * `AutenticacaoServiceTest`, que verifica que um login inexistente lança `UsernameNotFoundException` e que o `DaoAuthenticationProvider` ainda compara a senha com o hash fictício, sem deixar o tempo de resposta revelar quais logins existem;
+* `CarteiraServiceTotaisTest`, para os totais de `/carteira/total` (custo das posições, total aportado e total recebido em vendas) com vários ativos, posição totalmente vendida, valores de 18 casas e histórico inconsistente; e `TotalCarteiraHttpTest`, que verifica o JSON com a moeda `USDT` e que o custo das posições não fica negativo depois de uma venda com lucro;
 * `CarteiraServiceSimulacaoTest`, para as simulações de DCA e de venda com valores exatos em `BigDecimal`: moeda de preço muito baixo, primeira compra sem posição, posição totalmente vendida, venda com lucro e prejuízo, arredondamento do percentual e venda sem saldo; e `SimuladoresHttpTest`, que verifica por `MockMvc` que os simuladores recusam valores zero, negativos, `NaN`, `Infinity` e parâmetros ausentes com `400`, e nunca devolvem `NaN`;
 * `TokenServiceTest`, para a validação do `JWT_SECRET` na subida, a audiência, a versão, a assinatura e a expiração com relógio fixo; e `SessaoHttpTest`, que verifica por `MockMvc` que o logout revoga os tokens de todos os dispositivos, que a troca de senha revoga os tokens antigos e devolve um novo, os erros da troca de senha e o bloqueio por força bruta pela troca de senha;
 * `LimiteDeTentativasTest`, para a janela fixa com relógio ajustável e para a atomicidade com tentativas simultâneas; `ProtecaoForcaBrutaTest`, para a normalização da chave do login, o tempo do `Retry-After` e a validação dos limites; e `ProtecaoForcaBrutaHttpTest`, que verifica por `MockMvc` os bloqueios por login e por IP, o reset depois de um login com sucesso e a resposta `429`;
@@ -1162,7 +1163,7 @@ Os principais pontos identificados são:
 1. o `AnaliseController` ainda acessa o repository diretamente;
 2. a carteira é reconstruída repetidamente em diferentes endpoints;
 3. inconsistências do histórico não possuem logs estruturados nem alertas;
-4. o endpoint `/carteira/total` ainda utiliza `double` (as simulações de DCA e de venda já usam `BigDecimal`);
+4. ~~as simulações de DCA e de venda e o endpoint `/carteira/total` ainda utilizam `double`~~ (resolvida: todo o cálculo financeiro usa `BigDecimal`);
 5. parte da injeção de dependências ainda é realizada por atributos (`@Autowired` em `CarteiraController`, `TransacaoController` e `AnaliseController`);
 6. não há paginação ou filtros no histórico;
 7. não há lucro realizado persistido ou consolidado;
@@ -1171,6 +1172,6 @@ Os principais pontos identificados são:
 10. as colunas de dados da tabela `transacoes` ainda aceitam `NULL` no banco;
 11. ~~os testes usam schema gerado pelo Hibernate, então as migrations do Flyway não são exercitadas na suíte~~ (resolvida: os testes `*IT.java` aplicam as migrations num MySQL real; o `mvn test` continua usando o schema do Hibernate no H2);
 12. o cache de cotações é local à instância;
-13. `/carteira/total` retorna texto simples com o rótulo "R$", embora os valores não sejam convertidos para reais.
+13. ~~`/carteira/total` retorna texto simples com o rótulo "R$", embora os valores não sejam convertidos para reais~~ (resolvida: devolve JSON com o custo das posições, o total aportado, o total recebido em vendas e a moeda `USDT`).
 
 Esses itens serão tratados em commits pequenos e independentes.

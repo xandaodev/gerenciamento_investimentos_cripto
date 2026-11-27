@@ -70,7 +70,7 @@ O desenvolvimento deste sistema foi marcado por ciclos de melhoria contínua e r
 | `PUT` | `/transacoes/{id}` | Altera uma transação |
 | `DELETE` | `/transacoes/{id}` | Exclui uma transação |
 | `GET` | `/carteira/resumo` | Resumo da carteira com cotações atuais |
-| `GET` | `/carteira/total` | Total líquido de compras e vendas |
+| `GET` | `/carteira/total` | Custo das posições abertas, total aportado e total recebido em vendas (USDT) |
 | `GET` | `/carteira/simulador/dca` | Simulação de aporte |
 | `GET` | `/carteira/simulador/venda` | Simulação de venda a um preço-alvo |
 | `GET` | `/analise/aportes-por-moeda` | Total comprado por ativo |

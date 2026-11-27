@@ -383,7 +383,7 @@ public class IsolamentoTransacoesHttpTest {
             TipoTransacao.COMPRA
         );
 
-        mockMvc.perform(
+        String json = mockMvc.perform(
                 get("/carteira/total")
                     .header(
                         HttpHeaders.AUTHORIZATION,
@@ -391,12 +391,18 @@ public class IsolamentoTransacoesHttpTest {
                     )
             )
             .andExpect(status().isOk())
-            .andExpect(
-                content().string(
-                    "Patrimônio Total Investido: "
-                        + "R$ 100.0"
-                )
-            );
+            .andExpect(jsonPath("$.moeda").value("USDT"))
+            .andReturn()
+            .getResponse()
+            .getContentAsString();
+
+        // só a compra de 100 do próprio usuário entra; a de 900 do outro, não
+        assertEquals(0, new BigDecimal("100").compareTo(new BigDecimal(
+            com.jayway.jsonpath.JsonPath.read(json, "$.totalAportado").toString()
+        )));
+        assertEquals(0, new BigDecimal("100").compareTo(new BigDecimal(
+            com.jayway.jsonpath.JsonPath.read(json, "$.custoDasPosicoes").toString()
+        )));
     }
 
     @Test
