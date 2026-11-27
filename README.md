@@ -89,18 +89,22 @@ A aplicação lê as credenciais de variáveis de ambiente. O arquivo [`.env.exa
 | `JWT_SECRET` | Sim | Segredo para assinar os tokens (use um valor longo e aleatório) |
 | `MYSQL_ROOT_PASSWORD` | Só no Docker | Senha do root do container MySQL |
 | `CORS_ALLOWED_ORIGINS` | Em produção | Origens do frontend autorizadas pelo CORS, separadas por vírgula (padrão: `http://localhost:5173,http://localhost:5174`) |
+| `DOMINIO` | Em produção | Domínio público da API, para o qual o Caddy emite o certificado HTTPS (perfil `producao`) |
+| `COMPOSE_PROFILES` | Não | Use `producao` na VPS para que o Compose inclua o Caddy |
 | `BINANCE_API_BASE_URL` | Não | URL da API de mercado da Binance |
 | `COTACOES_CONNECT_TIMEOUT`, `COTACOES_READ_TIMEOUT`, `COTACOES_CACHE_TTL`, `COTACOES_CACHE_MAX_STALE` | Não | Timeouts e cache das cotações |
 
-### Com Docker
+### Com Docker (desenvolvimento)
 
-1.  Copie `.env.example` para `.env` e preencha os valores, incluindo `MYSQL_ROOT_PASSWORD`. Use em `DB_USER` um usuário diferente de `root`, pois a imagem do MySQL não aceita `root` como usuário adicional.
+1.  Copie `.env.example` para `.env` e preencha os valores, incluindo `MYSQL_ROOT_PASSWORD`. Use em `DB_USER` um usuário diferente de `root`, pois a imagem do MySQL não aceita `root` como usuário adicional. Deixe `DOMINIO` vazio.
 2.  Gere o JAR (o `Dockerfile` copia o arquivo de `target/`) e suba os containers:
     ```bash
     ./mvnw clean package
     docker compose up --build
     ```
-3.  A API fica em `http://localhost:8080` e o MySQL em `localhost:3307`. O Flyway cria as tabelas na primeira execução.
+3.  A API fica em `http://localhost:8080` e o MySQL em `localhost:3307`, sem HTTPS. As duas portas só aceitam conexões da própria máquina. O Flyway cria as tabelas na primeira execução.
+
+Para produção, com HTTPS, veja [Deploy em produção](#-deploy-em-produção-vps-com-https).
 
 ### Localmente
 
@@ -129,6 +133,86 @@ Crie uma conta em `/auth/register`, faça login em `/auth/login` e clique em **A
 O `clean test` usa um banco H2 em memória e não acessa a Binance, então não precisa de MySQL nem de Docker.
 
 O `clean verify` sobe um MySQL 8 em container com o Testcontainers, aplica as migrations do Flyway e roda os testes `*IT.java`. Ele precisa do Docker rodando e é o que o GitHub Actions executa.
+
+## 🚀 Deploy em produção (VPS com HTTPS)
+
+O `docker-compose.yml` tem um perfil `producao` que coloca o [Caddy](https://caddyserver.com) na frente da API. O Caddy emite e renova sozinho o certificado HTTPS do Let's Encrypt e redireciona HTTP para HTTPS. A API e o MySQL continuam acessíveis só de dentro do servidor.
+
+```text
+Internet ──443 (HTTPS)──▶ Caddy ──rede interna──▶ API ──▶ MySQL
+```
+
+### O que você precisa
+
+* Uma VPS com Linux, por exemplo Ubuntu 24.04 LTS, com pelo menos 2 GB de RAM por causa da JVM e do MySQL.
+* Um domínio. A API fica num subdomínio, como `api.seudominio.com.br`.
+
+### Passo a passo
+
+1.  **Aponte o domínio para a VPS.** No painel de DNS do seu domínio, crie um registro `A` para `api.seudominio.com.br` com o IP público da VPS (e um `AAAA`, se ela tiver IPv6). Confira com o comando abaixo, que deve mostrar o IP da VPS. A propagação pode levar alguns minutos.
+    ```bash
+    dig +short api.seudominio.com.br
+    ```
+
+2.  **Prepare o servidor.** Acesse por SSH, instale o Docker com o plugin do Compose seguindo o [guia oficial](https://docs.docker.com/engine/install/ubuntu/) e libere no firewall só SSH, HTTP e HTTPS:
+    ```bash
+    sudo ufw allow OpenSSH
+    sudo ufw allow 80/tcp
+    sudo ufw allow 443
+    sudo ufw enable
+    ```
+    A regra `443` libera TCP e UDP (o UDP é usado pelo HTTP/3). Atenção: o Docker publica portas por fora do `ufw`. Por isso o Compose prende a API e o MySQL a `127.0.0.1`. Não troque isso por portas abertas.
+
+3.  **Baixe o projeto e configure o `.env`.**
+    ```bash
+    git clone https://github.com/xandaodev/gerenciamento_investimentos_cripto.git
+    cd gerenciamento_investimentos_cripto
+    cp .env.example .env
+    nano .env
+    ```
+    No `.env`:
+    * `DOMINIO=api.seudominio.com.br`;
+    * `CORS_ALLOWED_ORIGINS` com o endereço do frontend, por exemplo `https://app.seudominio.com.br`;
+    * senhas fortes em `MYSQL_ROOT_PASSWORD` e `DB_PASSWORD` e um segredo longo em `JWT_SECRET`. Para gerar valores aleatórios, use `openssl rand -base64 48`;
+    * descomente `COMPOSE_PROFILES=producao`, para que os comandos do Compose incluam o Caddy.
+
+4.  **Gere o JAR.** Para não instalar o JDK no servidor, gere-o dentro de um container. O volume `criptovision-maven` guarda as dependências baixadas para as próximas vezes:
+    ```bash
+    docker run --rm -v "$PWD":/app -v criptovision-maven:/root/.m2 -w /app \
+      eclipse-temurin:25-jdk sh ./mvnw -B clean package -DskipTests
+    ```
+    Os testes são pulados aqui porque já rodam no GitHub Actions a cada pull request.
+
+5.  **Suba os containers.**
+    ```bash
+    docker compose up -d --build
+    ```
+
+6.  **Confira.** Na primeira subida, o Caddy obtém o certificado em alguns segundos:
+    ```bash
+    docker compose logs caddy
+    curl -I https://api.seudominio.com.br/swagger-ui.html
+    ```
+    O log do Caddy deve mostrar `certificate obtained successfully`, e a resposta do `curl` deve vir por HTTPS com o cabeçalho `Strict-Transport-Security`.
+
+### Atualizar a versão
+
+```bash
+git pull
+docker run --rm -v "$PWD":/app -v criptovision-maven:/root/.m2 -w /app \
+  eclipse-temurin:25-jdk sh ./mvnw -B clean package -DskipTests
+docker compose up -d --build
+```
+
+### Se o certificado não for emitido
+
+* Confira se o DNS já aponta para a VPS (`dig +short`) e se as portas 80 e 443 estão abertas: o Let's Encrypt valida o domínio por elas.
+* Veja o motivo em `docker compose logs caddy`. Sem `DOMINIO` no `.env`, o log pede para defini-lo.
+* Não apague o volume `caddy_data`, que guarda os certificados. Emitir muitos certificados seguidos esbarra nos limites do Let's Encrypt.
+
+### Ainda não incluído
+
+O [roadmap](docs/ROADMAP.md) lista o que falta para produção, em especial TLS na conexão com o MySQL (#3) e backups automáticos do banco (#5).
 
 ---
 ⭐ *Desenvolvido por **Alexandre Vital** - Estudante de Ciência da Computação na UFSJ, em busca de desafios como Desenvolvedor Back-End.*

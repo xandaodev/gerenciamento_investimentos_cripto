@@ -942,30 +942,47 @@ O projeto possui:
 ```text
 Dockerfile
 docker-compose.yml
+Caddyfile
 ```
 
 O Docker Compose define:
 
-* um container MySQL 8.0;
-* um container para a API construída a partir do código atual;
-* um volume persistente para o banco;
-* credenciais, segredos e configuração das cotações recebidos por variáveis de ambiente.
+* um container MySQL 8.0 (`db`);
+* um container para a API construída a partir do código atual (`api`);
+* um container Caddy (`caddy`), só no perfil `producao`;
+* volumes persistentes para o banco (`mysql_data`) e para os certificados do Caddy (`caddy_data` e `caddy_config`);
+* credenciais, segredos e configuração recebidos por variáveis de ambiente.
 
-O MySQL é exposto localmente na porta:
+Há dois modos de execução:
+
+| Comando | Modo | Acesso |
+| --- | --- | --- |
+| `docker compose up --build` | desenvolvimento | API em `http://localhost:8080` e MySQL em `localhost:3307`, sem HTTPS |
+| `docker compose --profile producao up -d --build` | produção (VPS) | Caddy em `80` e `443`, com HTTPS no domínio de `DOMINIO` |
+
+Em ambos os modos, as portas da API e do MySQL são publicadas só em `127.0.0.1`. Na VPS, o único acesso de fora é pelo Caddy. Isso importa porque o Docker publica portas por fora do firewall do sistema (`ufw`). Na VPS, definir `COMPOSE_PROFILES=producao` no `.env` faz os comandos do Compose incluírem o Caddy sem o `--profile`.
+
+### HTTPS com o Caddy
 
 ```text
-3307
+Internet
+   │ 443 (HTTPS)      80 → redireciona para 443
+   ▼
+Caddy ──HTTP, rede interna do Docker──▶ api:8080 ──▶ db:3306
 ```
 
-A API é exposta na porta:
+O `Caddyfile` usa o domínio de `DOMINIO`. Para ele, o Caddy emite e renova sozinho o certificado do Let's Encrypt, que fica no volume `caddy_data`, e redireciona HTTP para HTTPS. Sem `DOMINIO`, o container do Caddy termina com uma mensagem pedindo a variável. A checagem fica no container, e não no Compose, porque o Compose interpola o arquivo inteiro mesmo sem o perfil ativo, e exigir a variável ali quebraria o modo de desenvolvimento.
 
-```text
-8080
-```
+O Caddy repassa para a API o IP real do cliente em `X-Forwarded-For` e o protocolo original em `X-Forwarded-Proto`, descartando os valores que o próprio cliente enviar. No Compose, a API roda com `SERVER_FORWARD_HEADERS_STRATEGY=native`: o Tomcat só aceita esses cabeçalhos vindos de IPs internos, como o do Caddy na rede do Docker. Com isso:
+
+* os limites por IP do login e do cadastro usam o IP do cliente, e não o do Caddy;
+* a API reconhece que a requisição chegou por HTTPS, e o Spring Security envia o cabeçalho `Strict-Transport-Security` (HSTS).
+
+Fora do Compose, a propriedade `server.forward-headers-strategy` fica em `none` por padrão. Sem um proxy na frente, aceitar esses cabeçalhos permitiria a um cliente forjar o próprio IP. O `ProxyReversoHttpTest` e o `SemProxyReversoHttpTest` cobrem os dois casos num Tomcat real. O passo a passo de deploy numa VPS está no README.
 
 O Dockerfile usa a imagem `eclipse-temurin:25-jdk-alpine` e espera que o JAR já tenha sido gerado em `target/`.
 
-O ambiente local utiliza um arquivo `.env`, ignorado pelo Git, para fornecer `MYSQL_ROOT_PASSWORD`, `DB_USER`, `DB_PASSWORD` e `JWT_SECRET`, além das variáveis opcionais `BINANCE_API_BASE_URL` e `COTACOES_*`. O arquivo `.env.example` serve de modelo. Dentro da rede do Compose, a API acessa o banco pelo hostname `db` e pela porta interna `3306`.
+O ambiente utiliza um arquivo `.env`, ignorado pelo Git, para fornecer `MYSQL_ROOT_PASSWORD`, `DB_USER`, `DB_PASSWORD` e `JWT_SECRET`, além de `CORS_ALLOWED_ORIGINS` e `DOMINIO` em produção e das variáveis opcionais `BINANCE_API_BASE_URL` e `COTACOES_*`. O arquivo `.env.example` serve de modelo. Dentro da rede do Compose, a API acessa o banco pelo hostname `db` e pela porta interna `3306`.
 
 Fluxo atual:
 
@@ -1004,6 +1021,7 @@ Principais grupos:
 * `ConcorrenciaTransacoesTest`, que usa duas threads para verificar que uma venda aguarda o bloqueio de outra venda em andamento e é rejeitada por saldo insuficiente depois do commit;
 * `AutenticacaoServiceTest`, que verifica que um login inexistente lança `UsernameNotFoundException` e que o `DaoAuthenticationProvider` ainda compara a senha com o hash fictício, sem deixar o tempo de resposta revelar quais logins existem;
 * `LimiteDeTentativasTest`, para a janela fixa com relógio ajustável e para a atomicidade com tentativas simultâneas; `ProtecaoForcaBrutaTest`, para a normalização da chave do login, o tempo do `Retry-After` e a validação dos limites; e `ProtecaoForcaBrutaHttpTest`, que verifica por `MockMvc` os bloqueios por login e por IP, o reset depois de um login com sucesso e a resposta `429`;
+* `ProxyReversoHttpTest` e `SemProxyReversoHttpTest`, que sobem um Tomcat real: com `server.forward-headers-strategy=native`, o limite por IP usa o IP informado pelo proxy e o HSTS é enviado em HTTPS; sem a propriedade, um `X-Forwarded-For` forjado é ignorado;
 * `CorsPropertiesTest`, para a leitura e a validação de `CORS_ALLOWED_ORIGINS`, inclusive a falha na inicialização com uma origem inválida, e `CorsOrigensPadraoHttpTest` e `CorsOrigensConfiguradasHttpTest`, que verificam por `MockMvc` o preflight de origens permitidas e recusadas, com as origens padrão e com origens configuradas;
 * `CadastroUsuarioHttpTest`, `PadronizacaoErrosHttpTest` e `OpenApiDocumentationTest` para o cadastro, o login, o formato dos erros e a documentação.
 

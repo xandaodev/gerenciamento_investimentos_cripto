@@ -40,16 +40,17 @@ Prioridade das fases:
 
 ## Fase 2 — Pacote de deploy
 
-- [ ] **#2 — Não há HTTPS**
+- [x] **#2 — Não há HTTPS**
   - **Problema:** o Compose expõe a porta 8080 em HTTP puro, então o JWT e a senha trafegam em texto claro.
   - **Arquivo:** `docker-compose.yml`, `src/main/resources/application.properties`
   - **Correção:** colocar um proxy reverso com TLS (Caddy/Nginx ou o do provedor) na frente da API e configurar `server.forward-headers-strategy`. A API não deve ficar acessível diretamente pela internet.
-  - **Atenção:** os limites por IP do #4 dependem do `server.forward-headers-strategy`. Sem ele, atrás do proxy todos os clientes têm o IP do proxy e compartilham o mesmo limite. Configure só se a API estiver atrás do proxy, para que um cliente não forje o IP pelo cabeçalho `X-Forwarded-For`.
+  - **Feito:** o perfil `producao` do Compose sobe o Caddy com HTTPS automático no domínio de `DOMINIO`, e as portas da API e do MySQL ficam presas a `127.0.0.1`. A API roda com `SERVER_FORWARD_HEADERS_STRATEGY=native`, que só aceita os cabeçalhos `X-Forwarded-*` de IPs internos, então os limites por IP do #4 usam o IP do cliente e o HSTS é enviado. Fora do Compose, a propriedade continua `none`, para que um cliente não forje o IP. O passo a passo de deploy está no README.
 
 - [ ] **#3 — O MySQL fica exposto e sem TLS**
   - **Problema:** a porta `3307` é publicada em todas as interfaces, e a URL do datasource usa `useSSL=false&allowPublicKeyRetrieval=true`.
   - **Arquivo:** `docker-compose.yml`
   - **Correção:** não publicar a porta do MySQL em produção (ou prendê-la a `127.0.0.1`), habilitar TLS na conexão e remover `allowPublicKeyRetrieval`.
+  - **Parcial:** no #2, a porta do MySQL passou a aceitar só conexões de `127.0.0.1`. Faltam o TLS na conexão e a remoção do `allowPublicKeyRetrieval`.
 
 - [x] **#4 — Não há proteção contra força bruta**
   - **Problema:** `/auth/login` e `/auth/register` não têm rate limit nem bloqueio de conta.
