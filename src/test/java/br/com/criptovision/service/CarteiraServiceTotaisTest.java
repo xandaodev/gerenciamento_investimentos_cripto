@@ -101,7 +101,7 @@ class CarteiraServiceTotaisTest {
         when(transacaoRepository.findAllByUsuarioOrderByDataAscIdAsc(usuario))
             .thenReturn(historico);
 
-        return new CarteiraService(transacaoRepository, null, null, null)
+        return new CarteiraService(transacaoRepository, null, null, null, null)
             .calcularTotais(usuario);
     }
 

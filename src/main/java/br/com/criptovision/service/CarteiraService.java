@@ -6,6 +6,7 @@ import br.com.criptovision.cotacao.service.CotacaoService;
 import br.com.criptovision.cotacao.util.TickerNormalizer;
 import br.com.criptovision.dto.*;
 import br.com.criptovision.exception.AlteracaoHistoricoInvalidaException;
+import br.com.criptovision.exception.DataTransacaoInvalidaException;
 import br.com.criptovision.exception.HistoricoInconsistenteException;
 import br.com.criptovision.exception.SaldoInsuficienteException;
 import br.com.criptovision.exception.SemSaldoParaSimularException;
@@ -20,7 +21,11 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.math.BigDecimal;
 import java.math.MathContext;
 import java.math.RoundingMode;
+import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.function.Supplier;
 
@@ -57,22 +62,61 @@ public class CarteiraService {
     // os preços das operações e as cotações estão em USDT; não há conversão para reais
     public static final String MOEDA_DE_REFERENCIA = "USDT";
 
+    // bloco gênese do Bitcoin: nenhuma operação com criptomoedas é anterior a ele.
+    // Pega erros de digitação como o ano 0202
+    private static final LocalDateTime CRIACAO_DO_BITCOIN = LocalDateTime.of(2009, 1, 3, 0, 0);
+
+    // margem para a diferença entre o relógio do cliente e o do servidor
+    private static final Duration TOLERANCIA_DO_RELOGIO = Duration.ofMinutes(1);
+
     private final TransacaoRepository transacaoRepo;
     private final UsuarioRepository usuarioRepo;
     private final CotacaoService cotacaoService;
     private final TransactionTemplate transactionTemplate;
+    private final Clock clock;
 
     public CarteiraService(
         TransacaoRepository transacaoRepo,
         UsuarioRepository usuarioRepo,
         CotacaoService cotacaoService,
-        PlatformTransactionManager transactionManager
+        PlatformTransactionManager transactionManager,
+        Clock clock
     ) {
         this.transacaoRepo = transacaoRepo;
         this.usuarioRepo = usuarioRepo;
         this.cotacaoService = cotacaoService;
         this.transactionTemplate =
             new TransactionTemplate(transactionManager);
+        this.clock = clock;
+    }
+
+    // completa a data que não foi informada e recusa datas impossíveis.
+    // Todas as datas ficam em UTC, para que as informadas e as automáticas se ordenem juntas
+    private LocalDateTime resolverData(LocalDateTime informada, LocalDateTime padrao) {
+        if (informada == null) {
+            return padrao;
+        }
+
+        LocalDateTime limite = LocalDateTime.now(clock).plus(TOLERANCIA_DO_RELOGIO);
+
+        if (informada.isAfter(limite)) {
+            throw new DataTransacaoInvalidaException(
+                "A data da transação não pode estar no futuro."
+            );
+        }
+
+        if (informada.isBefore(CRIACAO_DO_BITCOIN)) {
+            throw new DataTransacaoInvalidaException(
+                "A data da transação não pode ser anterior a 2009-01-03, quando o Bitcoin foi criado."
+            );
+        }
+
+        // a coluna guarda microssegundos: o valor em memória fica igual ao do banco
+        return informada.truncatedTo(ChronoUnit.MICROS);
+    }
+
+    private LocalDateTime agora() {
+        return LocalDateTime.now(clock).truncatedTo(ChronoUnit.MICROS);
     }
 
     // nesse metodo é atualizado o estado de uma moeda baseado numa transacao
@@ -518,9 +562,12 @@ public class CarteiraService {
             transacaoExistente.getId()
         );
 
-        transacaoCandidata.setData(
+        // sem data informada, a transação mantém a data que já tinha: uma edição
+        // nunca move uma compra antiga para "agora" sem querer
+        transacaoCandidata.setData(resolverData(
+            transacaoCandidata.getData(),
             transacaoExistente.getData()
-        );
+        ));
 
         transacaoCandidata.setUsuario(
             transacaoExistente.getUsuario()
@@ -569,6 +616,9 @@ public class CarteiraService {
         transacaoExistente.setTipo(
             transacaoCandidata.getTipo()
         );
+        transacaoExistente.setData(
+            transacaoCandidata.getData()
+        );
 
         return transacaoRepo.save(transacaoExistente);
     }
@@ -615,18 +665,41 @@ public class CarteiraService {
             validarTicker(novaTransacao.getTicker());
         novaTransacao.setTicker(tickerNormalizado);
 
-        return executarComHistoricoBloqueado(usuario, () -> {
-            Carteira carteiraTemporaria = new Carteira();
-            List<Transacao> historico = carregarHistoricoDeTransacoes(usuario);
-            reconstruirCarteira(carteiraTemporaria, historico);
+        // sem data informada, vale o momento do cadastro
+        novaTransacao.setData(resolverData(novaTransacao.getData(), agora()));
 
-            Moeda moedaDaOperacao = carteiraTemporaria.obterMoeda(
-                tickerNormalizado,
-                tickerNormalizado
+        return executarComHistoricoBloqueado(usuario, () -> {
+            List<Transacao> historico = carregarHistoricoDeTransacoes(usuario);
+
+            // 1. a própria transação precisa caber no saldo da data dela: reproduz o
+            //    histórico até essa data e a processa. Uma venda sem saldo naquela
+            //    data responde 400 (Saldo insuficiente), como sempre
+            Carteira carteiraNaData = new Carteira();
+            reconstruirCarteira(
+                carteiraNaData,
+                historico.stream()
+                    .filter(anterior -> ORDEM_CRONOLOGICA.compare(anterior, novaTransacao) < 0)
+                    .toList()
+            );
+            processarTransacao(
+                carteiraNaData.obterMoeda(tickerNormalizado, tickerNormalizado),
+                novaTransacao,
+                false
             );
 
-            processarTransacao(moedaDaOperacao, novaTransacao, true);
+            // 2. uma transação com data passada entra no meio do histórico: as
+            //    posteriores precisam continuar válidas. Uma venda antiga que deixaria
+            //    uma venda posterior sem saldo responde 409, como na alteração
+            List<Transacao> historicoComANova = new ArrayList<>(historico);
+            historicoComANova.add(novaTransacao);
+            validarHistoricoAposAlteracao(
+                historicoComANova,
+                "A inclusão desta transação tornaria o histórico inconsistente: "
+                    + "uma transação posterior ficaria sem saldo."
+            );
 
+            // para uma entidade nova, o save persiste e preenche o id na própria instância
+            transacaoRepo.save(novaTransacao);
             return novaTransacao;
         });
     }

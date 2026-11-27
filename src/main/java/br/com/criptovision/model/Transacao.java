@@ -4,10 +4,10 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import jakarta.persistence.*;
 import io.swagger.v3.oas.annotations.media.Schema;
-import org.hibernate.annotations.CreationTimestamp;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 
 // toda vez que voce executa uma operação no sistema, esse objeto é criado, salvo no arquivo csv e processado pela carteira
 
@@ -43,9 +43,12 @@ public class Transacao {
         scale = 18
     )
     private BigDecimal precoUnitario;
-    @CreationTimestamp
+
+    // data da operação, sempre em UTC: a informada pelo usuário (convertida) ou o
+    // momento do cadastro. A carteira é reconstruída na ordem desta data
     @Schema(
-        description = "Data e hora de criação da transação.",
+        description = "Data e hora da operação, em UTC. É a data informada no cadastro "
+            + "ou, se nenhuma foi informada, o momento do cadastro.",
         example = "2026-08-05T17:30:00",
         accessMode = Schema.AccessMode.READ_ONLY
     )
@@ -87,7 +90,7 @@ public class Transacao {
         this.quantidade = quantidade;
         this.precoUnitario = precoUnitario;
         this.tipo = tipo;
-        this.data = LocalDateTime.now();
+        this.data = LocalDateTime.now(ZoneOffset.UTC);
     }
 
     //getters e setters

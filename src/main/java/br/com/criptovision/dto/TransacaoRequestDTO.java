@@ -11,6 +11,8 @@ import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.Size;
 
 import java.math.BigDecimal;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.Locale;
 
 @Schema(
@@ -72,7 +74,19 @@ public record TransacaoRequestDTO(
         allowableValues = {"COMPRA", "VENDA"}
     )
     @NotNull(message = "O tipo da transação é obrigatório.")
-    TipoTransacao tipo
+    TipoTransacao tipo,
+
+    // com o fuso obrigatório: sem ele, a mesma data valeria horários diferentes
+    // conforme o lugar. O CarteiraService valida o intervalo (passado, desde 2009)
+    @Schema(
+        description = "Data e hora da operação, em ISO 8601 com fuso, como "
+            + "\"2025-03-10T14:00:00-03:00\" ou \"2025-03-10T17:00:00Z\". Opcional: sem ela, "
+            + "vale o momento do cadastro e, na alteração, a data atual da transação. "
+            + "Não pode estar no futuro nem ser anterior a 2009-01-03, quando o Bitcoin foi criado.",
+        example = "2025-03-10T14:00:00-03:00",
+        nullable = true
+    )
+    OffsetDateTime data
 ) {
 
     public TransacaoRequestDTO {
@@ -83,12 +97,32 @@ public record TransacaoRequestDTO(
         }
     }
 
+    /** Transação sem data informada. */
+    public TransacaoRequestDTO(
+        String ticker,
+        BigDecimal quantidade,
+        BigDecimal precoUnitario,
+        TipoTransacao tipo
+    ) {
+        this(ticker, quantidade, precoUnitario, tipo, null);
+    }
+
+    /**
+     * Cria a transação com a data convertida para UTC, ou sem data (null) se nenhuma
+     * foi informada. O CarteiraService completa e valida a data.
+     */
     public Transacao toEntity() {
-        return new Transacao(
+        Transacao transacao = new Transacao(
             ticker,
             quantidade,
             precoUnitario,
             tipo
         );
+
+        transacao.setData(data == null
+            ? null
+            : data.withOffsetSameInstant(ZoneOffset.UTC).toLocalDateTime());
+
+        return transacao;
     }
 }

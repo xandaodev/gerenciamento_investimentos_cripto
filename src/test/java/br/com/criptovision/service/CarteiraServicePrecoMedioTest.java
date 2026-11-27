@@ -20,7 +20,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class CarteiraServicePrecoMedioTest {
 
     private final CarteiraService service =
-        new CarteiraService(null, null, null, null);
+        new CarteiraService(null, null, null, null, null);
 
     @Test
     void deveManterPrecoMedioExatoDeMoedaComPrecoMuitoBaixo() {
