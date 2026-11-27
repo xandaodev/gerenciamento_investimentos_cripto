@@ -6,8 +6,8 @@
 #
 #   docker compose --profile producao up -d --build
 #       Produção (VPS): acrescenta o Caddy, que atende HTTPS nas portas 80 e 443
-#       no domínio definido em DOMINIO e repassa para a API. Veja o passo a passo
-#       no README.
+#       no domínio definido em DOMINIO e repassa para a API, e o backup diário
+#       do MySQL. Veja o passo a passo no README.
 #
 # Em ambos os modos, a API e o MySQL só aceitam conexões da própria máquina
 # (127.0.0.1): na VPS, o único acesso de fora é pelo Caddy.
@@ -89,7 +89,39 @@ services:
       - caddy_data:/data
       - caddy_config:/config
 
+  backup:
+    build: ./backup
+    container_name: cripto-backup
+    restart: always
+    # em produção sobe junto com o Caddy; "--profile backup" sobe só o backup,
+    # para testar localmente sem HTTPS
+    profiles:
+      - producao
+      - backup
+    depends_on:
+      - db
+    # um backup por dia (BACKUP_HORARIO, em UTC), cifrado com BACKUP_SENHA e,
+    # se BACKUP_S3_BUCKET estiver definido, copiado para o bucket. Veja o README
+    environment:
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      BACKUP_SENHA: ${BACKUP_SENHA:-}
+      BACKUP_HORARIO: ${BACKUP_HORARIO:-03:00}
+      BACKUP_RETENCAO_DIAS: ${BACKUP_RETENCAO_DIAS:-14}
+      BACKUP_RETENCAO_REMOTA_DIAS: ${BACKUP_RETENCAO_REMOTA_DIAS:-30}
+      BACKUP_TESTE_SEMANAL: ${BACKUP_TESTE_SEMANAL:-true}
+      BACKUP_S3_PROVEDOR: ${BACKUP_S3_PROVEDOR:-Other}
+      BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:-}
+      BACKUP_S3_REGIAO: ${BACKUP_S3_REGIAO:-auto}
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
+      BACKUP_S3_PASTA: ${BACKUP_S3_PASTA:-criptovision}
+      BACKUP_S3_ACCESS_KEY_ID: ${BACKUP_S3_ACCESS_KEY_ID:-}
+      BACKUP_S3_SECRET_ACCESS_KEY: ${BACKUP_S3_SECRET_ACCESS_KEY:-}
+    volumes:
+      - mysql_backups:/backups
+
 volumes:
   mysql_data:
   caddy_data:
   caddy_config:
+  mysql_backups:

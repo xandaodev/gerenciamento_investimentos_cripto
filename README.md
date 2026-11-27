@@ -90,7 +90,10 @@ A aplicação lê as credenciais de variáveis de ambiente. O arquivo [`.env.exa
 | `MYSQL_ROOT_PASSWORD` | Só no Docker | Senha do root do container MySQL |
 | `CORS_ALLOWED_ORIGINS` | Em produção | Origens do frontend autorizadas pelo CORS, separadas por vírgula (padrão: `http://localhost:5173,http://localhost:5174`) |
 | `DOMINIO` | Em produção | Domínio público da API, para o qual o Caddy emite o certificado HTTPS (perfil `producao`) |
-| `COMPOSE_PROFILES` | Não | Use `producao` na VPS para que o Compose inclua o Caddy |
+| `COMPOSE_PROFILES` | Não | Use `producao` na VPS para que o Compose inclua o Caddy e o backup |
+| `BACKUP_SENHA` | Em produção | Senha que cifra os backups do MySQL (ao menos 20 caracteres). Guarde uma cópia fora do servidor |
+| `BACKUP_S3_*` | Recomendado | Bucket S3 para a cópia dos backups fora do servidor (veja [Backups do banco](#backups-do-banco)) |
+| `BACKUP_HORARIO`, `BACKUP_RETENCAO_DIAS`, `BACKUP_RETENCAO_REMOTA_DIAS`, `BACKUP_TESTE_SEMANAL` | Não | Horário (UTC), retenção e teste semanal dos backups |
 | `BINANCE_API_BASE_URL` | Não | URL da API de mercado da Binance |
 | `COTACOES_CONNECT_TIMEOUT`, `COTACOES_READ_TIMEOUT`, `COTACOES_CACHE_TTL`, `COTACOES_CACHE_MAX_STALE` | Não | Timeouts e cache das cotações |
 
@@ -212,9 +215,89 @@ docker compose up -d --build
 * Veja o motivo em `docker compose logs caddy`. Sem `DOMINIO` no `.env`, o log pede para defini-lo.
 * Não apague o volume `caddy_data`, que guarda os certificados. Emitir muitos certificados seguidos esbarra nos limites do Let's Encrypt.
 
+### Backups do banco
+
+No perfil `producao`, o serviço `backup` faz um backup do MySQL por dia, às 03:00 UTC (meia-noite em Brasília). Cada backup é comprimido, **cifrado com a sua senha** (`gpg`, AES-256) e conferido antes de ser aceito. Os backups ficam 14 dias no servidor e, se você configurar um bucket, também 30 dias fora dele. Todo domingo, ele testa a restauração do backup mais recente num MySQL temporário.
+
+> **Guarde a `BACKUP_SENHA` fora do servidor**, num gerenciador de senhas. Ela não vai para o bucket, e sem ela nenhum backup pode ser restaurado.
+
+#### 1. Crie a senha dos backups
+
+```bash
+openssl rand -base64 32
+```
+
+Coloque o valor em `BACKUP_SENHA` no `.env` e guarde uma cópia no seu gerenciador de senhas.
+
+#### 2. Crie o bucket e uma credencial que só acessa ele
+
+Qualquer serviço compatível com S3 funciona. O Cloudflare R2 e o Backblaze B2 têm camada gratuita de 10 GB, o que sobra para este projeto. Os nomes dos menus podem mudar, então confira a documentação do [R2](https://developers.cloudflare.com/r2/) ou do [B2](https://www.backblaze.com/docs/cloud-storage) se algo estiver diferente.
+
+**Cloudflare R2**
+1. No painel da Cloudflare, abra **R2 Object Storage** e crie um bucket, por exemplo `criptovision-backups`.
+2. Em **Manage API tokens**, crie um token com a permissão **Object Read & Write**, aplicada **só a esse bucket** (*Apply to specific buckets only*).
+3. Anote o **Access Key ID**, o **Secret Access Key** e o endpoint S3, no formato `https://<ID_DA_CONTA>.r2.cloudflarestorage.com`. O secret só aparece uma vez.
+4. No `.env`: `BACKUP_S3_PROVEDOR=Cloudflare`, `BACKUP_S3_REGIAO=auto`, mais o endpoint, o bucket e as duas chaves.
+
+**Backblaze B2**
+1. Em **Buckets**, crie um bucket **privado**, por exemplo `criptovision-backups`, e anote o **Endpoint** dele, como `s3.us-west-004.backblazeb2.com`.
+2. Em **Application Keys**, crie uma chave com acesso **só a esse bucket** e permissão **Read and Write**.
+3. Anote o **keyID** e a **applicationKey**. A applicationKey só aparece uma vez.
+4. No `.env`: `BACKUP_S3_PROVEDOR=Other`, `BACKUP_S3_ENDPOINT=https://s3.<regiao>.backblazeb2.com`, `BACKUP_S3_REGIAO=<regiao>`, mais o bucket e as duas chaves.
+
+A credencial não precisa listar nem criar buckets: o serviço só lê e escreve dentro do bucket informado.
+
+#### 3. Suba e confira
+
+```bash
+docker compose up -d --build
+docker compose logs backup
+```
+
+Ao subir, o serviço já faz um backup. O log deve mostrar `Backup conferido` e `Enviado para o bucket`. Sem bucket configurado, ele avisa que o backup ficou só no servidor. Se os backups pararem, o `docker compose ps` mostra o serviço como `unhealthy` depois de 26 horas sem backup.
+
+#### Comandos
+
+```bash
+docker compose exec backup backup listar          # backups no servidor e no bucket
+docker compose exec backup backup agora           # faz um backup agora
+docker compose exec backup backup testar          # restaura o mais recente num MySQL temporário e confere
+docker compose cp backup:/backups ./meus-backups  # copia os backups para a sua máquina
+```
+
+Para conferir um backup no seu computador, decifre-o com o `gpg` e a `BACKUP_SENHA`:
+
+```bash
+gpg --decrypt criptovision-AAAAMMDDTHHMMSSZ.sql.gz.gpg | gunzip > backup.sql
+```
+
+#### Restaurar
+
+A restauração substitui todos os dados do banco. Antes de restaurar, o serviço faz um backup do estado atual.
+
+```bash
+docker compose stop api
+docker compose exec backup backup listar
+docker compose exec backup backup restaurar criptovision-AAAAMMDDTHHMMSSZ.sql.gz.gpg --confirmar
+docker compose start api
+```
+
+**Se a VPS for perdida**, prepare uma VPS nova seguindo o passo a passo de deploy, com o **mesmo `.env`** (a mesma `BACKUP_SENHA` e a mesma credencial do bucket). Antes de subir a API, restaure do bucket:
+
+```bash
+docker compose up -d db
+docker compose run --rm backup listar
+docker compose run --rm backup restaurar criptovision-AAAAMMDDTHHMMSSZ.sql.gz.gpg --confirmar
+docker compose up -d --build
+```
+
+O backup é diário, então numa perda total você recupera o banco como estava no último backup. Isso pode deixar de fora até um dia de transações.
+
+**Para mais segurança**, crie a credencial sem permissão de apagar arquivos, use `BACKUP_RETENCAO_REMOTA_DIAS=0` e configure no próprio bucket uma regra de ciclo de vida que apague os arquivos com mais de 30 dias. Assim, mesmo quem invadir a VPS não consegue apagar os backups do bucket.
+
 ### Ainda não incluído
 
-O [roadmap](docs/ROADMAP.md) lista o que falta para produção, em especial os backups automáticos do banco (#5).
+O [roadmap](docs/ROADMAP.md) lista o que falta para produção depois do pacote de deploy, como observabilidade (#14) e a imagem Docker de produção (#15).
 
 ---
 ⭐ *Desenvolvido por **Alexandre Vital** - Estudante de Ciência da Computação na UFSJ, em busca de desafios como Desenvolvedor Back-End.*
