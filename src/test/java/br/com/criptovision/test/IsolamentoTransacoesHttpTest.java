@@ -80,10 +80,10 @@ public class IsolamentoTransacoesHttpTest {
         );
 
         tokenAlexandre =
-            tokenService.gerarToken(alexandre.getLogin());
+            tokenService.gerarToken(alexandre);
 
         tokenOutroUsuario =
-            tokenService.gerarToken(outroUsuario.getLogin());
+            tokenService.gerarToken(outroUsuario);
 
         when(cotacaoService.normalizarTicker(anyString()))
             .thenAnswer(invocacao ->

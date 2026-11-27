@@ -528,7 +528,30 @@ Limitações atuais:
 * o IP é o `request.getRemoteAddr()`. Atrás de um proxy reverso, ele só é o do cliente se `server.forward-headers-strategy` estiver configurado (item #2 do roadmap). Sem isso, todos os clientes compartilhariam o limite do IP do proxy;
 * o bloqueio por login permite que alguém bloqueie temporariamente a conta de outra pessoa errando a senha de propósito. É a troca usual para impedir a adivinhação de senhas, e o bloqueio dura no máximo a janela configurada.
 
-O token é assinado com HMAC256 usando o segredo `JWT_SECRET`, possui o emissor `CriptoVision API`, o login como `subject` e expira em 2 horas.
+O token é assinado com HMAC-SHA256 usando o segredo `JWT_SECRET` e contém:
+
+| Claim | Valor |
+| --- | --- |
+| `iss` | `CriptoVision API` |
+| `aud` | `criptovision-api` |
+| `sub` | o login do usuário |
+| `versao` | a versão dos tokens do usuário no momento da emissão |
+| `iat` / `exp` | a emissão e a expiração, 2 horas depois |
+
+O `TokenService` só aceita tokens com esse emissor, essa audiência e a claim `versao`, com o tempo vindo do `Clock`. Na inicialização, ele exige um `JWT_SECRET` de ao menos 32 bytes, o mínimo para o HMAC-SHA256 (RFC 7518), e recusa o valor de exemplo do `.env.example`. Com um segredo fraco, a aplicação não sobe.
+
+### Revogação dos tokens
+
+Cada usuário tem uma `versao_token` (migration `V4`). O token carrega a versão com que foi emitido, e o `SecurityFilter` só autentica a requisição se ela for igual à do banco. Isso não custa uma consulta extra, porque o filtro já carrega o usuário a cada requisição. Incrementar a versão revoga todos os tokens do usuário, em todos os dispositivos:
+
+* `POST /auth/logout` incrementa a versão e responde `204`;
+* `PUT /auth/senha` confere a senha atual, troca a senha, incrementa a versão e devolve um token novo para a sessão atual continuar. A senha atual errada responde `400` e conta como falha de login para a proteção contra força bruta, então quem roubar um token não consegue testar senhas por ali.
+
+As duas operações leem o usuário com `SELECT ... FOR UPDATE` (`UsuarioRepository.bloquearPorId`), para que um logout e uma troca de senha simultâneos não percam o incremento um do outro.
+
+O logout encerra todas as sessões, e não só a do dispositivo atual. Revogar um token específico exigiria guardar os identificadores dos tokens revogados até a expiração deles.
+
+**Refresh token: avaliado e não adotado por enquanto.** Ele permitiria tokens de acesso mais curtos sem pedir login a cada 2 horas. Em troca, exigiria guardar os refresh tokens no banco, rotacioná-los a cada uso e detectar reuso para encerrar a família de tokens roubada. Com tokens de 2 horas e revogação pela versão, o ganho não compensa agora. Se o frontend precisar de sessões longas, este é o próximo passo.
 
 O cliente deve enviar o token nas próximas requisições:
 
@@ -543,9 +566,11 @@ Requisição protegida
         ↓
 SecurityFilter
         ↓
-TokenService valida o JWT
+TokenService valida assinatura, emissor, audiência, expiração e versão
         ↓
 Usuário é buscado pelo login
+        ↓
+A versão do token precisa ser igual à do usuário
         ↓
 Autenticação é registrada no SecurityContext
         ↓
@@ -554,7 +579,7 @@ Controller recebe o Usuario autenticado
 Requisição continua
 ```
 
-A aplicação utiliza sessões stateless, portanto o servidor não mantém uma sessão HTTP para o usuário. Tokens ausentes, expirados, malformados, com assinatura inválida ou emitidos para um login que não existe mais não autenticam a requisição e resultam em `401 Unauthorized`, respondido pelo `AutenticacaoEntryPoint` no formato Problem Details.
+A aplicação utiliza sessões stateless, portanto o servidor não mantém uma sessão HTTP para o usuário. Tokens ausentes, expirados, malformados, com assinatura ou audiência inválida, revogados (versão antiga) ou emitidos para um login que não existe mais não autenticam a requisição e resultam em `401 Unauthorized`, respondido pelo `AutenticacaoEntryPoint` no formato Problem Details.
 
 ### CORS
 
@@ -841,6 +866,8 @@ cotacoes.cache.max-stale=${COTACOES_CACHE_MAX_STALE:15m}
 ```http
 POST /auth/register
 POST /auth/login
+POST /auth/logout      (autenticado)
+PUT  /auth/senha       (autenticado)
 ```
 
 ## Transações
@@ -1070,6 +1097,7 @@ Principais grupos:
 * `IsolamentoTransacoesHttpTest`, que inicializa o contexto Spring Boot, autentica dois usuários com JWT e verifica por `MockMvc` que um usuário não lista, consulta, altera ou exclui transações do outro, nem acessa a carteira e as análises do outro;
 * `ConcorrenciaTransacoesTest`, que usa duas threads para verificar que uma venda aguarda o bloqueio de outra venda em andamento e é rejeitada por saldo insuficiente depois do commit;
 * `AutenticacaoServiceTest`, que verifica que um login inexistente lança `UsernameNotFoundException` e que o `DaoAuthenticationProvider` ainda compara a senha com o hash fictício, sem deixar o tempo de resposta revelar quais logins existem;
+* `TokenServiceTest`, para a validação do `JWT_SECRET` na subida, a audiência, a versão, a assinatura e a expiração com relógio fixo; e `SessaoHttpTest`, que verifica por `MockMvc` que o logout revoga os tokens de todos os dispositivos, que a troca de senha revoga os tokens antigos e devolve um novo, os erros da troca de senha e o bloqueio por força bruta pela troca de senha;
 * `LimiteDeTentativasTest`, para a janela fixa com relógio ajustável e para a atomicidade com tentativas simultâneas; `ProtecaoForcaBrutaTest`, para a normalização da chave do login, o tempo do `Retry-After` e a validação dos limites; e `ProtecaoForcaBrutaHttpTest`, que verifica por `MockMvc` os bloqueios por login e por IP, o reset depois de um login com sucesso e a resposta `429`;
 * `ProxyReversoHttpTest` e `SemProxyReversoHttpTest`, que sobem um Tomcat real: com `server.forward-headers-strategy=native`, o limite por IP usa o IP informado pelo proxy e o HSTS é enviado em HTTPS; sem a propriedade, um `X-Forwarded-For` forjado é ignorado;
 * `CorsPropertiesTest`, para a leitura e a validação de `CORS_ALLOWED_ORIGINS`, inclusive a falha na inicialização com uma origem inválida, e `CorsOrigensPadraoHttpTest` e `CorsOrigensConfiguradasHttpTest`, que verificam por `MockMvc` o preflight de origens permitidas e recusadas, com as origens padrão e com origens configuradas;
@@ -1134,7 +1162,7 @@ Os principais pontos identificados são:
 2. a carteira é reconstruída repetidamente em diferentes endpoints;
 3. inconsistências do histórico não possuem logs estruturados nem alertas;
 4. as simulações de DCA e de venda e o endpoint `/carteira/total` ainda utilizam `double`;
-5. parte da injeção de dependências ainda é realizada por atributos (`@Autowired` em `CarteiraController`, `TransacaoController`, `AnaliseController` e `SecurityFilter`);
+5. parte da injeção de dependências ainda é realizada por atributos (`@Autowired` em `CarteiraController`, `TransacaoController` e `AnaliseController`);
 6. não há paginação ou filtros no histórico;
 7. não há lucro realizado persistido ou consolidado;
 8. não há suporte a taxas;

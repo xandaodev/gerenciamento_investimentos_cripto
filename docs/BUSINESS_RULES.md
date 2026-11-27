@@ -135,6 +135,13 @@ Quando um limite é atingido, a API responde `429 Too Many Requests` com a mensa
 
 Os limites podem ser ajustados pelas propriedades `seguranca.tentativas.*`.
 
+### Sessões, logout e troca de senha
+
+- o token JWT vale por 2 horas;
+- `POST /auth/logout` encerra **todas** as sessões do usuário, em todos os dispositivos: nenhum token emitido antes continua válido;
+- `PUT /auth/senha` exige a senha atual e uma nova senha com 8 a 64 caracteres, diferente da atual. Depois da troca, todos os tokens emitidos antes deixam de valer, e a resposta traz um token novo para a sessão atual continuar;
+- uma senha atual errada responde `400` sem revogar nada, mas conta como falha de login: depois de 5 falhas em 15 minutos, a troca de senha e o login daquela conta ficam bloqueados com `429` até a janela fechar.
+
 ### Associação obrigatória
 
 Cada transação possui um proprietário obrigatório:

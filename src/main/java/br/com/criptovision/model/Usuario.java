@@ -35,6 +35,14 @@ public class Usuario implements UserDetails {
     )
     private String senha;
 
+    // versão dos tokens JWT: só tokens emitidos com a versão atual são aceitos.
+    // Incrementá-la revoga todos os tokens do usuário, em todos os dispositivos
+    @Column(
+        name = "versao_token",
+        nullable = false
+    )
+    private long versaoToken;
+
     public Usuario() {
     }
 
@@ -53,6 +61,21 @@ public class Usuario implements UserDetails {
 
     public String getSenha() {
         return senha;
+    }
+
+    public long getVersaoToken() {
+        return versaoToken;
+    }
+
+    /** Invalida todos os tokens emitidos até agora para este usuário. */
+    public void revogarTokens() {
+        versaoToken++;
+    }
+
+    /** Troca o hash da senha e revoga os tokens emitidos com a senha antiga. */
+    public void alterarSenha(String novoHash) {
+        this.senha = novoHash;
+        revogarTokens();
     }
 
     @Override
