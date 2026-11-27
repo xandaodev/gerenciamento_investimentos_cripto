@@ -8,6 +8,7 @@ import br.com.criptovision.dto.*;
 import br.com.criptovision.exception.AlteracaoHistoricoInvalidaException;
 import br.com.criptovision.exception.HistoricoInconsistenteException;
 import br.com.criptovision.exception.SaldoInsuficienteException;
+import br.com.criptovision.exception.SemSaldoParaSimularException;
 import br.com.criptovision.exception.TransacaoNaoEncontradaException;
 import br.com.criptovision.model.*;
 import br.com.criptovision.repository.TransacaoRepository;
@@ -46,6 +47,12 @@ public class CarteiraService {
     // precisão da divisão do custo na venda parcial (a mesma do IEEE 754 decimal128)
     private static final MathContext PRECISAO_CUSTO =
         new MathContext(34, RoundingMode.HALF_UP);
+
+    // percentuais com 8 casas, como os do resumo da carteira
+    private static final int ESCALA_PERCENTUAL = 8;
+
+    // quantidades com 18 casas, a mesma escala do banco
+    private static final int ESCALA_QUANTIDADE = 18;
 
     private final TransacaoRepository transacaoRepo;
     private final UsuarioRepository usuarioRepo;
@@ -125,41 +132,67 @@ public class CarteiraService {
             .findAllByUsuarioOrderByDataAscIdAsc(usuario);
     }
 
-    // metodo muito importante e funcional, ele calcula quanto voce ganharia se vendesse tudo agora
-    // "Lucro nao realizado"
-    public double calcularLucroPotencial(Moeda moeda, double precoAtual){
-        if(moeda.getSaldo().compareTo(BigDecimal.ZERO) <= 0){
-            return 0;
+    // lucro não realizado: quanto o usuário ganharia vendendo todo o saldo a precoAtual
+    public BigDecimal calcularLucroPotencial(Moeda moeda, BigDecimal precoAtual) {
+        if (moeda.getSaldo().signum() <= 0) {
+            return BigDecimal.ZERO;
         }
-        double valorInvestido = moeda.getCustoTotal().doubleValue();
-        double valorAtual = moeda.getSaldo().multiply(BigDecimal.valueOf(precoAtual)).doubleValue();
-        return valorAtual - valorInvestido;
+
+        return moeda.getSaldo()
+            .multiply(precoAtual)
+            .subtract(moeda.getCustoTotal());
     }
 
-    // agr o metodo puro, sem prints, apenas regra de negócio
-    public SimulacaoDCADTO simularDCA(Moeda moeda, double valorAporteUSD, double precoMercado){
-        double saldoAtual = moeda.getSaldo().doubleValue();
-        double pmAtual = moeda.getPrecoMedio().doubleValue();
-        double custoTotalAtual = moeda.getCustoTotal().doubleValue();
+    // efeito de um novo aporte no preço médio. Sem posição anterior, simula a
+    // primeira compra: não há preço médio atual nem diferença percentual (null)
+    public SimulacaoDCADTO simularDCA(Moeda moeda, BigDecimal aporte, BigDecimal precoMercado) {
+        exigirPositivo(aporte, "O aporte");
+        exigirPositivo(precoMercado, "O preço de mercado");
 
-        // quantidade que o novo aporte compraria
-        double qtdComprada = valorAporteUSD / precoMercado;
+        boolean temPosicao = moeda.getSaldo().signum() > 0;
 
-        // novos valores totais simulados
-        double novoSaldoTotal = saldoAtual + qtdComprada;
-        double novoCustoTotal = custoTotalAtual + valorAporteUSD;
-        double novoPM = novoCustoTotal / novoSaldoTotal;
+        BigDecimal qtdComprada = aporte.divide(precoMercado, PRECISAO_CUSTO);
+        BigDecimal novoSaldo = moeda.getSaldo().add(qtdComprada);
+        BigDecimal novoCusto = moeda.getCustoTotal().add(aporte);
+        BigDecimal novoPM = novoCusto.divide(novoSaldo, PRECISAO_CUSTO);
 
-        // diferenças em porcentagem do preço medio
-        double diferencaPM = ((novoPM - pmAtual) / pmAtual) * 100;
+        // a diferença usa o preço médio exato, e não o arredondado para exibição
+        BigDecimal diferencaPM = temPosicao
+            ? percentual(
+                novoPM.subtract(precoMedioExato(moeda)),
+                precoMedioExato(moeda)
+            )
+            : null;
 
-        //mostra quanto a moeda precisa valorizar para começar a ter lucro
-        double valorizacaoNecessaria = ((novoPM / precoMercado) - 1) * 100;
+        // quanto o preço de mercado precisa subir para chegar ao novo preço médio (break-even)
+        BigDecimal valorizacaoNecessaria =
+            percentual(novoPM.subtract(precoMercado), precoMercado);
 
-        // empacota tudo na caixa e devolve
         return new SimulacaoDCADTO(
-                qtdComprada, saldoAtual, novoSaldoTotal, pmAtual, novoPM, diferencaPM, valorizacaoNecessaria
+            qtdComprada.setScale(ESCALA_QUANTIDADE, RoundingMode.HALF_UP),
+            moeda.getSaldo(),
+            novoSaldo.setScale(ESCALA_QUANTIDADE, RoundingMode.HALF_UP),
+            temPosicao ? moeda.getPrecoMedio() : null,
+            novoPM.setScale(Moeda.ESCALA_PRECO_MEDIO, RoundingMode.HALF_UP),
+            diferencaPM,
+            valorizacaoNecessaria
         );
+    }
+
+    private static BigDecimal precoMedioExato(Moeda moeda) {
+        return moeda.getCustoTotal().divide(moeda.getSaldo(), PRECISAO_CUSTO);
+    }
+
+    // (parte ÷ base) × 100, com 8 casas como os percentuais do resumo
+    private static BigDecimal percentual(BigDecimal parte, BigDecimal base) {
+        return parte.multiply(CEM).divide(base, ESCALA_PERCENTUAL, RoundingMode.HALF_UP);
+    }
+
+    // o controller já valida; aqui é a defesa para qualquer outro chamador
+    private static void exigirPositivo(BigDecimal valor, String nome) {
+        if (valor == null || valor.signum() <= 0) {
+            throw new IllegalArgumentException(nome + " deve ser maior que zero.");
+        }
     }
 
     // agora a reconstrução da carteira nao fica mais na main, fica aqui no service
@@ -196,19 +229,29 @@ public class CarteiraService {
 
     // METODOS DTO
 
-    public SimulacaoVendaDTO simularVendaFutura(Moeda moeda, double precoFicticio, double precoAtualMercado){
+    // resultado de vender todo o saldo no preço-alvo. Sem saldo, não há o que vender
+    public SimulacaoVendaDTO simularVendaFutura(
+        Moeda moeda,
+        BigDecimal precoAlvo,
+        BigDecimal precoAtualMercado
+    ) {
+        exigirSaldo(moeda);
+        exigirPositivo(precoAlvo, "O preço-alvo");
 
-        // calcula o lucro e a porcentagem
-        double lucroSimulado = calcularLucroPotencial(moeda, precoFicticio);
-        double custoBase = moeda.getCustoTotal().doubleValue();
-        double porcSimulada = (lucroSimulado / custoBase) * 100;
+        BigDecimal lucroSimulado = calcularLucroPotencial(moeda, precoAlvo);
 
-        // calcula os totais
-        double valorTotalFicticio = moeda.getSaldo().doubleValue() * precoFicticio;
-        double valorTotalAtual = moeda.getSaldo().doubleValue() * precoAtualMercado;
+        return new SimulacaoVendaDTO(
+            lucroSimulado,
+            percentual(lucroSimulado, moeda.getCustoTotal()),
+            moeda.getSaldo().multiply(precoAlvo),
+            moeda.getSaldo().multiply(precoAtualMercado)
+        );
+    }
 
-        //empacota tudo na caixa (DTO) e devolve para quem chamou
-        return new SimulacaoVendaDTO(lucroSimulado, porcSimulada, valorTotalFicticio, valorTotalAtual);
+    private static void exigirSaldo(Moeda moeda) {
+        if (moeda.getSaldo().signum() <= 0) {
+            throw new SemSaldoParaSimularException(moeda.getTicker());
+        }
     }
 
     // gera o resumo completo da carteira e empacota tudo num DTO
@@ -570,7 +613,12 @@ public class CarteiraService {
         });
     }
 
-    public SimulacaoDCADTO executarSimulacaoDCA(String ticker, double valorAporte, double precoMercado, Usuario usuario){
+    public SimulacaoDCADTO executarSimulacaoDCA(
+        String ticker,
+        BigDecimal valorAporte,
+        BigDecimal precoMercado,
+        Usuario usuario
+    ) {
         Carteira carteira = new Carteira();
         List<Transacao> historico = carregarHistoricoDeTransacoes(usuario);
         reconstruirCarteira(carteira, historico);
@@ -585,7 +633,11 @@ public class CarteiraService {
         return simularDCA(moeda, valorAporte, precoMercado);
     }
 
-    public SimulacaoVendaDTO executarSimulacaoVenda(String ticker, double precoFicticio, Usuario usuario){
+    public SimulacaoVendaDTO executarSimulacaoVenda(
+        String ticker,
+        BigDecimal precoFicticio,
+        Usuario usuario
+    ) {
         Carteira carteira = new Carteira();
         List<Transacao> historico = carregarHistoricoDeTransacoes(usuario);
         reconstruirCarteira(carteira, historico);
@@ -598,10 +650,11 @@ public class CarteiraService {
             tickerNormalizado
         );
 
-        double precoAtualMercado =
-            cotacaoService.buscarCotacao(
-                tickerNormalizado
-            ).preco().doubleValue();
+        // sem saldo, recusa antes de consultar a Binance
+        exigirSaldo(moeda);
+
+        BigDecimal precoAtualMercado =
+            cotacaoService.buscarCotacao(tickerNormalizado).preco();
 
         return simularVendaFutura(
             moeda,

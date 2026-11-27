@@ -79,11 +79,13 @@ public class CarteiraServiceTest {
         eth.setSaldo(BigDecimal.valueOf(2.0));
         eth.setCustoTotal(BigDecimal.valueOf(6000.0)); // preço médio 3000
 
-        SimulacaoDCADTO simulacao = service.simularDCA(eth, 3000.0, 1500.0);
+        SimulacaoDCADTO simulacao = service.simularDCA(
+            eth, new BigDecimal("3000"), new BigDecimal("1500")
+        );
 
-        assertEquals(2.0, simulacao.getQtdComprada(), 0.001);
-        assertEquals(4.0, simulacao.getNovoSaldoTotal(), 0.001);
-        assertEquals(2250.0, simulacao.getNovoPM(), 0.001);
+        assertEquals(0, new BigDecimal("2").compareTo(simulacao.getQtdComprada()));
+        assertEquals(0, new BigDecimal("4").compareTo(simulacao.getNovoSaldoTotal()));
+        assertEquals(0, new BigDecimal("2250").compareTo(simulacao.getNovoPM()));
     }
 
     @Test
@@ -94,9 +96,9 @@ public class CarteiraServiceTest {
         btc.setSaldo(BigDecimal.valueOf(0.5));
         btc.setCustoTotal(BigDecimal.valueOf(25000.0)); // preço médio 50000
 
-        double lucroPotencial = service.calcularLucroPotencial(btc, 70000.0);
+        BigDecimal lucroPotencial = service.calcularLucroPotencial(btc, new BigDecimal("70000"));
 
-        assertEquals(10000.0, lucroPotencial, 0.001);
+        assertEquals(0, new BigDecimal("10000").compareTo(lucroPotencial));
     }
 
     @Test

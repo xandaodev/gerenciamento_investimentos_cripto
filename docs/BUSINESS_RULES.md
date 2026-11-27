@@ -963,18 +963,24 @@ valorização necessária =
 ((novo preço médio ÷ preço de mercado) - 1) × 100
 ```
 
-### Limitações atuais
+### Validação das entradas
 
-Ainda não há validação explícita para:
+O aporte e o preço de mercado precisam ser números maiores que zero, com no máximo 20 dígitos inteiros e 18 casas decimais. Valores zero ou negativos respondem `400 Dados inválidos`, com o parâmetro na lista `erros`. Textos que não são números finitos, como `NaN`, `Infinity` e `abc`, respondem `400 Parâmetro inválido`. A API nunca devolve `NaN` nem `Infinity`.
 
-* aporte igual a zero;
-* aporte negativo;
-* preço igual a zero;
-* preço negativo;
-* ativo sem posição anterior (nunca comprado ou totalmente vendido);
-* preço médio atual igual a zero.
+### Ativo sem posição
 
-Como o cálculo usa `double`, esses casos não lançam erro: produzem valores sem significado financeiro, como infinito ou `NaN`.
+Sem posição anterior, seja porque o ativo nunca foi comprado ou porque foi totalmente vendido, a simulação é a de uma primeira compra:
+
+```text
+preço médio atual = null
+diferença do preço médio = null
+novo preço médio = preço de mercado
+valorização necessária = 0
+```
+
+### Precisão
+
+O cálculo usa `BigDecimal` e parte do custo exato da posição. As divisões usam 34 dígitos significativos. A quantidade, o novo saldo e o novo preço médio são devolvidos com 18 casas, e os percentuais com 8 casas, todos com `HALF_UP`. A diferença do preço médio é calculada sobre o preço médio exato, e não sobre o valor arredondado para exibição.
 
 ---
 
@@ -1019,13 +1025,21 @@ valor atual =
 saldo × preço atual de mercado
 ```
 
+### Validação e ativo sem saldo
+
+O preço-alvo precisa ser um número maior que zero, com no máximo 20 dígitos inteiros e 18 casas decimais. Os erros respondem como na simulação de DCA.
+
+Sem saldo do ativo, não há o que vender: a simulação responde `400 Sem saldo para simular`, antes de consultar a cotação.
+
+### Precisão
+
+O cálculo usa `BigDecimal` e o custo exato da posição. O lucro e os valores totais são exatos, e o percentual tem 8 casas com `HALF_UP`.
+
 ### Limitação atual
 
 A simulação considera a venda de todo o saldo.
 
 Ainda não é possível informar uma quantidade parcial para a simulação.
-
-O preço-alvo não é validado, e o cálculo usa `double`. Para um ativo sem posição, o custo é zero e o percentual simulado resulta em `NaN`.
 
 ---
 
@@ -1088,15 +1102,10 @@ Também utilizam `BigDecimal`:
 * o preço médio, derivado do custo só na leitura (escala 18, `HALF_UP`);
 * as cotações recebidas da Binance;
 * o resumo da carteira: valor dos ativos, PNL, percentuais e variação de 24 horas;
+* as simulações de DCA e de venda;
 * o total aportado por moeda.
 
-Ainda convertem valores para `double`:
-
-* a simulação de DCA;
-* a simulação de venda;
-* o endpoint `/carteira/total`.
-
-Assim, a aplicação ainda não utiliza `BigDecimal` de ponta a ponta.
+Ainda converte valores para `double` só o endpoint `/carteira/total` (item #13 do roadmap).
 
 ---
 

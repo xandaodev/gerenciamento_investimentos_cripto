@@ -16,6 +16,9 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Digits;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Positive;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -23,6 +26,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.math.BigDecimal;
 
 @RestController
 @RequestMapping("/carteira")
@@ -126,7 +131,7 @@ public class CarteiraController {
         ),
         @ApiResponse(
             responseCode = "400",
-            description = "Parâmetros ausentes ou com tipos inválidos.",
+            description = "Parâmetros ausentes, que não são números ou menores ou iguais a zero.",
             content = @Content(
                 mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                 schema = @Schema(implementation = ProblemaApiDTO.class)
@@ -155,21 +160,27 @@ public class CarteiraController {
             example = "BTC",
             required = true
         )
-        @RequestParam String ticker,
+        @RequestParam @NotBlank(message = "O ticker é obrigatório.") String ticker,
 
         @Parameter(
-            description = "Valor hipotético do novo aporte em USD.",
+            description = "Valor hipotético do novo aporte em USD. Deve ser maior que zero.",
             example = "500.00",
             required = true
         )
-        @RequestParam double aporte,
+        @RequestParam
+        @Positive(message = "O aporte deve ser maior que zero.")
+        @Digits(integer = 20, fraction = 18, message = "O aporte deve ter no máximo 20 dígitos inteiros e 18 casas decimais.")
+        BigDecimal aporte,
 
         @Parameter(
-            description = "Preço de mercado utilizado na simulação.",
+            description = "Preço de mercado utilizado na simulação, em USD. Deve ser maior que zero.",
             example = "65000.00",
             required = true
         )
-        @RequestParam double preco,
+        @RequestParam
+        @Positive(message = "O preço deve ser maior que zero.")
+        @Digits(integer = 20, fraction = 18, message = "O preço deve ter no máximo 20 dígitos inteiros e 18 casas decimais.")
+        BigDecimal preco,
 
         @AuthenticationPrincipal Usuario usuario
     ) {
@@ -198,7 +209,7 @@ public class CarteiraController {
         ),
         @ApiResponse(
             responseCode = "400",
-            description = "Parâmetros ausentes ou com tipos inválidos.",
+            description = "Parâmetros ausentes, que não são números, menores ou iguais a zero, ou ativo sem saldo na carteira.",
             content = @Content(
                 mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
                 schema = @Schema(implementation = ProblemaApiDTO.class)
@@ -235,14 +246,17 @@ public class CarteiraController {
             example = "BTC",
             required = true
         )
-        @RequestParam String ticker,
+        @RequestParam @NotBlank(message = "O ticker é obrigatório.") String ticker,
 
         @Parameter(
-            description = "Preço-alvo hipotético em USD.",
+            description = "Preço-alvo hipotético em USD. Deve ser maior que zero.",
             example = "72000.00",
             required = true
         )
-        @RequestParam double precoAlvo,
+        @RequestParam
+        @Positive(message = "O preço-alvo deve ser maior que zero.")
+        @Digits(integer = 20, fraction = 18, message = "O preço-alvo deve ter no máximo 20 dígitos inteiros e 18 casas decimais.")
+        BigDecimal precoAlvo,
 
         @AuthenticationPrincipal Usuario usuario
     ) {

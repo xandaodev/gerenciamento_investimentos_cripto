@@ -2,41 +2,51 @@ package br.com.criptovision.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 
+import java.math.BigDecimal;
+
 @Schema(
     name = "SimulacaoDCA",
     description = "Resultado de uma simulação de novo aporte e preço médio."
 )
 public class SimulacaoDCADTO {
 
-    @Schema(description = "Quantidade que o aporte compraria.", example = "0.0076923")
-    private double qtdComprada;
+    @Schema(description = "Quantidade que o aporte compraria.", example = "0.007692307692307692")
+    private final BigDecimal qtdComprada;
 
     @Schema(description = "Saldo atual do ativo.", example = "0.025")
-    private double saldoAtual;
+    private final BigDecimal saldoAtual;
 
-    @Schema(description = "Saldo após o aporte simulado.", example = "0.0326923")
-    private double novoSaldoTotal;
+    @Schema(description = "Saldo após o aporte simulado.", example = "0.032692307692307692")
+    private final BigDecimal novoSaldoTotal;
 
-    @Schema(description = "Preço médio atual.", example = "59000.00")
-    private double pmAtual;
+    @Schema(
+        description = "Preço médio atual. Ausente quando ainda não há posição no ativo.",
+        example = "59000.00",
+        nullable = true
+    )
+    private final BigDecimal pmAtual;
 
-    @Schema(description = "Novo preço médio estimado.", example = "60411.76")
-    private double novoPM;
+    @Schema(description = "Novo preço médio estimado.", example = "60411.764705882352941176")
+    private final BigDecimal novoPM;
 
-    @Schema(description = "Variação percentual do preço médio.", example = "2.39")
-    private double diferencaPM;
+    @Schema(
+        description = "Variação percentual do preço médio. Ausente quando ainda não há posição no ativo.",
+        example = "2.39182114",
+        nullable = true
+    )
+    private final BigDecimal diferencaPM;
 
-    @Schema(description = "Valorização necessária para atingir o ponto de equilíbrio.", example = "-7.06")
-    private double valorizacaoNecessaria;
+    @Schema(description = "Valorização necessária para atingir o ponto de equilíbrio, em percentual.", example = "-7.05882353")
+    private final BigDecimal valorizacaoNecessaria;
 
     public SimulacaoDCADTO(
-        double qtdComprada,
-        double saldoAtual,
-        double novoSaldoTotal,
-        double pmAtual,
-        double novoPM,
-        double diferencaPM,
-        double valorizacaoNecessaria
+        BigDecimal qtdComprada,
+        BigDecimal saldoAtual,
+        BigDecimal novoSaldoTotal,
+        BigDecimal pmAtual,
+        BigDecimal novoPM,
+        BigDecimal diferencaPM,
+        BigDecimal valorizacaoNecessaria
     ) {
         this.qtdComprada = qtdComprada;
         this.saldoAtual = saldoAtual;
@@ -47,31 +57,31 @@ public class SimulacaoDCADTO {
         this.valorizacaoNecessaria = valorizacaoNecessaria;
     }
 
-    public double getQtdComprada() {
+    public BigDecimal getQtdComprada() {
         return qtdComprada;
     }
 
-    public double getSaldoAtual() {
+    public BigDecimal getSaldoAtual() {
         return saldoAtual;
     }
 
-    public double getNovoSaldoTotal() {
+    public BigDecimal getNovoSaldoTotal() {
         return novoSaldoTotal;
     }
 
-    public double getPmAtual() {
+    public BigDecimal getPmAtual() {
         return pmAtual;
     }
 
-    public double getNovoPM() {
+    public BigDecimal getNovoPM() {
         return novoPM;
     }
 
-    public double getDiferencaPM() {
+    public BigDecimal getDiferencaPM() {
         return diferencaPM;
     }
 
-    public double getValorizacaoNecessaria() {
+    public BigDecimal getValorizacaoNecessaria() {
         return valorizacaoNecessaria;
     }
 }
