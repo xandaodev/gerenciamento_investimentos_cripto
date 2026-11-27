@@ -1,3 +1,17 @@
+# Dois modos de execução:
+#
+#   docker compose up --build
+#       Desenvolvimento: API em http://localhost:8080 e MySQL em localhost:3307,
+#       sem HTTPS.
+#
+#   docker compose --profile producao up -d --build
+#       Produção (VPS): acrescenta o Caddy, que atende HTTPS nas portas 80 e 443
+#       no domínio definido em DOMINIO e repassa para a API. Veja o passo a passo
+#       no README.
+#
+# Em ambos os modos, a API e o MySQL só aceitam conexões da própria máquina
+# (127.0.0.1): na VPS, o único acesso de fora é pelo Caddy.
+
 services:
   db:
     image: mysql:8.0
@@ -9,7 +23,7 @@ services:
       MYSQL_USER: ${DB_USER}
       MYSQL_PASSWORD: ${DB_PASSWORD}
     ports:
-      - "3307:3306"
+      - "127.0.0.1:3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
 
@@ -18,7 +32,7 @@ services:
     container_name: cripto-api
     restart: always
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     depends_on:
       - db
     environment:
@@ -28,11 +42,47 @@ services:
       SPRING_JPA_HIBERNATE_DDL_AUTO: validate
       JWT_SECRET: ${JWT_SECRET}
       CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:5174}
+      # aceita os cabeçalhos X-Forwarded-* só de IPs internos (o Caddy, na rede
+      # do Docker), para que o IP do cliente e o HTTPS sejam os reais. É seguro
+      # porque a porta da API só aceita conexões da própria máquina
+      SERVER_FORWARD_HEADERS_STRATEGY: native
       BINANCE_API_BASE_URL: ${BINANCE_API_BASE_URL:-https://data-api.binance.vision/api/v3}
       COTACOES_CONNECT_TIMEOUT: ${COTACOES_CONNECT_TIMEOUT:-3s}
       COTACOES_READ_TIMEOUT: ${COTACOES_READ_TIMEOUT:-5s}
       COTACOES_CACHE_TTL: ${COTACOES_CACHE_TTL:-60s}
       COTACOES_CACHE_MAX_STALE: ${COTACOES_CACHE_MAX_STALE:-15m}
 
+  caddy:
+    image: caddy:2
+    container_name: cripto-caddy
+    restart: always
+    profiles:
+      - producao
+    depends_on:
+      - api
+    environment:
+      DOMINIO: ${DOMINIO:-}
+    # sem DOMINIO, o Caddy não teria para qual domínio emitir o certificado.
+    # A checagem fica aqui, e não no Compose, para não exigir DOMINIO em desenvolvimento
+    entrypoint:
+      - /bin/sh
+      - -c
+      - >-
+        test -n "$$DOMINIO" || {
+        echo 'Defina DOMINIO no .env (por exemplo api.seudominio.com.br) para usar o perfil producao.' >&2;
+        exit 1; };
+        exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # certificados e chaves emitidos: perder este volume obriga a emitir de novo
+      - caddy_data:/data
+      - caddy_config:/config
+
 volumes:
   mysql_data:
+  caddy_data:
+  caddy_config:

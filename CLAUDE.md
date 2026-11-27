@@ -27,10 +27,11 @@ Use the Maven wrapper (`.\mvnw.cmd` on Windows, `./mvnw` elsewhere):
 ./mvnw test -Dtest=CarteiraServiceTest#nomeDoMetodo # single test method
 ./mvnw verify -Dit.test=MigracoesMysqlIT -Dtest=none -Dsurefire.failIfNoSpecifiedTests=false  # single integration test class
 ./mvnw spring-boot:run                              # run locally (needs MySQL + env vars)
-./mvnw clean package && docker compose up --build   # Dockerfile copies target/*.jar, so package first
+./mvnw clean package && docker compose up --build   # dev: API on http://localhost:8080, no HTTPS (Dockerfile copies target/*.jar, so package first)
+docker compose --profile producao up -d --build     # production (VPS): adds Caddy with HTTPS for DOMINIO on 80/443
 ```
 
-Runtime env vars (see `.env.example`): `DB_USER`, `DB_PASSWORD`, `JWT_SECRET` (required), plus `MYSQL_ROOT_PASSWORD` for Compose, `CORS_ALLOWED_ORIGINS` (required in production), `BINANCE_API_BASE_URL` and `COTACOES_*` timeouts/TTL. Locally the datasource points to `localhost:3306/criptovision`. Docker Compose exposes MySQL on host port `3307`. Swagger UI is served at `/swagger-ui.html`.
+Runtime env vars (see `.env.example`): `DB_USER`, `DB_PASSWORD`, `JWT_SECRET` (required), plus `MYSQL_ROOT_PASSWORD` for Compose, `CORS_ALLOWED_ORIGINS` (required in production), `BINANCE_API_BASE_URL` and `COTACOES_*` timeouts/TTL. Locally the datasource points to `localhost:3306/criptovision`. Docker Compose publishes MySQL on `127.0.0.1:3307` and the API on `127.0.0.1:8080` (never on all interfaces: Docker bypasses `ufw`). The `producao` profile adds Caddy (`Caddyfile`, needs `DOMINIO`), which terminates TLS and proxies to `api:8080`. The API runs there with `SERVER_FORWARD_HEADERS_STRATEGY=native`, so per-IP limits and HSTS see the real client. Outside Compose that property stays `none`, so clients can't spoof `X-Forwarded-For`. The VPS deploy steps are in the README. Swagger UI is served at `/swagger-ui.html`.
 
 ## Architecture
 

@@ -1,0 +1,18 @@
+# Proxy reverso com HTTPS na frente da API (perfil "producao" do docker-compose).
+#
+# O Caddy emite e renova sozinho o certificado do Let's Encrypt para o domínio
+# em DOMINIO (definido no .env) e redireciona HTTP para HTTPS. Para isso, o DNS
+# do domínio precisa apontar para o IP do servidor, com as portas 80 e 443 abertas.
+
+{$DOMINIO} {
+	# repassa para a API pela rede interna do Docker. O Caddy envia o IP real
+	# do cliente em X-Forwarded-For e descarta o valor que o próprio cliente
+	# mandar, então o IP usado nos limites de tentativas não pode ser forjado
+	reverse_proxy api:8080
+
+	encode zstd gzip
+
+	# o HSTS e os demais cabeçalhos de segurança vêm da própria API
+	# (Spring Security); aqui só deixa de anunciar o servidor
+	header -Server
+}
