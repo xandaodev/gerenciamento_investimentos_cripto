@@ -30,7 +30,7 @@ Use the Maven wrapper (`.\mvnw.cmd` on Windows, `./mvnw` elsewhere):
 ./mvnw clean package && docker compose up --build   # Dockerfile copies target/*.jar, so package first
 ```
 
-Runtime env vars (see `.env.example`): `DB_USER`, `DB_PASSWORD`, `JWT_SECRET` (required), plus `MYSQL_ROOT_PASSWORD` for Compose, `BINANCE_API_BASE_URL` and `COTACOES_*` timeouts/TTL. Locally the datasource points to `localhost:3306/criptovision`. Docker Compose exposes MySQL on host port `3307`. Swagger UI is served at `/swagger-ui.html`.
+Runtime env vars (see `.env.example`): `DB_USER`, `DB_PASSWORD`, `JWT_SECRET` (required), plus `MYSQL_ROOT_PASSWORD` for Compose, `CORS_ALLOWED_ORIGINS` (required in production), `BINANCE_API_BASE_URL` and `COTACOES_*` timeouts/TTL. Locally the datasource points to `localhost:3306/criptovision`. Docker Compose exposes MySQL on host port `3307`. Swagger UI is served at `/swagger-ui.html`.
 
 ## Architecture
 
@@ -42,7 +42,7 @@ Base package `br.com.criptovision`: controller → service → repository, plus 
 - A sale larger than the balance throws `SaldoInsuficienteException`. A replay failure on persisted data throws `HistoricoInconsistenteException` → 500. Invalid transactions must never be skipped silently.
 - Create, update and delete must go through `CarteiraService`, never straight to the repository from controllers.
 
-**Per-user isolation.** Controllers get the `Usuario` entity via `@AuthenticationPrincipal` (set by `SecurityFilter` from the JWT) and pass it down. Every repository query filters by user. Accessing another user's transaction returns **404, not 403**, so the API never reveals that the ID exists. `Transacao.usuario` is `@JsonIgnore`d. The request DTO has no user/id/date fields. Public routes: `/auth/login`, `/auth/register` and the Swagger paths. CORS allows `localhost:5173/5174` (the Vite frontend).
+**Per-user isolation.** Controllers get the `Usuario` entity via `@AuthenticationPrincipal` (set by `SecurityFilter` from the JWT) and pass it down. Every repository query filters by user. Accessing another user's transaction returns **404, not 403**, so the API never reveals that the ID exists. `Transacao.usuario` is `@JsonIgnore`d. The request DTO has no user/id/date fields. Public routes: `/auth/login`, `/auth/register` and the Swagger paths. CORS origins come from `CORS_ALLOWED_ORIGINS` (comma-separated, bound and validated at startup by the `CorsProperties` record; invalid origins stop the app). They default to `localhost:5173/5174` (the Vite frontend), and a configured list replaces the defaults.
 
 **Quotes (`cotacao` package).** `CotacaoService` → `CotacaoClient` (interface; `BinanceCotacaoClient` implementation using Spring `RestClient` against `binance.api.base-url`, default `data-api.binance.vision`) + `CotacaoCache` (in-memory, with a fresh TTL `cotacoes.cache.ttl` and a stale-fallback window `cotacoes.cache.max-stale`). Behavior:
 - It batch-fetches the pending tickers, falls back to per-ticker requests on `TickerInvalidoException`, and falls back to stale cached quotes on `ServicoCotacaoIndisponivelException`.

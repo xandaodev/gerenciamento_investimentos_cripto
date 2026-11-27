@@ -88,6 +88,7 @@ A aplicação lê as credenciais de variáveis de ambiente. O arquivo [`.env.exa
 | `DB_USER` / `DB_PASSWORD` | Sim | Credenciais do MySQL |
 | `JWT_SECRET` | Sim | Segredo para assinar os tokens (use um valor longo e aleatório) |
 | `MYSQL_ROOT_PASSWORD` | Só no Docker | Senha do root do container MySQL |
+| `CORS_ALLOWED_ORIGINS` | Em produção | Origens do frontend autorizadas pelo CORS, separadas por vírgula (padrão: `http://localhost:5173,http://localhost:5174`) |
 | `BINANCE_API_BASE_URL` | Não | URL da API de mercado da Binance |
 | `COTACOES_CONNECT_TIMEOUT`, `COTACOES_READ_TIMEOUT`, `COTACOES_CACHE_TTL`, `COTACOES_CACHE_MAX_STALE` | Não | Timeouts e cache das cotações |
 
