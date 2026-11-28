@@ -15,7 +15,15 @@ WORKDIR /build
 # esta camada fica em cache e um build só de código não baixa tudo de novo
 COPY .mvn/ .mvn/
 COPY mvnw pom.xml ./
-RUN sh ./mvnw --batch-mode --no-transfer-progress dependency:go-offline
+# até 3 tentativas: o Maven Central às vezes recusa downloads por um tempo
+# (HTTP 429), o que derrubaria o build por um problema passageiro
+RUN for tentativa in 1 2 3; do \
+        sh ./mvnw --batch-mode --no-transfer-progress dependency:go-offline && exit 0; \
+        [ "$tentativa" -lt 3 ] \
+            && echo "Download das dependências falhou (tentativa $tentativa de 3). Tentando de novo..." \
+            && sleep $((tentativa * 30)); \
+    done; \
+    exit 1
 
 # compila sem os testes (o CI já os rodou) e separa o JAR em camadas
 # (dependências, loader, aplicação), para que uma nova versão só troque a
