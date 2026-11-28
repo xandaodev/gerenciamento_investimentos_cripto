@@ -7,6 +7,9 @@ import br.com.criptovision.cotacao.model.ResultadoCotacoes;
 import br.com.criptovision.cotacao.service.CotacaoService;
 import br.com.criptovision.exception.ServicoCotacaoIndisponivelException;
 import br.com.criptovision.exception.TickerInvalidoException;
+import br.com.criptovision.observabilidade.MetricasCriptoVision;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -33,6 +36,7 @@ class CotacaoServiceTest {
 
     private MutableClock clock;
     private CotacaoService service;
+    private SimpleMeterRegistry registro;
 
     @BeforeEach
     void preparar() {
@@ -46,10 +50,13 @@ class CotacaoServiceTest {
             clock
         );
 
+        registro = new SimpleMeterRegistry();
+
         service = new CotacaoService(
             cotacaoClient,
             cache,
-            clock
+            clock,
+            new MetricasCriptoVision(registro)
         );
     }
 
@@ -101,6 +108,58 @@ class CotacaoServiceTest {
         assertTrue(cotacao.desatualizada());
         assertTrue(resultado.possuiDadosParciais());
         assertTrue(resultado.indisponiveis().isEmpty());
+        assertEquals(1, falhasDoProvedor("cotacao_anterior"));
+        assertEquals(0, falhasDoProvedor("sem_cotacao"));
+    }
+
+    @Test
+    void deveContarAtivoSemCotacaoQuandoProvedorFalharSemCotacaoAnterior() {
+        Set<String> tickers = Set.of("BTC", "ETH");
+
+        when(cotacaoClient.buscarCotacoes(tickers))
+            .thenThrow(new ServicoCotacaoIndisponivelException());
+
+        ResultadoCotacoes resultado =
+            service.buscarCotacoes(tickers);
+
+        assertEquals(Set.of("BTC", "ETH"), resultado.indisponiveis());
+        assertEquals(2, falhasDoProvedor("sem_cotacao"));
+        assertEquals(0, falhasDoProvedor("cotacao_anterior"));
+    }
+
+    @Test
+    void naoDeveContarTickerInvalidoComoFalhaDoProvedor() {
+        when(cotacaoClient.buscarCotacao("XYZ"))
+            .thenThrow(new TickerInvalidoException("XYZ"));
+
+        assertThrows(
+            TickerInvalidoException.class,
+            () -> service.buscarCotacao("XYZ")
+        );
+
+        assertEquals(0, falhasDoProvedor("sem_cotacao"));
+        assertEquals(0, falhasDoProvedor("cotacao_anterior"));
+    }
+
+    @Test
+    void deveContarFalhaDoProvedorNaConsultaDeUmTicker() {
+        when(cotacaoClient.buscarCotacao("BTC"))
+            .thenReturn(cotacao("BTC", "65000", "2.5"))
+            .thenThrow(new ServicoCotacaoIndisponivelException());
+        when(cotacaoClient.buscarCotacao("ETH"))
+            .thenThrow(new ServicoCotacaoIndisponivelException());
+
+        service.buscarCotacao("BTC");
+        clock.avancar(Duration.ofMinutes(2));
+
+        assertTrue(service.buscarCotacao("BTC").desatualizada());
+        assertThrows(
+            ServicoCotacaoIndisponivelException.class,
+            () -> service.buscarCotacao("ETH")
+        );
+
+        assertEquals(1, falhasDoProvedor("cotacao_anterior"));
+        assertEquals(1, falhasDoProvedor("sem_cotacao"));
     }
 
     @Test
@@ -141,6 +200,7 @@ class CotacaoServiceTest {
 
         verify(cotacaoClient, times(2))
             .buscarCotacao("BTC");
+        assertEquals(1, falhasDoProvedor("cotacao_anterior"));
     }
 
     @Test
@@ -154,6 +214,16 @@ class CotacaoServiceTest {
             ServicoCotacaoIndisponivelException.class,
             () -> service.validarTicker("BTC")
         );
+        assertEquals(1, falhasDoProvedor("sem_cotacao"));
+    }
+
+    private double falhasDoProvedor(String resultado) {
+        Counter contador = registro
+            .find(MetricasCriptoVision.PROVEDOR_DE_COTACOES_INDISPONIVEL)
+            .tag("resultado", resultado)
+            .counter();
+
+        return contador == null ? 0 : contador.count();
     }
 
     private CotacaoMercado cotacao(

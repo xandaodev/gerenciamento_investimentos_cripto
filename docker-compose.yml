@@ -12,11 +12,21 @@
 # Em ambos os modos, a API e o MySQL só aceitam conexões da própria máquina
 # (127.0.0.1): na VPS, o único acesso de fora é pelo Caddy.
 
+# Logs de todos os serviços com rotação: sem limite, o driver padrão do Docker
+# (json-file) cresce até encher o disco da VPS. Guarda até 5 arquivos de 10 MB
+# por container ("docker compose logs" lê todos eles)
+x-logs: &logs
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
 services:
   db:
     image: mysql:8.0
     container_name: cripto-mysql
     restart: always
+    logging: *logs
     # recusa qualquer conexão sem TLS. O MySQL 8 gera o próprio certificado
     # ao inicializar o banco, então não há certificados para criar ou distribuir
     command: --require-secure-transport=ON
@@ -34,6 +44,7 @@ services:
     build: .
     container_name: cripto-api
     restart: always
+    logging: *logs
     ports:
       - "127.0.0.1:8080:8080"
     depends_on:
@@ -53,6 +64,9 @@ services:
       # do Docker), para que o IP do cliente e o HTTPS sejam os reais. É seguro
       # porque a porta da API só aceita conexões da própria máquina
       SERVER_FORWARD_HEADERS_STRATEGY: native
+      # logs em JSON (formato ECS), um objeto por linha, com o ID da requisição
+      # no campo requestId: prontos para uma ferramenta de logs filtrar e alertar
+      LOGGING_STRUCTURED_FORMAT_CONSOLE: ecs
       BINANCE_API_BASE_URL: ${BINANCE_API_BASE_URL:-https://data-api.binance.vision/api/v3}
       COTACOES_CONNECT_TIMEOUT: ${COTACOES_CONNECT_TIMEOUT:-3s}
       COTACOES_READ_TIMEOUT: ${COTACOES_READ_TIMEOUT:-5s}
@@ -63,6 +77,7 @@ services:
     image: caddy:2
     container_name: cripto-caddy
     restart: always
+    logging: *logs
     profiles:
       - producao
     depends_on:
@@ -93,6 +108,7 @@ services:
     build: ./backup
     container_name: cripto-backup
     restart: always
+    logging: *logs
     # em produção sobe junto com o Caddy; "--profile backup" sobe só o backup,
     # para testar localmente sem HTTPS
     profiles:

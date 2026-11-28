@@ -7,6 +7,7 @@ import br.com.criptovision.cotacao.model.ResultadoCotacoes;
 import br.com.criptovision.cotacao.util.TickerNormalizer;
 import br.com.criptovision.exception.ServicoCotacaoIndisponivelException;
 import br.com.criptovision.exception.TickerInvalidoException;
+import br.com.criptovision.observabilidade.MetricasCriptoVision;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -29,15 +30,18 @@ public class CotacaoService {
     private final CotacaoClient cotacaoClient;
     private final CotacaoCache cotacaoCache;
     private final Clock clock;
+    private final MetricasCriptoVision metricas;
 
     public CotacaoService(
         CotacaoClient cotacaoClient,
         CotacaoCache cotacaoCache,
-        Clock clock
+        Clock clock,
+        MetricasCriptoVision metricas
     ) {
         this.cotacaoClient = cotacaoClient;
         this.cotacaoCache = cotacaoCache;
         this.clock = clock;
+        this.metricas = metricas;
     }
 
     public ResultadoCotacoes buscarCotacoes(
@@ -107,9 +111,11 @@ public class CotacaoService {
                     "Validação do ticker {} utilizou cotação anterior por indisponibilidade do provedor.",
                     normalizado
                 );
+                metricas.cotacaoAnteriorUsada();
                 return;
             }
 
+            metricas.semCotacao();
             throw ex;
         }
     }
@@ -200,8 +206,12 @@ public class CotacaoService {
                             "Cotação anterior utilizada como fallback para {}.",
                             ticker
                         );
+                        metricas.cotacaoAnteriorUsada();
                     },
-                    () -> indisponiveis.add(ticker)
+                    () -> {
+                        indisponiveis.add(ticker);
+                        metricas.semCotacao();
+                    }
                 );
         }
     }
@@ -219,9 +229,13 @@ public class CotacaoService {
                         "Cotação anterior utilizada como fallback para {}.",
                         ticker
                     );
+                    metricas.cotacaoAnteriorUsada();
                     return cotacao;
                 })
-                .orElseThrow(() -> ex);
+                .orElseThrow(() -> {
+                    metricas.semCotacao();
+                    return ex;
+                });
         }
     }
 

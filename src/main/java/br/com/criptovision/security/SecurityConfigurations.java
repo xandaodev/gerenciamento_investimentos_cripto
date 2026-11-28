@@ -1,8 +1,13 @@
 package br.com.criptovision.security;
 
+import br.com.criptovision.observabilidade.IdentificadorRequisicaoFilter;
+
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
+import org.springframework.boot.security.autoconfigure.actuate.web.servlet.EndpointRequest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -25,6 +30,9 @@ import java.util.Arrays;
     TentativasProperties.class
 })
 public class SecurityConfigurations {
+
+    /** Health público na porta da API (grupo "publico" do Actuator, em application.properties). */
+    public static final String CAMINHO_SAUDE = "/saude";
 
     private final SecurityFilter securityFilter;
     private final AutenticacaoEntryPoint autenticacaoEntryPoint;
@@ -71,6 +79,13 @@ public class SecurityConfigurations {
                     "/swagger-ui/**"
                 ).permitAll();
 
+                // health público, só com UP/DOWN, para um monitor de disponibilidade
+                req.requestMatchers(HttpMethod.GET, CAMINHO_SAUDE).permitAll();
+
+                // a porta de gerenciamento (health completo e métricas) não é publicada
+                // nem passa pelo Caddy: quem a alcança já está dentro do servidor
+                req.requestMatchers(EndpointRequest.toAnyEndpoint()).permitAll();
+
                 req.anyRequest().authenticated();
             })
             .addFilterBefore(
@@ -111,6 +126,12 @@ public class SecurityConfigurations {
         ));
 
         configuration.setAllowedHeaders(Arrays.asList("*"));
+
+        // sem isso, o JavaScript do frontend não consegue ler esses cabeçalhos
+        configuration.setExposedHeaders(Arrays.asList(
+            IdentificadorRequisicaoFilter.CABECALHO,
+            HttpHeaders.RETRY_AFTER
+        ));
 
         UrlBasedCorsConfigurationSource source =
             new UrlBasedCorsConfigurationSource();

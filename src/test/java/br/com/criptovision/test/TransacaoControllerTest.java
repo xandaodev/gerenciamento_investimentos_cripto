@@ -2,6 +2,8 @@ package br.com.criptovision.test;
 
 import br.com.criptovision.controller.TransacaoController;
 import br.com.criptovision.exception.GlobalExceptionHandler;
+import br.com.criptovision.observabilidade.MetricasCriptoVision;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import br.com.criptovision.model.TipoTransacao;
 import br.com.criptovision.model.Transacao;
 import br.com.criptovision.model.Usuario;
@@ -74,7 +76,9 @@ public class TransacaoControllerTest {
 
         mockMvc = MockMvcBuilders
             .standaloneSetup(controller)
-            .setControllerAdvice(new GlobalExceptionHandler())
+            .setControllerAdvice(new GlobalExceptionHandler(
+                new MetricasCriptoVision(new SimpleMeterRegistry())
+            ))
             .setValidator(validator).setCustomArgumentResolvers(
                 new AuthenticationPrincipalArgumentResolver()
             )

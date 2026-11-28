@@ -592,6 +592,8 @@ A aplicação lança `HistoricoInconsistenteException`, informando:
 
 Uma transação inválida não é mais ignorada silenciosamente.
 
+A resposta é um `500` com uma mensagem genérica e o `requestId` da requisição. A causa vai para o log de erro, com o mesmo ID, e cada ocorrência incrementa a métrica `criptovision.erros.internos` (tag `excecao=HistoricoInconsistenteException`). Assim, um histórico corrompido aparece no monitoramento em vez de ficar escondido, e o usuário pode informar o ID para localizar o caso.
+
 ---
 
 ## 13. Registro de nova transação

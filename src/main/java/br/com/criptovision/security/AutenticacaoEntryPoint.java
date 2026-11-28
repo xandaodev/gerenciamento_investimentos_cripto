@@ -1,5 +1,7 @@
 package br.com.criptovision.security;
 
+import br.com.criptovision.observabilidade.IdentificadorRequisicaoFilter;
+
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -59,6 +61,11 @@ public class AutenticacaoEntryPoint
             "dataHora",
             OffsetDateTime.now(ZoneOffset.UTC)
         );
+
+        String identificador = IdentificadorRequisicaoFilter.atual();
+        if (identificador != null) {
+            problema.put("requestId", identificador);
+        }
 
         jsonMapper.writeValue(
             response.getOutputStream(),

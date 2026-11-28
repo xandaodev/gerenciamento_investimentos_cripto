@@ -42,7 +42,8 @@ O desenvolvimento deste sistema foi marcado por ciclos de melhoria contínua e r
 * **💰 Simuladores:** Impacto de um novo aporte (DCA) no preço médio e no *break-even*, e resultado de vender a posição a um preço-alvo.
 * **📖 Documentação Interativa:** Interface gerada com **Swagger/OpenAPI** para testar as rotas da API.
 * **🔄 Normalização de Tickers:** Nomes comuns (ex: "Bitcoin") são convertidos para o ticker oficial ("BTC").
-* **⚠️ Erros Padronizados:** Todas as respostas de erro seguem o formato Problem Details (RFC 7807).
+* **⚠️ Erros Padronizados:** Todas as respostas de erro seguem o formato Problem Details (RFC 7807), com o ID da requisição (`requestId`), que também está no cabeçalho `X-Request-Id` e nos logs.
+* **🩺 Observabilidade:** Health check público em `/saude`, health completo e métricas (Prometheus) numa porta de gerenciamento privada, e logs em JSON com o ID de cada requisição.
 
 ## 🛠️ Tecnologias e Stack
 
@@ -74,8 +75,9 @@ O desenvolvimento deste sistema foi marcado por ciclos de melhoria contínua e r
 | `GET` | `/carteira/simulador/dca` | Simulação de aporte |
 | `GET` | `/carteira/simulador/venda` | Simulação de venda a um preço-alvo |
 | `GET` | `/analise/aportes-por-moeda` | Total comprado por ativo |
+| `GET` | `/saude` | Health check público: `{"status":"UP"}` ou `DOWN` (503), sem detalhes |
 
-Com exceção de `/auth/register`, `/auth/login` e do Swagger, todas as rotas exigem o cabeçalho `Authorization: Bearer <token>`.
+Com exceção de `/auth/register`, `/auth/login`, `/saude` e do Swagger, todas as rotas exigem o cabeçalho `Authorization: Bearer <token>`.
 
 Mais detalhes em [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) e [`docs/BUSINESS_RULES.md`](docs/BUSINESS_RULES.md).
 
@@ -98,6 +100,8 @@ A aplicação lê as credenciais de variáveis de ambiente. O arquivo [`.env.exa
 | `BACKUP_HORARIO`, `BACKUP_RETENCAO_DIAS`, `BACKUP_RETENCAO_REMOTA_DIAS`, `BACKUP_TESTE_SEMANAL` | Não | Horário (UTC), retenção e teste semanal dos backups |
 | `BINANCE_API_BASE_URL` | Não | URL da API de mercado da Binance |
 | `COTACOES_CONNECT_TIMEOUT`, `COTACOES_READ_TIMEOUT`, `COTACOES_CACHE_TTL`, `COTACOES_CACHE_MAX_STALE` | Não | Timeouts e cache das cotações |
+| `MANAGEMENT_SERVER_PORT` / `MANAGEMENT_SERVER_ADDRESS` | Não | Porta e endereço do Actuator (padrão: `8081` em `127.0.0.1`). Use `0.0.0.0` só para um Prometheus coletar as métricas de outro container |
+| `JPA_SHOW_SQL` | Não | `true` manda o SQL do Hibernate para o log. Útil no ambiente local, nunca em produção (padrão: `false`) |
 
 ### Com Docker (desenvolvimento)
 
@@ -200,7 +204,24 @@ Internet ──443 (HTTPS)──▶ Caddy ──rede interna──▶ API ──
     docker compose logs caddy
     curl -I https://api.seudominio.com.br/swagger-ui.html
     ```
-    O log do Caddy deve mostrar `certificate obtained successfully`, e a resposta do `curl` deve vir por HTTPS com o cabeçalho `Strict-Transport-Security`.
+    O log do Caddy deve mostrar `certificate obtained successfully`, e a resposta do `curl` deve vir por HTTPS com o cabeçalho `Strict-Transport-Security`. O health check público também deve responder:
+    ```bash
+    curl https://api.seudominio.com.br/saude   # {"status":"UP"}
+    ```
+
+### Monitoramento
+
+* **Disponibilidade:** cadastre `https://<DOMINIO>/saude` num monitor externo gratuito (UptimeRobot, Better Stack etc.) para ser avisado quando a API ou o banco caírem. Ele responde `503` quando o banco não responde.
+* **Métricas:** ficam na porta de gerenciamento, que não sai do container. Para consultá-las na VPS:
+    ```bash
+    docker compose exec api wget -qO- http://127.0.0.1:8081/actuator/prometheus | grep criptovision
+    ```
+    `criptovision_erros_internos_total` conta os erros `500` por tipo de exceção. Qualquer valor acima de zero merece investigação.
+* **Logs:** saem em JSON, um objeto por linha. Para achar tudo o que aconteceu numa requisição a partir do `requestId` de um erro:
+    ```bash
+    docker compose logs api | grep '"requestId":"<id>"'
+    ```
+    Os logs de cada container giram em até 5 arquivos de 10 MB, para não encher o disco.
 
 ### Atualizar a versão
 
@@ -299,7 +320,7 @@ O backup é diário, então numa perda total você recupera o banco como estava 
 
 ### Ainda não incluído
 
-O [roadmap](docs/ROADMAP.md) lista o que falta para produção depois do pacote de deploy, como observabilidade (#14) e a imagem Docker de produção (#15).
+O [roadmap](docs/ROADMAP.md) lista o que falta para produção depois do pacote de deploy, como a imagem Docker de produção (#15) e um alerta ativo para erros `500`, que depende de uma ferramenta de monitoramento.
 
 ---
 ⭐ *Desenvolvido por **Alexandre Vital** - Estudante de Ciência da Computação na UFSJ, em busca de desafios como Desenvolvedor Back-End.*
