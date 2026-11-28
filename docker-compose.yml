@@ -39,16 +39,36 @@ services:
       - "127.0.0.1:3307:3306"
     volumes:
       - mysql_data:/var/lib/mysql
+    # pronto quando o servidor definitivo aceita conexões TCP. Na primeira subida,
+    # o MySQL inicializa o volume com um servidor temporário sem rede, que não
+    # passa neste teste: a API e o backup só sobem depois disso
+    healthcheck:
+      test: ["CMD-SHELL", "MYSQL_PWD=\"$$MYSQL_ROOT_PASSWORD\" mysqladmin ping -h 127.0.0.1 -u root --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 180s
 
   api:
+    # imagem multi-stage (Dockerfile): compila o JAR dentro do Docker, então
+    # não é preciso Java nem Maven na máquina. O HEALTHCHECK vem da imagem
     build: .
     container_name: cripto-api
     restart: always
     logging: *logs
     ports:
       - "127.0.0.1:8080:8080"
+    # sem isso, a API subia antes do MySQL aceitar conexões, falhava e só
+    # funcionava depois de o Docker reiniciá-la
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    # o heap da JVM é 75% deste limite (MaxRAMPercentage, no Dockerfile).
+    # Ajuste à memória da VPS, lembrando que o MySQL também precisa da dele
+    mem_limit: ${API_LIMITE_MEMORIA:-1g}
+    # o graceful shutdown do Spring espera até 30s pelas requisições em
+    # andamento; o padrão do Docker (10s) o cortaria com SIGKILL
+    stop_grace_period: 40s
     environment:
       # sslMode=REQUIRED: a conexão com o banco é sempre cifrada, e a senha do
       # login (caching_sha2_password) viaja dentro do TLS. Por isso não é preciso
@@ -115,7 +135,8 @@ services:
       - producao
       - backup
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     # um backup por dia (BACKUP_HORARIO, em UTC), cifrado com BACKUP_SENHA e,
     # se BACKUP_S3_BUCKET estiver definido, copiado para o bucket. Veja o README
     environment:

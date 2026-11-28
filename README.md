@@ -102,16 +102,18 @@ A aplicação lê as credenciais de variáveis de ambiente. O arquivo [`.env.exa
 | `COTACOES_CONNECT_TIMEOUT`, `COTACOES_READ_TIMEOUT`, `COTACOES_CACHE_TTL`, `COTACOES_CACHE_MAX_STALE` | Não | Timeouts e cache das cotações |
 | `MANAGEMENT_SERVER_PORT` / `MANAGEMENT_SERVER_ADDRESS` | Não | Porta e endereço do Actuator (padrão: `8081` em `127.0.0.1`). Use `0.0.0.0` só para um Prometheus coletar as métricas de outro container |
 | `JPA_SHOW_SQL` | Não | `true` manda o SQL do Hibernate para o log. Útil no ambiente local, nunca em produção (padrão: `false`) |
+| `API_LIMITE_MEMORIA` | Não | Limite de memória do container da API no Compose (padrão: `1g`). O heap da JVM fica em 75% dele |
 
 ### Com Docker (desenvolvimento)
 
 1.  Copie `.env.example` para `.env` e preencha os valores, incluindo `MYSQL_ROOT_PASSWORD`. Use em `DB_USER` um usuário diferente de `root`, pois a imagem do MySQL não aceita `root` como usuário adicional. Deixe `DOMINIO` vazio.
-2.  Gere o JAR (o `Dockerfile` copia o arquivo de `target/`) e suba os containers:
+2.  Suba os containers. O `Dockerfile` compila a API dentro do Docker, então não é preciso ter Java na máquina. O primeiro build baixa as dependências e leva alguns minutos; os seguintes reaproveitam o cache:
     ```bash
-    ./mvnw clean package
     docker compose up --build
     ```
-3.  A API fica em `http://localhost:8080` e o MySQL em `localhost:3307`, sem HTTPS. As duas portas só aceitam conexões da própria máquina. O Flyway cria as tabelas na primeira execução.
+3.  A API fica em `http://localhost:8080` e o MySQL em `localhost:3307`, sem HTTPS. As duas portas só aceitam conexões da própria máquina. A API só sobe depois que o MySQL fica saudável, e o Flyway cria as tabelas na primeira execução. `docker compose ps` mostra os dois como `healthy` quando estão prontos.
+
+Para conferir a imagem de produção e a stack inteira de uma vez (healthcheck, usuário sem root, memória da JVM, logs em JSON e graceful shutdown), rode `bash scripts/testar-stack.sh`. Ele usa um projeto isolado, com portas e senhas próprias, sem tocar na stack normal nem no `.env`, e apaga tudo no fim. O CI roda o mesmo script.
 
 O MySQL só aceita conexões cifradas com TLS. Ao abrir o banco numa ferramenta como DBeaver ou MySQL Workbench, mantenha o SSL ativado, que costuma ser o padrão. O certificado é gerado pelo próprio MySQL, então a ferramenta não deve exigir a verificação dele.
 
@@ -155,7 +157,7 @@ Internet ──443 (HTTPS)──▶ Caddy ──rede interna──▶ API ──
 
 ### O que você precisa
 
-* Uma VPS com Linux, por exemplo Ubuntu 24.04 LTS, com pelo menos 2 GB de RAM por causa da JVM e do MySQL.
+* Uma VPS com Linux, por exemplo Ubuntu 24.04 LTS, com pelo menos 2 GB de RAM por causa da JVM e do MySQL. O container da API fica limitado a 1 GB (`API_LIMITE_MEMORIA`).
 * Um domínio. A API fica num subdomínio, como `api.seudominio.com.br`.
 
 ### Passo a passo
@@ -187,19 +189,13 @@ Internet ──443 (HTTPS)──▶ Caddy ──rede interna──▶ API ──
     * senhas fortes em `MYSQL_ROOT_PASSWORD` e `DB_PASSWORD` e um segredo longo em `JWT_SECRET`. Para gerar valores aleatórios, use `openssl rand -base64 48`;
     * descomente `COMPOSE_PROFILES=producao`, para que os comandos do Compose incluam o Caddy.
 
-4.  **Gere o JAR.** Para não instalar o JDK no servidor, gere-o dentro de um container. O volume `criptovision-maven` guarda as dependências baixadas para as próximas vezes:
-    ```bash
-    docker run --rm -v "$PWD":/app -v criptovision-maven:/root/.m2 -w /app \
-      eclipse-temurin:25-jdk sh ./mvnw -B clean package -DskipTests
-    ```
-    Os testes são pulados aqui porque já rodam no GitHub Actions a cada pull request.
-
-5.  **Suba os containers.**
+4.  **Suba os containers.** O build da imagem compila a API dentro do Docker, então não é preciso instalar Java no servidor. Os testes não rodam nesse build, porque já rodam no GitHub Actions a cada pull request. A primeira vez leva alguns minutos:
     ```bash
     docker compose up -d --build
     ```
+    A API só sobe depois que o MySQL fica saudável. `docker compose ps` deve mostrar `db` e `api` como `healthy`.
 
-6.  **Confira.** Na primeira subida, o Caddy obtém o certificado em alguns segundos:
+5.  **Confira.** Na primeira subida, o Caddy obtém o certificado em alguns segundos:
     ```bash
     docker compose logs caddy
     curl -I https://api.seudominio.com.br/swagger-ui.html
@@ -227,10 +223,10 @@ Internet ──443 (HTTPS)──▶ Caddy ──rede interna──▶ API ──
 
 ```bash
 git pull
-docker run --rm -v "$PWD":/app -v criptovision-maven:/root/.m2 -w /app \
-  eclipse-temurin:25-jdk sh ./mvnw -B clean package -DskipTests
 docker compose up -d --build
 ```
+
+O build reaproveita a camada das dependências quando o `pom.xml` não mudou. Ao trocar o container, o Docker manda um SIGTERM e espera até 40 segundos: a API termina as requisições em andamento antes de sair (graceful shutdown).
 
 ### Se o certificado não for emitido
 
@@ -320,7 +316,7 @@ O backup é diário, então numa perda total você recupera o banco como estava 
 
 ### Ainda não incluído
 
-O [roadmap](docs/ROADMAP.md) lista o que falta para produção depois do pacote de deploy, como a imagem Docker de produção (#15) e um alerta ativo para erros `500`, que depende de uma ferramenta de monitoramento.
+O [roadmap](docs/ROADMAP.md) lista o que falta antes de abrir para usuários, como o circuit breaker das cotações (#16), os requisitos da LGPD (#10) e um alerta ativo para erros `500`, que depende de uma ferramenta de monitoramento.
 
 ---
 ⭐ *Desenvolvido por **Alexandre Vital** - Estudante de Ciência da Computação na UFSJ, em busca de desafios como Desenvolvedor Back-End.*
