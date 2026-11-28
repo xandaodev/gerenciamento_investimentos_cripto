@@ -5,6 +5,9 @@ import br.com.criptovision.exception.ServicoCotacaoIndisponivelException;
 import br.com.criptovision.exception.TickerInvalidoException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -18,6 +21,7 @@ import java.time.ZoneOffset;
 import java.util.Map;
 import java.util.Set;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -26,6 +30,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+@ExtendWith(OutputCaptureExtension.class)
 class BinanceCotacaoClientTest {
 
     private MockRestServiceServer server;
@@ -151,6 +156,38 @@ class BinanceCotacaoClientTest {
             () -> client.buscarCotacao("BTC")
         );
 
+        server.verify();
+    }
+
+    @Test
+    void bloqueioDeRegiaoDeveVirarIndisponibilidadeComUmLogClaro(CapturedOutput saida) {
+        server.expect(requestTo(containsString("symbol=BTCUSDT")))
+            .andRespond(withStatus(HttpStatus.UNAVAILABLE_FOR_LEGAL_REASONS));
+
+        assertThrows(
+            ServicoCotacaoIndisponivelException.class,
+            () -> client.buscarCotacao("BTC")
+        );
+
+        // sem a explicação, o 451 pareceria uma instabilidade qualquer da Binance
+        assertThat(saida.getOut())
+            .contains("ERROR")
+            .contains("HTTP 451")
+            .contains("região");
+        server.verify();
+    }
+
+    @Test
+    void limiteDeRequisicoesDaBinanceDeveVirarIndisponibilidade(CapturedOutput saida) {
+        server.expect(requestTo(containsString("symbols=")))
+            .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS));
+
+        assertThrows(
+            ServicoCotacaoIndisponivelException.class,
+            () -> client.buscarCotacoes(Set.of("BTC", "ETH"))
+        );
+
+        assertThat(saida.getOut()).contains("limitou as consultas").contains("HTTP 429");
         server.verify();
     }
 }

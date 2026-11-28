@@ -89,7 +89,9 @@ class ObservabilidadeHttpTest {
         assertThat(resposta.body())
             .contains("http_server_requests_seconds_count")
             .contains("hikaricp_connections")
-            .contains("jvm_memory_used_bytes");
+            .contains("jvm_memory_used_bytes")
+            // o estado do circuit breaker da Binance, para um alerta quando ele abrir
+            .contains("resilience4j_circuitbreaker_state{name=\"binance\",state=\"closed\"} 1.0");
     }
 
     @Test

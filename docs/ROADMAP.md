@@ -121,13 +121,18 @@ Prioridade das fases:
     - `.dockerignore` em lista de permissão;
     - o `scripts/testar-stack.sh` confere tudo isso contra o `docker-compose.yml` real e roda no CI.
 
-- [ ] **#16 — A integração com a Binance tem riscos de disponibilidade e latência**
+- [x] **#16 — A integração com a Binance tem riscos de disponibilidade e latência**
   - **Problema:**
     - a `data-api.binance.vision` pode responder 451 em algumas regiões de nuvem (EUA);
     - no fallback individual, N tickers viram N chamadas sequenciais com timeout de 5s cada, então o resumo pode levar N×5s;
     - não há circuit breaker nem proteção contra rajada de requisições quando o cache expira.
   - **Arquivo:** `src/main/java/br/com/criptovision/cotacao/service/CotacaoService.java` (`buscarIndividualmente`), `src/main/java/br/com/criptovision/cotacao/client/BinanceCotacaoClient.java`, `src/main/java/br/com/criptovision/cotacao/cache/CotacaoCache.java`
   - **Correção:** validar a região do deploy contra a Binance, limitar o tempo total do fallback individual (ou paralelizá-lo com limite), adicionar circuit breaker (Resilience4j) e evitar consultas duplicadas ao mesmo ticker quando o cache expira.
+  - **Feito:**
+    - a `ConsultaDeCotacoes` faz uma consulta só por ticker para requisições simultâneas, e um lote sobreposto busca só o que falta;
+    - a consulta individual roda em paralelo (até 4 por vez), com prazo total de 5s;
+    - circuit breaker do Resilience4j, que só conta a indisponibilidade como falha, com o estado nas métricas;
+    - o HTTP 451 vira um ERROR que explica o bloqueio de região, e o README mostra como conferir a região da VPS antes do deploy.
 
 ---
 

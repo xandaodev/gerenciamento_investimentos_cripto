@@ -48,6 +48,7 @@
         <java.version>25</java.version>
         <springdoc.version>3.0.3</springdoc.version>
         <java-jwt.version>4.4.0</java-jwt.version>
+        <resilience4j.version>2.4.0</resilience4j.version>
     </properties>
 
     <dependencies>
@@ -131,6 +132,22 @@
         <dependency>
             <groupId>io.micrometer</groupId>
             <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+
+        <!-- Circuit breaker da Binance: com o provedor fora do ar, as consultas falham
+             na hora, em vez de cada uma esperar o timeout. Só o módulo core, sem
+             starter do Spring Boot: a configuração fica em CotacaoConfiguration -->
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-circuitbreaker</artifactId>
+            <version>${resilience4j.version}</version>
+        </dependency>
+
+        <!-- Estado e chamadas do circuit breaker nas métricas do Actuator -->
+        <dependency>
+            <groupId>io.github.resilience4j</groupId>
+            <artifactId>resilience4j-micrometer</artifactId>
+            <version>${resilience4j.version}</version>
         </dependency>
 
         <!-- Cache em memória com tamanho limitado (contadores de tentativas de login) -->

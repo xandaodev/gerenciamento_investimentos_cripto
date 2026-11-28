@@ -813,7 +813,7 @@ O ativo USDT não é consultado: o `CotacaoService` retorna preço `1` e variaç
 ### Tratamento de respostas
 
 * `400` da Binance é interpretado como ticker inválido (`TickerInvalidoException`);
-* outros erros HTTP, timeouts, falhas de rede, respostas vazias ou dados inesperados geram `ServicoCotacaoIndisponivelException`;
+* outros erros HTTP, timeouts, falhas de rede, respostas vazias ou dados inesperados geram `ServicoCotacaoIndisponivelException`. O status vai para o log: `451` é um ERROR que explica o bloqueio da região do servidor (a Binance recusa IPs dos EUA, entre outros), e `418`/`429` avisam que a Binance limitou as consultas;
 * uma cotação com preço menor ou igual a zero é rejeitada;
 * falhas do provedor nunca são convertidas em preço zero.
 
@@ -829,10 +829,26 @@ cotacoes.cache.max-stale=15m   # idade máxima para uso como fallback
 O fluxo de uma consulta é:
 
 1. cotações dentro do TTL são servidas pelo cache;
-2. os tickers restantes são consultados em lote;
-3. se o lote for rejeitado por ticker inválido, os tickers são consultados individualmente, e os inválidos são marcados como indisponíveis;
+2. os tickers restantes são consultados na Binance pela `ConsultaDeCotacoes`: em lote, ou com a consulta individual quando é um ticker só;
+3. se o lote for rejeitado por ticker inválido (a Binance recusa o lote inteiro sem dizer qual), os tickers são consultados individualmente, e os inválidos são marcados como indisponíveis;
 4. se a Binance estiver indisponível, é usada a última cotação com idade até `max-stale`, marcada como desatualizada;
 5. sem cotação nem fallback, o ticker é marcado como indisponível.
+
+### Proteções da consulta à Binance
+
+A `ConsultaDeCotacoes` fica entre o `CotacaoService` (que decide o cache e o fallback) e o `CotacaoClient` (que faz o HTTP):
+
+* **uma consulta por ticker.** Requisições simultâneas do mesmo ticker esperam a mesma chamada, em vez de cada uma ir à Binance quando o cache expira. Um lote que se sobrepõe a outro em andamento só busca o que falta. Quem espera a consulta de outra requisição desiste depois de 30 segundos, o que só acontece se algo travar;
+* **consulta individual em paralelo e com prazo.** Antes, N tickers viravam N chamadas sequenciais de até 5 segundos cada. Agora são feitas em threads virtuais, até `cotacoes.individual.paralelismo` por vez (padrão 4, por causa do limite de requisições por IP da Binance), com prazo total de `cotacoes.individual.tempo-maximo` (padrão 5s). As que passam do prazo são interrompidas e usam a cotação anterior. Os logs dessas threads mantêm o ID da requisição;
+* **circuit breaker (Resilience4j).** Configurado em `CotacaoConfiguration`:
+    * janela das últimas 10 chamadas, decidindo a partir de 5: se metade delas falhar ou demorar mais que `cotacoes.circuit-breaker.chamada-lenta` (padrão 3s), o circuito abre;
+    * aberto, as chamadas falham na hora, sem esperar os timeouts, e o resumo usa as cotações anteriores;
+    * depois de `cotacoes.circuit-breaker.espera-aberto` (padrão 30s), 2 chamadas de teste decidem se ele fecha;
+    * só a indisponibilidade conta como falha: um ticker inválido (`400`) é uma resposta normal;
+    * as mudanças de estado vão para o log (WARN ao abrir);
+    * o estado aparece na métrica `resilience4j.circuitbreaker.state{name="binance"}`, com as chamadas e a taxa de falhas.
+
+O pior caso de uma requisição passou a ser limitado: o lote (até `connect-timeout` + `read-timeout`) e, se ele for recusado, a consulta individual (até `tempo-maximo`). Com a Binance fora do ar, o circuito abre depois de poucas falhas e as requisições seguintes respondem na hora.
 
 Na validação de ticker durante a criação e a atualização de transações, uma cotação dentro da janela de fallback também é aceita quando o provedor está indisponível.
 
@@ -860,12 +876,19 @@ cotacoes.http.connect-timeout=${COTACOES_CONNECT_TIMEOUT:3s}
 cotacoes.http.read-timeout=${COTACOES_READ_TIMEOUT:5s}
 cotacoes.cache.ttl=${COTACOES_CACHE_TTL:60s}
 cotacoes.cache.max-stale=${COTACOES_CACHE_MAX_STALE:15m}
+cotacoes.individual.paralelismo=${COTACOES_INDIVIDUAL_PARALELISMO:4}
+cotacoes.individual.tempo-maximo=${COTACOES_INDIVIDUAL_TEMPO_MAXIMO:5s}
+cotacoes.circuit-breaker.espera-aberto=${COTACOES_CIRCUIT_BREAKER_ESPERA:30s}
+cotacoes.circuit-breaker.chamada-lenta=${COTACOES_CIRCUIT_BREAKER_CHAMADA_LENTA:3s}
 ```
+
+### Região do servidor
+
+A Binance recusa consultas de algumas regiões (os EUA, por exemplo) com HTTP `451`. Isso não tem conserto no código: o servidor precisa estar numa região aceita. O README mostra como conferir da VPS antes do deploy. Se acontecer em produção, o log mostra um ERROR com o `451`, o circuito abre e o resumo segue com as cotações anteriores, até elas passarem de 15 minutos.
 
 ### Limitações atuais
 
-* as chamadas são síncronas;
-* o cache não é compartilhado entre instâncias;
+* o cache, a coalescência das consultas e o circuit breaker são locais a cada instância;
 * somente pares com USDT são suportados.
 
 ---
@@ -1178,6 +1201,12 @@ Principais grupos:
 * testes de unidade do motor financeiro e da criação, atualização e exclusão de transações no `CarteiraService`;
 * `CarteiraServicePrecoMedioTest`, que verifica que o custo da posição não acumula erro de arredondamento: moedas de preço muito baixo, compras seguidas, venda parcial com divisão não exata, venda total e o PNL do resumo;
 * `CotacaoServiceTest` para cache, lote, fallback e tickers indisponíveis;
+* `ConsultaDeCotacoesTest`, com um provedor falso e barreiras em vez de tempos medidos:
+    * uma consulta só para requisições simultâneas do mesmo ticker, e um lote sobreposto buscando só o que falta;
+    * ninguém travado depois de um erro inesperado;
+    * a consulta individual em paralelo, com o limite de paralelismo e o prazo, mantendo o ID da requisição nos logs;
+    * o circuit breaker abrindo depois de falhas seguidas, ignorando tickers inválidos e fechando depois da espera, com relógio ajustável;
+* `BinanceCotacaoClientTest` também cobre os logs do `451` (bloqueio de região) e do `429`;
 * `BinanceCotacaoClientTest` com `MockRestServiceServer` para o mapeamento das respostas e dos erros da Binance;
 * `CarteiraResumoCotacoesTest` para o resumo com cotações parciais;
 * `TransacaoRepositoryUsuarioTest` (`@DataJpaTest`) para as consultas restritas ao proprietário;
