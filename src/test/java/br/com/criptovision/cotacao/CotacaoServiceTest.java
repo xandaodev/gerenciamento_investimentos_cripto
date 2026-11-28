@@ -4,6 +4,8 @@ import br.com.criptovision.cotacao.cache.CotacaoCache;
 import br.com.criptovision.cotacao.client.CotacaoClient;
 import br.com.criptovision.cotacao.model.CotacaoMercado;
 import br.com.criptovision.cotacao.model.ResultadoCotacoes;
+import br.com.criptovision.config.CotacaoConfiguration;
+import br.com.criptovision.cotacao.service.ConsultaDeCotacoes;
 import br.com.criptovision.cotacao.service.CotacaoService;
 import br.com.criptovision.exception.ServicoCotacaoIndisponivelException;
 import br.com.criptovision.exception.TickerInvalidoException;
@@ -52,8 +54,20 @@ class CotacaoServiceTest {
 
         registro = new SimpleMeterRegistry();
 
-        service = new CotacaoService(
+        ConsultaDeCotacoes consulta = new ConsultaDeCotacoes(
             cotacaoClient,
+            CotacaoConfiguration.criarCircuitBreakerDaBinance(
+                Duration.ofSeconds(30),
+                Duration.ofSeconds(3),
+                clock,
+                registro
+            ),
+            4,
+            Duration.ofSeconds(5)
+        );
+
+        service = new CotacaoService(
+            consulta,
             cache,
             clock,
             new MetricasCriptoVision(registro)
@@ -87,10 +101,9 @@ class CotacaoServiceTest {
     void deveUsarCotacaoAnteriorQuandoProvedorFalhar() {
         Set<String> tickers = Set.of("BTC");
 
-        when(cotacaoClient.buscarCotacoes(tickers))
-            .thenReturn(Map.of(
-                "BTC", cotacao("BTC", "65000", "2.5")
-            ))
+        // um ticker só vai pela consulta individual
+        when(cotacaoClient.buscarCotacao("BTC"))
+            .thenReturn(cotacao("BTC", "65000", "2.5"))
             .thenThrow(
                 new ServicoCotacaoIndisponivelException()
             );

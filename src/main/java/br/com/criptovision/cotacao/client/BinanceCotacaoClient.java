@@ -3,6 +3,8 @@ package br.com.criptovision.cotacao.client;
 import br.com.criptovision.cotacao.model.CotacaoMercado;
 import br.com.criptovision.exception.ServicoCotacaoIndisponivelException;
 import br.com.criptovision.exception.TickerInvalidoException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.client.JdkClientHttpRequestFactory;
@@ -27,6 +29,9 @@ import java.util.stream.Collectors;
 
 @Component
 public class BinanceCotacaoClient implements CotacaoClient {
+
+    private static final Logger LOGGER =
+        LoggerFactory.getLogger(BinanceCotacaoClient.class);
 
     private static final String MOEDA_COTACAO = "USDT";
     private static final int TAMANHO_MAXIMO_LOTE = 20;
@@ -119,7 +124,7 @@ public class BinanceCotacaoClient implements CotacaoClient {
                 .onStatus(
                     HttpStatusCode::isError,
                     (request, response) -> {
-                        throw new ServicoCotacaoIndisponivelException();
+                        throw indisponivel(response.getStatusCode());
                     }
                 )
                 .body(BinanceTicker24hResponse.class);
@@ -165,7 +170,7 @@ public class BinanceCotacaoClient implements CotacaoClient {
                 .onStatus(
                     HttpStatusCode::isError,
                     (request, response) -> {
-                        throw new ServicoCotacaoIndisponivelException();
+                        throw indisponivel(response.getStatusCode());
                     }
                 )
                 .body(BinanceTicker24hResponse[].class);
@@ -237,5 +242,23 @@ public class BinanceCotacaoClient implements CotacaoClient {
 
     private String paraParBinance(String ticker) {
         return ticker + MOEDA_COTACAO;
+    }
+
+    // o status vai para o log: sem ele, um bloqueio de região ou de limite de
+    // requisições pareceria uma instabilidade qualquer do provedor
+    private static ServicoCotacaoIndisponivelException indisponivel(HttpStatusCode status) {
+        switch (status.value()) {
+            case 451 -> LOGGER.error(
+                "A Binance recusou a consulta com HTTP 451: ela bloqueia a região deste servidor "
+                    + "(por exemplo, os EUA). Hospede a API em outra região; veja \"O que você precisa\" no README."
+            );
+            case 418, 429 -> LOGGER.warn(
+                "A Binance limitou as consultas deste servidor (HTTP {}). O circuit breaker reduz as tentativas.",
+                status.value()
+            );
+            default -> LOGGER.warn("A Binance respondeu HTTP {}.", status.value());
+        }
+
+        return new ServicoCotacaoIndisponivelException();
     }
 }

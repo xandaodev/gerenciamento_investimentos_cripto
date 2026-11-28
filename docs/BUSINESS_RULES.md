@@ -853,6 +853,8 @@ As cotações são obtidas pelo `CotacaoService`:
 
 Uma cotação nunca é substituída por preço zero.
 
+A espera pela Binance é limitada: os tickers que não respondem dentro do prazo da consulta individual (5 segundos) entram como indisponíveis e usam a cotação anterior, como num provedor fora do ar. Com a Binance falhando seguidamente, o circuit breaker faz o resumo responder na hora com as cotações anteriores, em vez de esperar os timeouts. A regra é a mesma: cotação anterior marcada como desatualizada, ou ativo sem cotação, e nunca preço zero.
+
 Além dos ativos, o resumo informa:
 
 - `cotacoesAtualizadasEm`: horário da cotação mais antiga utilizada;

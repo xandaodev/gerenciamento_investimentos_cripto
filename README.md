@@ -37,7 +37,7 @@ O desenvolvimento deste sistema foi marcado por ciclos de melhoria contínua e r
 
 * **👤 Contas e Autenticação:** Cadastro de usuários com senha criptografada (BCrypt) e login que devolve um token JWT válido por 2 horas, com limite de tentativas por IP e por login contra ataques de força bruta.
 * **🧾 Histórico de Transações:** Cadastro, consulta, edição e exclusão de compras e vendas. Edições e exclusões que deixariam o histórico inconsistente (ex: uma venda sem saldo) são bloqueadas.
-* **📈 Cotações da Binance:** Preço e variação de 24 horas consultados em lote, com timeout, cache de 60 segundos e uso da última cotação conhecida (até 15 minutos) quando a Binance está fora do ar.
+* **📈 Cotações da Binance:** Preço e variação de 24 horas consultados em lote, com timeout, cache de 60 segundos e uso da última cotação conhecida (até 15 minutos) quando a Binance está fora do ar. Um circuit breaker faz a API responder na hora quando a Binance falha seguidamente, e requisições simultâneas do mesmo ativo dividem uma única consulta.
 * **📊 Resumo da Carteira:** Saldo, preço médio, valor atual, PNL e variação de 24 horas por ativo e da carteira inteira, em USD (pares com USDT). Ativos sem cotação continuam aparecendo, e a resposta indica quando os dados são parciais.
 * **💰 Simuladores:** Impacto de um novo aporte (DCA) no preço médio e no *break-even*, e resultado de vender a posição a um preço-alvo.
 * **📖 Documentação Interativa:** Interface gerada com **Swagger/OpenAPI** para testar as rotas da API.
@@ -100,6 +100,7 @@ A aplicação lê as credenciais de variáveis de ambiente. O arquivo [`.env.exa
 | `BACKUP_HORARIO`, `BACKUP_RETENCAO_DIAS`, `BACKUP_RETENCAO_REMOTA_DIAS`, `BACKUP_TESTE_SEMANAL` | Não | Horário (UTC), retenção e teste semanal dos backups |
 | `BINANCE_API_BASE_URL` | Não | URL da API de mercado da Binance |
 | `COTACOES_CONNECT_TIMEOUT`, `COTACOES_READ_TIMEOUT`, `COTACOES_CACHE_TTL`, `COTACOES_CACHE_MAX_STALE` | Não | Timeouts e cache das cotações |
+| `COTACOES_INDIVIDUAL_PARALELISMO`, `COTACOES_INDIVIDUAL_TEMPO_MAXIMO`, `COTACOES_CIRCUIT_BREAKER_ESPERA`, `COTACOES_CIRCUIT_BREAKER_CHAMADA_LENTA` | Não | Consulta individual (padrão: 4 por vez, 5s no total) e circuit breaker da Binance (padrão: 30s aberto, chamada lenta acima de 3s) |
 | `MANAGEMENT_SERVER_PORT` / `MANAGEMENT_SERVER_ADDRESS` | Não | Porta e endereço do Actuator (padrão: `8081` em `127.0.0.1`). Use `0.0.0.0` só para um Prometheus coletar as métricas de outro container |
 | `JPA_SHOW_SQL` | Não | `true` manda o SQL do Hibernate para o log. Útil no ambiente local, nunca em produção (padrão: `false`) |
 | `API_LIMITE_MEMORIA` | Não | Limite de memória do container da API no Compose (padrão: `1g`). O heap da JVM fica em 75% dele |
@@ -158,6 +159,11 @@ Internet ──443 (HTTPS)──▶ Caddy ──rede interna──▶ API ──
 ### O que você precisa
 
 * Uma VPS com Linux, por exemplo Ubuntu 24.04 LTS, com pelo menos 2 GB de RAM por causa da JVM e do MySQL. O container da API fica limitado a 1 GB (`API_LIMITE_MEMORIA`).
+* **Numa região que a Binance aceite.** Ela recusa consultas de alguns países, como os EUA, com HTTP `451`. Prefira uma região no Brasil ou na Europa e confira da VPS, antes do deploy, se a resposta é `200`:
+    ```bash
+    curl -s -o /dev/null -w "%{http_code}\n" https://data-api.binance.vision/api/v3/ping
+    ```
+    Com `451`, a API funciona, mas sem cotações novas: o log mostra um ERROR explicando o bloqueio.
 * Um domínio. A API fica num subdomínio, como `api.seudominio.com.br`.
 
 ### Passo a passo
