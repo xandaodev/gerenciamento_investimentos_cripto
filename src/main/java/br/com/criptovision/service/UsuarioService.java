@@ -2,6 +2,7 @@ package br.com.criptovision.service;
 
 import br.com.criptovision.dto.DadosCadastroUsuario;
 import br.com.criptovision.dto.DadosTrocaSenha;
+import br.com.criptovision.exception.ContaInexistenteException;
 import br.com.criptovision.exception.LoginJaCadastradoException;
 import br.com.criptovision.exception.NovaSenhaInvalidaException;
 import br.com.criptovision.exception.SenhaAtualIncorretaException;
@@ -72,8 +73,6 @@ public class UsuarioService {
     // simultâneos não perdem o incremento um do outro na versão dos tokens
     private Usuario bloquear(Usuario usuario) {
         return usuarioRepository.bloquearPorId(usuario.getId())
-            .orElseThrow(() -> new IllegalStateException(
-                "Usuário autenticado não encontrado."
-            ));
+            .orElseThrow(ContaInexistenteException::new);
     }
 }

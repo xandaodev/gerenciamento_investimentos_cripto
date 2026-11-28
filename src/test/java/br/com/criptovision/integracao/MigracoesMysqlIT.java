@@ -116,4 +116,41 @@ class MigracoesMysqlIT {
         assertThat(lida.getQuantidade()).isEqualByComparingTo(quantidadeMaxima);
         assertThat(lida.getPrecoUnitario()).isEqualByComparingTo(menorPreco);
     }
+
+    @Test
+    void chaveEstrangeiraDasTransacoesDeveExcluirEmCascata() {
+        // o ddl-auto=validate também não confere a regra da FK: a garantia do V5 é aqui
+        String regra = jdbcTemplate.queryForObject("""
+            SELECT DELETE_RULE
+            FROM information_schema.REFERENTIAL_CONSTRAINTS
+            WHERE CONSTRAINT_SCHEMA = DATABASE()
+              AND CONSTRAINT_NAME = 'fk_transacoes_usuario'
+            """, String.class);
+
+        assertThat(regra).isEqualTo("CASCADE");
+    }
+
+    @Test
+    void excluirOUsuarioDiretoNoBancoDeveLevarAsTransacoesJunto() {
+        Usuario usuario = usuarioRepository.saveAndFlush(
+            new Usuario("conta.cascata", "senha-criptografada")
+        );
+        Transacao transacao = new Transacao(
+            "BTC",
+            BigDecimal.ONE,
+            new BigDecimal("65000"),
+            TipoTransacao.COMPRA
+        );
+        transacao.setUsuario(usuario);
+        transacaoRepository.saveAndFlush(transacao);
+
+        // como um administrador faria, sem passar pelo ContaService
+        jdbcTemplate.update("DELETE FROM usuarios WHERE id = ?", usuario.getId());
+
+        assertThat(jdbcTemplate.queryForObject(
+            "SELECT COUNT(*) FROM transacoes WHERE usuario_id = ?",
+            Long.class,
+            usuario.getId()
+        )).isZero();
+    }
 }

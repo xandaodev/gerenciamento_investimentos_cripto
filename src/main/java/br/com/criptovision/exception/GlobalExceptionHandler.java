@@ -359,6 +359,41 @@ public class GlobalExceptionHandler {
             .body(problema);
     }
 
+    @ExceptionHandler(SenhaDeConfirmacaoIncorretaException.class)
+    public ResponseEntity<ProblemDetail> tratarExclusaoDeContaRecusada(
+        SenhaDeConfirmacaoIncorretaException ex,
+        HttpServletRequest request
+    ) {
+        ProblemDetail problema = criarProblema(
+            HttpStatus.BAD_REQUEST,
+            "Exclusão de conta recusada",
+            ex.getMessage(),
+            request
+        );
+
+        return ResponseEntity
+            .status(HttpStatus.BAD_REQUEST)
+            .body(problema);
+    }
+
+    // a conta foi excluída durante a requisição: igual a um token de conta inexistente
+    @ExceptionHandler(ContaInexistenteException.class)
+    public ResponseEntity<ProblemDetail> tratarContaInexistente(
+        ContaInexistenteException ex,
+        HttpServletRequest request
+    ) {
+        ProblemDetail problema = criarProblema(
+            HttpStatus.UNAUTHORIZED,
+            "Não autorizado",
+            ex.getMessage(),
+            request
+        );
+
+        return ResponseEntity
+            .status(HttpStatus.UNAUTHORIZED)
+            .body(problema);
+    }
+
     @ExceptionHandler(LoginJaCadastradoException.class)
     public ResponseEntity<ProblemDetail> tratarLoginJaCadastrado(
         LoginJaCadastradoException ex,

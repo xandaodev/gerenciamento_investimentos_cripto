@@ -2,7 +2,7 @@
 
 Este roadmap organiza em fases o que falta para publicar o CriptoVision para usuários reais. Ele nasceu de uma auditoria de segurança, autenticação, testes, tratamento de erros, performance e infraestrutura, e incorpora as dívidas técnicas de `docs/ARCHITECTURE.md` (§15).
 
-A numeração dos itens (#1 a #28) é a da auditoria original. Ela é mantida para facilitar referências em issues, branches e commits. Marque o checkbox quando o item estiver concluído e documentado.
+A numeração dos itens (#1 a #28) é a da auditoria original. Ela é mantida para facilitar referências em issues, branches e commits. Itens que surgiram depois continuam a partir do #29. Marque o checkbox quando o item estiver concluído e documentado.
 
 Prioridade das fases:
 
@@ -13,6 +13,7 @@ Prioridade das fases:
 | 3 | Antes de abrir para usuários | Antes de convidar usuários reais |
 | 4 | Qualidade e escala | Logo após o lançamento |
 | 5 | Evolução do produto | Contínuo |
+| — | Processos contínuos | A cada funcionalidade nova |
 
 ---
 
@@ -78,10 +79,17 @@ Prioridade das fases:
   - **Correção:** validar o tamanho mínimo do segredo na inicialização, adicionar `audience` e um mecanismo de invalidação (por exemplo, um `tokenVersion` no usuário verificado no filtro). Avaliar refresh token e criar troca de senha.
   - **Feito:** a aplicação não sobe com `JWT_SECRET` menor que 32 bytes nem com o valor de exemplo. O token tem `audience` e a versão dos tokens do usuário (`versao_token`, migration `V4`), que o `SecurityFilter` compara com a do banco. `POST /auth/logout` encerra as sessões em todos os dispositivos. `PUT /auth/senha` troca a senha, revoga os tokens antigos e devolve um novo, e a senha atual errada conta para a proteção contra força bruta. O refresh token foi avaliado e não adotado por enquanto: exigiria armazenamento, rotação e detecção de reuso, e os tokens duram 2 horas (veja o ARCHITECTURE, seção 6).
 
-- [ ] **#10 — Requisitos mínimos da LGPD**
+- [x] **#10 — Requisitos mínimos da LGPD**
   - **Problema:** não existe exclusão de conta, a FK `fk_transacoes_usuario` não tem `ON DELETE`, e não há política de privacidade nem exportação de dados.
   - **Arquivo:** `src/main/resources/db/migration/V1__cria_schema_inicial.sql` (FK), `src/main/java/br/com/criptovision/controller/AutenticacaoController.java`, `src/main/java/br/com/criptovision/service/UsuarioService.java`
   - **Correção:** criar endpoints de exclusão de conta e de exportação dos dados do usuário, ajustar a FK em nova migration (ou excluir as transações explicitamente no serviço) e publicar uma política de privacidade.
+  - **Feito:**
+    - `GET /conta/exportacao` devolve um JSON com a conta e todas as transações (acesso e portabilidade), sem o hash da senha;
+    - `POST /conta/exclusao` exclui a conta e as transações depois de conferir a senha atual. A senha errada conta como falha de login;
+    - o `ContaService` apaga as transações explicitamente, e a migration `V5` põe `ON DELETE CASCADE` na FK;
+    - uma requisição em andamento de uma conta excluída responde 401, e não 500;
+    - o rascunho da política, com cada dado, a finalidade, a base legal, a retenção e os serviços de terceiros (inclusive os planejados), está em `docs/POLITICA_DE_PRIVACIDADE.md`.
+  - **Pendente (autor):** publicar a política. É preciso preencher os campos entre colchetes (controlador, contato, provedores e regiões), resolver as "Notas para a revisão" (Marco Civil, encarregado, transferência internacional) com um advogado e colocar o link no cadastro do frontend.
 
 - [x] **#11 — A data da transação é sempre o momento do cadastro**
   - **Problema:** `Transacao.data` usa `@CreationTimestamp`, então o usuário não consegue lançar compras antigas com a data real. Se lançar o histórico fora de ordem, uma venda legítima pode ser rejeitada por saldo insuficiente.
@@ -202,3 +210,17 @@ Prioridade das fases:
   - **Problema:** o cache de cotações é local à instância (dívida #12 do §15). Só importa quando houver mais de uma instância.
   - **Arquivo:** `src/main/java/br/com/criptovision/cotacao/cache/CotacaoCache.java`
   - **Correção:** quando escalar horizontalmente, migrar para um cache compartilhado (por exemplo, Redis) mantendo as regras de TTL e fallback.
+
+---
+
+## Processos contínuos
+
+- [ ] **#29 — Revisar a política de privacidade a cada funcionalidade que trate dados pessoais**
+  - **Problema:** a política de privacidade (`docs/POLITICA_DE_PRIVACIDADE.md`) só é verdadeira enquanto descreve o que a API realmente faz. Uma funcionalidade nova que colete um dado, use um serviço de terceiros ou mude um prazo de retenção a deixa desatualizada. Isso vale para o diário com ditado por voz, os alertas por e-mail e pelo Telegram e as cotações do Ibovespa e do CDI, que já aparecem nela como planejados.
+  - **Arquivo:** `docs/POLITICA_DE_PRIVACIDADE.md`, `src/main/java/br/com/criptovision/service/ContaService.java`, `src/main/java/br/com/criptovision/dto/ExportacaoDadosDTO.java`
+  - **Correção:** este item nunca é marcado como concluído. No PR de qualquer funcionalidade que trate dados pessoais:
+    - atualizar a tabela de dados (finalidade, base legal e retenção) e a de serviços de terceiros, tirando a marca de "planejado" do que foi lançado;
+    - incluir o dado novo na exportação (`GET /conta/exportacao`) e garantir que ele saia na exclusão da conta, com testes;
+    - atualizar a versão e a data da política e avisar os usuários, se ela já estiver publicada;
+    - preferir provedores no Brasil ou, se não for possível, registrar o mecanismo de transferência internacional.
+

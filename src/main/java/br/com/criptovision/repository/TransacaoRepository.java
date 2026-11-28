@@ -5,6 +5,7 @@ import br.com.criptovision.model.TipoTransacao;
 import br.com.criptovision.model.Transacao;
 import br.com.criptovision.model.Usuario;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -28,6 +29,11 @@ public interface TransacaoRepository extends JpaRepository<Transacao, Long> {
         Long id,
         Usuario usuario
     );
+
+    // exclusão de conta: um DELETE só, sem carregar as transações
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query("DELETE FROM Transacao t WHERE t.usuario = :usuario")
+    int excluirTodasDoUsuario(@Param("usuario") Usuario usuario);
 
     // calcula o total de dólares aportados, agrupado por moeda
     @Query("""
