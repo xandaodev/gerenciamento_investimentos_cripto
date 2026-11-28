@@ -126,6 +126,7 @@ Contém os endpoints HTTP da aplicação.
 Classes atuais:
 
 * `AutenticacaoController`;
+* `ContaController`;
 * `TransacaoController`;
 * `CarteiraController`;
 * `AnaliseController`.
@@ -179,6 +180,8 @@ Classes atuais:
 * `ServicoCotacaoIndisponivelException`;
 * `ArquivoNaoEncontradoException`;
 * `BancoDeDadosException`;
+* `SenhaDeConfirmacaoIncorretaException`;
+* `ContaInexistenteException`;
 * `GlobalExceptionHandler`.
 
 ### Formato e status das respostas de erro
@@ -262,7 +265,8 @@ Contém as principais regras de negócio.
 Classes atuais:
 
 * `CarteiraService`;
-* `UsuarioService`.
+* `UsuarioService`;
+* `ContaService`, com a exportação dos dados e a exclusão da conta (veja "Conta e direitos do titular" na seção 6).
 
 ---
 
@@ -401,7 +405,11 @@ Migrations atuais:
 V1__cria_schema_inicial.sql              tabelas usuarios e transacoes
 V2__torna_credenciais_obrigatorias.sql   login (100) e senha obrigatórios
 V3__aumenta_precisao_valores_cripto.sql  quantidade e preço com DECIMAL(38, 18)
+V4__adiciona_versao_token.sql            versão dos tokens do usuário (revogação)
+V5__exclui_transacoes_com_o_usuario.sql  FK fk_transacoes_usuario com ON DELETE CASCADE
 ```
+
+O `ddl-auto=validate` não confere precisão, escala nem a regra das FKs. Por isso o `MigracoesMysqlIT` confere o `DECIMAL(38, 18)` da V3 e o `CASCADE` da V5 direto no `information_schema`. A entidade `Transacao` tem `@OnDelete(CASCADE)`, para que o schema do H2 nos testes também apague as transações junto com o usuário.
 
 O Hibernate apenas valida o schema criado pelo Flyway:
 
@@ -548,6 +556,22 @@ O token é assinado com HMAC-SHA256 usando o segredo `JWT_SECRET` e contém:
 | `iat` / `exp` | a emissão e a expiração, 2 horas depois |
 
 O `TokenService` só aceita tokens com esse emissor, essa audiência e a claim `versao`, com o tempo vindo do `Clock`. Na inicialização, ele exige um `JWT_SECRET` de ao menos 32 bytes, o mínimo para o HMAC-SHA256 (RFC 7518), e recusa o valor de exemplo do `.env.example`. Com um segredo fraco, a aplicação não sobe.
+
+### Conta e direitos do titular
+
+O `ContaController` (`/conta`) atende os direitos do titular da LGPD. A política de privacidade, ainda em rascunho, está em `docs/POLITICA_DE_PRIVACIDADE.md`.
+
+* `GET /conta/exportacao` devolve um JSON com a conta (login) e todas as transações em ordem cronológica, com as datas em UTC e o fuso explícito, para download (`Content-Disposition: attachment`). Ficam de fora o hash da senha e a versão dos tokens.
+* `POST /conta/exclusao` recebe `{"senhaAtual": "..."}` e exclui a conta de forma definitiva. É um `POST`, e não um `DELETE`, porque leva corpo. O `ContaService`:
+    1. bloqueia o usuário com `bloquearPorId` (`SELECT ... FOR UPDATE`, a primeira consulta, como nas operações de transação);
+    2. confere a senha;
+    3. apaga as transações num único `DELETE` (`excluirTodasDoUsuario`) e depois o usuário.
+
+  A FK com `ON DELETE CASCADE` (V5) garante o mesmo numa exclusão feita direto no banco. A senha errada responde `400` e conta como falha de login na `ProtecaoForcaBruta`, como na troca de senha. O log registra só o ID da conta excluída, nunca o login.
+
+Uma requisição que já estava em andamento quando a conta foi excluída, como uma transação esperando o bloqueio, não encontra mais o usuário no `bloquearPorId`. Ela recebe `ContaInexistenteException` e responde `401`, como um token de conta inexistente. Antes, isso virava um `IllegalStateException` e um `500`.
+
+Toda funcionalidade nova que trate dados pessoais precisa entrar na exportação, na exclusão e na política (ROADMAP #29).
 
 ### Revogação dos tokens
 
@@ -929,6 +953,13 @@ GET /carteira/simulador/venda?ticker=&precoAlvo=
 GET /analise/aportes-por-moeda
 ```
 
+## Conta
+
+```http
+GET  /conta/exportacao   (autenticado)
+POST /conta/exclusao     (autenticado)
+```
+
 ## Saúde
 
 ```http
@@ -1221,6 +1252,10 @@ Principais grupos:
 * `ProxyReversoHttpTest` e `SemProxyReversoHttpTest`, que sobem um Tomcat real: com `server.forward-headers-strategy=native`, o limite por IP usa o IP informado pelo proxy e o HSTS é enviado em HTTPS; sem a propriedade, um `X-Forwarded-For` forjado é ignorado;
 * `CorsPropertiesTest`, para a leitura e a validação de `CORS_ALLOWED_ORIGINS`, inclusive a falha na inicialização com uma origem inválida, e `CorsOrigensPadraoHttpTest` e `CorsOrigensConfiguradasHttpTest`, que verificam por `MockMvc` o preflight de origens permitidas e recusadas, com as origens padrão e com origens configuradas;
 * `ObservabilidadeHttpTest`, que sobe um Tomcat real com as duas portas: o `/saude` público só com o status, o Actuator ausente da porta da API, e o health completo, as probes e as métricas do Prometheus na porta de gerenciamento; `ConfiguracaoDeProducaoTest`, que lê o `application.properties` e trava os padrões de produção (porta `8081` no loopback, só `health`, `metrics` e `prometheus` expostos, `/saude` sem detalhes, `show-sql` desligado); `IdentificadorRequisicaoHttpTest`, para o ID gerado, o aproveitado do cliente, o inseguro trocado e o `requestId` nos erros `400` e `401`; `ErrosInternosHttpTest`, que verifica que um `500` conta na métrica com o tipo da exceção e vai para o log com o ID da requisição; e `LogsEmJsonTest`, que usa o encoder do Spring Boot para garantir que o ID vira o campo `requestId` do JSON. As métricas da força bruta e das cotações são verificadas no `ProtecaoForcaBrutaHttpTest` e no `CotacaoServiceTest`;
+* `ContaHttpTest`, que verifica por `MockMvc`:
+    * a exportação: todas as transações em ordem, com datas em UTC, sem dados de outra conta nem segredos, como arquivo para download;
+    * a exclusão: conta e transações apagadas, a outra conta intacta, o token sem valor, o login livre para novo cadastro;
+    * a recusa com a senha errada ou ausente, sem apagar nada, e o bloqueio por força bruta;
 * `CadastroUsuarioHttpTest`, `PadronizacaoErrosHttpTest` e `OpenApiDocumentationTest` para o cadastro, o login, o formato dos erros e a documentação.
 
 Essa suíte rápida, que não precisa de banco externo nem de Docker, pode ser executada com:

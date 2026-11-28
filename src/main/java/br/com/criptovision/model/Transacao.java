@@ -3,6 +3,8 @@ package br.com.criptovision.model;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.math.BigDecimal;
@@ -68,6 +70,8 @@ public class Transacao {
         name = "usuario_id",
         nullable = false
     )
+    // igual à migration V5, para que o schema do H2 nos testes também tenha o CASCADE
+    @OnDelete(action = OnDeleteAction.CASCADE)
     private Usuario usuario;
 
     //private double taxa;

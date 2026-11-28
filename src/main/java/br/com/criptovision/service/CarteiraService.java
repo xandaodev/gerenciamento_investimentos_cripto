@@ -5,6 +5,7 @@ import br.com.criptovision.cotacao.model.ResultadoCotacoes;
 import br.com.criptovision.cotacao.service.CotacaoService;
 import br.com.criptovision.cotacao.util.TickerNormalizer;
 import br.com.criptovision.dto.*;
+import br.com.criptovision.exception.ContaInexistenteException;
 import br.com.criptovision.exception.AlteracaoHistoricoInvalidaException;
 import br.com.criptovision.exception.DataTransacaoInvalidaException;
 import br.com.criptovision.exception.HistoricoInconsistenteException;
@@ -522,9 +523,7 @@ public class CarteiraService {
     ) {
         return transactionTemplate.execute(status -> {
             usuarioRepo.bloquearPorId(usuario.getId())
-                .orElseThrow(() -> new IllegalStateException(
-                    "Usuário autenticado não encontrado."
-                ));
+                .orElseThrow(ContaInexistenteException::new);
 
             return acao.get();
         });

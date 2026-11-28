@@ -142,6 +142,15 @@ Os limites podem ser ajustados pelas propriedades `seguranca.tentativas.*`.
 - `PUT /auth/senha` exige a senha atual e uma nova senha com 8 a 64 caracteres, diferente da atual. Depois da troca, todos os tokens emitidos antes deixam de valer, e a resposta traz um token novo para a sessão atual continuar;
 - uma senha atual errada responde `400` sem revogar nada, mas conta como falha de login: depois de 5 falhas em 15 minutos, a troca de senha e o login daquela conta ficam bloqueados com `429` até a janela fechar.
 
+### Exportação dos dados e exclusão da conta
+
+Os direitos do titular da LGPD (art. 18) funcionam pela própria conta:
+
+- `GET /conta/exportacao` devolve, num arquivo JSON, todos os dados guardados sobre o usuário: o login e todas as transações, em ordem cronológica, com as datas em UTC. O hash da senha e a versão dos tokens não entram;
+- `POST /conta/exclusao` exclui a conta, de forma definitiva, depois de conferir a senha atual. Todas as transações saem junto, todos os tokens deixam de valer e o login fica livre para um novo cadastro. A exclusão não pode ser desfeita: o usuário deve exportar os dados antes, se quiser guardá-los;
+- uma senha errada na exclusão responde `400`, não apaga nada e conta como falha de login, como na troca de senha;
+- os backups cifrados que ainda contêm a conta expiram em até 14 dias no servidor e 30 dias no bucket. Esse prazo é informado na política de privacidade (`docs/POLITICA_DE_PRIVACIDADE.md`, ainda em rascunho).
+
 ### Associação obrigatória
 
 Cada transação possui um proprietário obrigatório:

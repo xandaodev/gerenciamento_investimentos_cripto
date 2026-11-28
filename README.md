@@ -41,6 +41,7 @@ O desenvolvimento deste sistema foi marcado por ciclos de melhoria contínua e r
 * **📊 Resumo da Carteira:** Saldo, preço médio, valor atual, PNL e variação de 24 horas por ativo e da carteira inteira, em USD (pares com USDT). Ativos sem cotação continuam aparecendo, e a resposta indica quando os dados são parciais.
 * **💰 Simuladores:** Impacto de um novo aporte (DCA) no preço médio e no *break-even*, e resultado de vender a posição a um preço-alvo.
 * **📖 Documentação Interativa:** Interface gerada com **Swagger/OpenAPI** para testar as rotas da API.
+* **🔐 Privacidade (LGPD):** O usuário exporta todos os seus dados num arquivo JSON e exclui a conta com todas as transações. A política de privacidade, ainda em rascunho, está em [`docs/POLITICA_DE_PRIVACIDADE.md`](docs/POLITICA_DE_PRIVACIDADE.md).
 * **🔄 Normalização de Tickers:** Nomes comuns (ex: "Bitcoin") são convertidos para o ticker oficial ("BTC").
 * **⚠️ Erros Padronizados:** Todas as respostas de erro seguem o formato Problem Details (RFC 7807), com o ID da requisição (`requestId`), que também está no cabeçalho `X-Request-Id` e nos logs.
 * **🩺 Observabilidade:** Health check público em `/saude`, health completo e métricas (Prometheus) numa porta de gerenciamento privada, e logs em JSON com o ID de cada requisição.
@@ -75,6 +76,8 @@ O desenvolvimento deste sistema foi marcado por ciclos de melhoria contínua e r
 | `GET` | `/carteira/simulador/dca` | Simulação de aporte |
 | `GET` | `/carteira/simulador/venda` | Simulação de venda a um preço-alvo |
 | `GET` | `/analise/aportes-por-moeda` | Total comprado por ativo |
+| `GET` | `/conta/exportacao` | Exporta todos os dados do usuário (conta e transações) num arquivo JSON |
+| `POST` | `/conta/exclusao` | Exclui a conta e todas as transações, confirmando a senha atual |
 | `GET` | `/saude` | Health check público: `{"status":"UP"}` ou `DOWN` (503), sem detalhes |
 
 Com exceção de `/auth/register`, `/auth/login`, `/saude` e do Swagger, todas as rotas exigem o cabeçalho `Authorization: Bearer <token>`.
@@ -322,7 +325,10 @@ O backup é diário, então numa perda total você recupera o banco como estava 
 
 ### Ainda não incluído
 
-O [roadmap](docs/ROADMAP.md) lista o que falta antes de abrir para usuários, como o circuit breaker das cotações (#16), os requisitos da LGPD (#10) e um alerta ativo para erros `500`, que depende de uma ferramenta de monitoramento.
+O [roadmap](docs/ROADMAP.md) lista o que falta. Antes de abrir para usuários, ainda é preciso:
+
+* publicar a [política de privacidade](docs/POLITICA_DE_PRIVACIDADE.md), que é um rascunho com campos a preencher e pontos para revisar com um advogado;
+* configurar um alerta ativo para erros `500`, que depende de uma ferramenta de monitoramento.
 
 ---
 ⭐ *Desenvolvido por **Alexandre Vital** - Estudante de Ciência da Computação na UFSJ, em busca de desafios como Desenvolvedor Back-End.*
