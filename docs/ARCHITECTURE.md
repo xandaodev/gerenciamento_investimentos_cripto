@@ -1179,7 +1179,9 @@ O `scripts/testar-stack.sh` testa tudo isso de uma vez. Ele sobe o `db` e a `api
 * os logs em JSON com o `requestId`;
 * a saída com o código `143` (SIGTERM, e não `137` do SIGKILL), com o graceful shutdown concluído.
 
-O CI o roda num job próprio (`Imagem Docker e stack`), em paralelo aos testes do Maven.
+O CI o roda num job próprio (`Imagem Docker e stack`), em paralelo aos testes do Maven. A imagem é construída antes, pelo `docker/build-push-action`, com o cache do GitHub Actions (`type=gha,mode=max`), que guarda também as camadas do estágio de build. Depois, o script recebe a imagem pronta em `IMAGEM_API`. Sem o cache, cada execução baixava o Maven e as dependências do Maven Central, e um `429` de lá chegou a derrubar o job. No próprio Dockerfile, o download das dependências tem até 3 tentativas, para que um `429` passageiro não derrube um build sem cache, como na VPS.
+
+O script lê os logs numa variável antes de procurar neles. Com `pipefail`, `docker compose logs | grep -q` dava falso negativo: o `grep` sai ao achar a linha, o `docker compose logs` leva SIGPIPE e o pipeline conta como erro.
 
 ### Observabilidade
 

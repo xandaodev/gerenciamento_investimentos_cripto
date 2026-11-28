@@ -117,7 +117,7 @@ A aplicação lê as credenciais de variáveis de ambiente. O arquivo [`.env.exa
     ```
 3.  A API fica em `http://localhost:8080` e o MySQL em `localhost:3307`, sem HTTPS. As duas portas só aceitam conexões da própria máquina. A API só sobe depois que o MySQL fica saudável, e o Flyway cria as tabelas na primeira execução. `docker compose ps` mostra os dois como `healthy` quando estão prontos.
 
-Para conferir a imagem de produção e a stack inteira de uma vez (healthcheck, usuário sem root, memória da JVM, logs em JSON e graceful shutdown), rode `bash scripts/testar-stack.sh`. Ele usa um projeto isolado, com portas e senhas próprias, sem tocar na stack normal nem no `.env`, e apaga tudo no fim. O CI roda o mesmo script.
+Para conferir a imagem de produção e a stack inteira de uma vez (healthcheck, usuário sem root, memória da JVM, logs em JSON e graceful shutdown), rode `bash scripts/testar-stack.sh`. Ele usa um projeto isolado, com portas e senhas próprias, sem tocar na stack normal nem no `.env`, e apaga tudo no fim. O CI roda o mesmo script, com a imagem construída antes, usando o cache do GitHub Actions (`IMAGEM_API`).
 
 O MySQL só aceita conexões cifradas com TLS. Ao abrir o banco numa ferramenta como DBeaver ou MySQL Workbench, mantenha o SSL ativado, que costuma ser o padrão. O certificado é gerado pelo próprio MySQL, então a ferramenta não deve exigir a verificação dele.
 

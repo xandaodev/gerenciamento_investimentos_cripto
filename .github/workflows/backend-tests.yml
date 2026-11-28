@@ -59,8 +59,25 @@ jobs:
       - name: Baixar o código
         uses: actions/checkout@v6
 
-      # constrói a imagem de produção do zero, como na VPS, e sobe db + api pelo
-      # docker-compose: confere o HEALTHCHECK, o depends_on, o usuário sem root,
-      # o limite de memória da JVM, os logs em JSON e o graceful shutdown
+      # o Buildx guarda as camadas no cache do GitHub Actions, inclusive as do
+      # estágio de build (o Maven e as dependências). Sem isso, cada execução
+      # baixava tudo do Maven Central, e um 429 de lá já derrubou este job
+      - name: Preparar o Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Construir a imagem de produção com cache
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          load: true
+          tags: criptovision-api:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # sobe db + api pelo docker-compose com a imagem construída acima: confere
+      # o HEALTHCHECK, o depends_on, o usuário sem root, o limite de memória da
+      # JVM, os logs em JSON e o graceful shutdown
       - name: Testar a imagem de produção e a stack do docker-compose
+        env:
+          IMAGEM_API: criptovision-api:ci
         run: bash scripts/testar-stack.sh

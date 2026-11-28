@@ -3,7 +3,7 @@
 # num projeto isolado (nomes, portas e volumes próprios, com um .env gerado na
 # hora) e confere o que a produção depende:
 #
-#   - a imagem constrói do zero, sem Java na máquina;
+#   - a imagem constrói pelo Dockerfile do projeto, sem Java na máquina;
 #   - a API só sobe depois do MySQL ficar saudável (nenhum reinício na subida);
 #   - os dois containers ficam "healthy", e /saude responde UP;
 #   - a API roda sem root e não consegue alterar os próprios arquivos;
@@ -15,11 +15,16 @@
 # Uso: scripts/testar-stack.sh
 # Precisa de Docker com Compose 2.24 ou mais novo. Não usa o .env do projeto nem
 # toca nos containers da stack normal. No fim, apaga containers, volumes e imagem.
+#
+# IMAGEM_API=<imagem> usa uma imagem da API já construída pelo mesmo Dockerfile,
+# em vez de construí-la aqui. É o que o CI faz, para construir com o cache do
+# GitHub Actions e não baixar o Maven e as dependências a cada execução.
 set -euo pipefail
 
 PROJETO=${PROJETO:-criptovision-teste-stack}
 PORTA_API=${PORTA_API:-18080}
 PORTA_DB=${PORTA_DB:-13307}
+IMAGEM_API=${IMAGEM_API:-}
 
 raiz=$(cd "$(dirname "$0")/.." && pwd)
 tmp=$(mktemp -d)
@@ -74,8 +79,20 @@ services:
       - "127.0.0.1:$PORTA_API:8080"
 EOF
 
-echo "Construindo a imagem e subindo db + api (projeto $PROJETO)..."
-if ! dc up -d --build --wait --wait-timeout 300 db api; then
+construir=(--build)
+if [ -n "$IMAGEM_API" ]; then
+    # usa a imagem pronta, sem build e sem tentar baixá-la de um registro
+    cat >> "$tmp/override.yml" <<EOF
+    build: !reset null
+    image: $IMAGEM_API
+    pull_policy: never
+EOF
+    construir=()
+    echo "Usando a imagem da API $IMAGEM_API."
+fi
+
+echo "Subindo db + api (projeto $PROJETO)..."
+if ! dc up -d "${construir[@]}" --wait --wait-timeout 300 db api; then
     echo "A stack não ficou saudável em 5 minutos."
     dc ps -a
     dc logs --tail 80 db api
@@ -133,7 +150,11 @@ for i in 1 2 3 4 5 6; do
         -d '{"login": "conta.teste.stack", "senha": "senha-errada"}' \
         "http://127.0.0.1:$PORTA_API/auth/login"
 done
-linha=$(dc logs --no-log-prefix api | grep '"requestId":"teste-stack-' | head -1 || true)
+# os logs vão para uma variável antes da busca. Com pipefail, "dc logs | grep -q"
+# falha à toa: o grep sai ao achar a linha, o "dc logs" ainda escrevendo leva
+# SIGPIPE, e o pipeline inteiro conta como erro mesmo com a linha encontrada
+logs_da_api=$(dc logs --no-log-prefix api)
+linha=$(grep -m 1 '"requestId":"teste-stack-' <<< "$logs_da_api" || true)
 case "$linha" in
     '{"@timestamp"'*) ok "logs em JSON com o requestId" ;;
     *) falhou "nenhuma linha de log em JSON com o requestId das requisições do teste" ;;
@@ -144,7 +165,8 @@ esac
 dc stop -t 40 api >/dev/null 2>&1
 conferir "docker stop encerra a JVM pelo SIGTERM" "143" \
     "$(docker inspect -f '{{.State.ExitCode}}' "$api")"
-if dc logs --no-log-prefix api | grep -q "Graceful shutdown complete"; then
+logs_da_api=$(dc logs --no-log-prefix api)
+if grep -q "Graceful shutdown complete" <<< "$logs_da_api"; then
     ok "graceful shutdown concluído"
 else
     falhou "o log não mostra o graceful shutdown"
