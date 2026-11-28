@@ -987,8 +987,10 @@ O projeto possui:
 
 ```text
 Dockerfile
+.dockerignore
 docker-compose.yml
 Caddyfile
+scripts/testar-stack.sh
 ```
 
 O Docker Compose define:
@@ -1078,19 +1080,52 @@ O `BackupMysqlIT` cobre o serviço com containers de verdade: um MySQL que exige
 
 O Dockerfile usa a imagem `eclipse-temurin:25-jdk-alpine` e espera que o JAR já tenha sido gerado em `target/`.
 
-O ambiente utiliza um arquivo `.env`, ignorado pelo Git, para fornecer `MYSQL_ROOT_PASSWORD`, `DB_USER`, `DB_PASSWORD` e `JWT_SECRET`, além de `CORS_ALLOWED_ORIGINS` e `DOMINIO` em produção e das variáveis opcionais `BINANCE_API_BASE_URL` e `COTACOES_*`. O arquivo `.env.example` serve de modelo. Dentro da rede do Compose, a API acessa o banco pelo hostname `db` e pela porta interna `3306`.
+O ambiente utiliza um arquivo `.env`, ignorado pelo Git, para fornecer `MYSQL_ROOT_PASSWORD`, `DB_USER`, `DB_PASSWORD` e `JWT_SECRET`, além de `CORS_ALLOWED_ORIGINS` e `DOMINIO` em produção e das variáveis opcionais `BINANCE_API_BASE_URL`, `COTACOES_*` e `API_LIMITE_MEMORIA`. O arquivo `.env.example` serve de modelo. Dentro da rede do Compose, a API acessa o banco pelo hostname `db` e pela porta interna `3306`.
 
 Fluxo atual:
 
 ```text
-Maven gera o JAR
+docker compose up --build
         ↓
-Docker copia o JAR
+estágio build: o Maven Wrapper baixa as dependências e gera o JAR (sem testes)
         ↓
-Java executa o arquivo app.jar
+estágio runtime: JRE + o JAR separado em camadas, com usuário sem privilégios
         ↓
-Flyway aplica as migrations pendentes
+MySQL fica healthy → a API sobe (depends_on com service_healthy)
+        ↓
+Flyway aplica as migrations pendentes → a API fica healthy
 ```
+
+### Imagem da API
+
+O `Dockerfile` tem dois estágios:
+
+* **build** (`eclipse-temurin:25-jdk-alpine`): copia primeiro o `pom.xml` e o Maven Wrapper e baixa as dependências (`dependency:go-offline`). Essa camada fica em cache enquanto o `pom.xml` não muda. Depois copia `src/main`, gera o JAR sem compilar os testes (o CI já os rodou) e o separa em camadas (`jarmode=tools extract --layers --launcher`). Não é preciso Java nem Maven na máquina, nem na VPS;
+* **runtime** (`eclipse-temurin:25-jre-alpine`): só o JRE e as quatro camadas do JAR, da que muda menos (dependências) para a que muda mais (aplicação). Uma nova versão só troca a camada pequena da aplicação.
+
+Na execução:
+
+* a API roda com o usuário `criptovision` (UID `10001`), sem shell de login. Os arquivos em `/app` são do root, então a aplicação não consegue alterar o próprio código;
+* o `ENTRYPOINT` em formato exec faz do Java o PID 1. Ele recebe o SIGTERM do `docker stop`, e o Spring encerra com graceful shutdown. O Compose dá 40 segundos (`stop_grace_period`), acima dos 30 segundos do Spring;
+* `-XX:MaxRAMPercentage=75` limita o heap a 75% da memória do container (`mem_limit`, `API_LIMITE_MEMORIA`, padrão `1g`), deixando o resto para metaspace, threads e buffers. `-XX:+ExitOnOutOfMemoryError` encerra a JVM num `OutOfMemoryError`, e o `restart: always` a reinicia em vez de ela seguir num estado ruim;
+* o `HEALTHCHECK` consulta `/actuator/health` na porta de gerenciamento, dentro do container (`wget` do Alpine). Como o health inclui o banco, o container fica `unhealthy` quando o MySQL não responde.
+
+O `.dockerignore` é uma lista de permissão: o build só recebe o `pom.xml`, o Maven Wrapper e `src/main`. O `.env`, o `.git` e o `target` nunca entram no contexto do build.
+
+O MySQL tem um healthcheck (`mysqladmin ping` por TCP). Na primeira subida, a imagem do MySQL inicializa o volume com um servidor temporário sem rede, que não passa nesse teste. Por isso a API e o backup esperam o banco com `depends_on: condition: service_healthy`. Antes, a API subia antes do MySQL aceitar conexões, falhava e só funcionava depois de o Docker reiniciá-la. O Caddy continua dependendo só da API ter iniciado: se ela ficar `unhealthy`, o HTTPS segue no ar.
+
+O `scripts/testar-stack.sh` testa tudo isso de uma vez. Ele sobe o `db` e a `api` do próprio `docker-compose.yml` num projeto isolado, com portas, volumes e senhas próprias, e confere:
+
+* a imagem construída do zero;
+* os dois containers `healthy`, com a API sem nenhum reinício;
+* o `/saude`;
+* o UID `10001` e os arquivos protegidos;
+* a JVM como PID 1, com o heap entre 60% e 75% do limite do container;
+* a porta de gerenciamento não publicada;
+* os logs em JSON com o `requestId`;
+* a saída com o código `143` (SIGTERM, e não `137` do SIGKILL), com o graceful shutdown concluído.
+
+O CI o roda num job próprio (`Imagem Docker e stack`), em paralelo aos testes do Maven.
 
 ### Observabilidade
 

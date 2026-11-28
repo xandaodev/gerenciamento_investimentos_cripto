@@ -31,15 +31,15 @@ jobs:
           java-version: "25"
           cache: maven
 
-      # falha cedo se o docker-compose, o Caddyfile ou o script de backup tiverem erro
-      - name: Validar o docker-compose, o Caddyfile e o script de backup
+      # falha cedo se o docker-compose, o Caddyfile ou os scripts tiverem erro
+      - name: Validar o docker-compose, o Caddyfile e os scripts
         run: |
           docker compose --profile producao config --quiet
           docker run --rm -e DOMINIO=api.exemplo.com.br \
             -v "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2 \
             caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
-          docker run --rm -v "$PWD/backup:/src:ro" koalaman/shellcheck:stable \
-            -S warning /src/backup.sh
+          docker run --rm -v "$PWD:/src:ro" koalaman/shellcheck:stable \
+            -S warning /src/backup/backup.sh /src/scripts/testar-stack.sh
 
       - name: Permitir execução do Maven Wrapper
         run: chmod +x mvnw
@@ -49,3 +49,18 @@ jobs:
       # O runner ubuntu-latest já tem Docker disponível.
       - name: Executar os testes unitários e de integração
         run: ./mvnw --batch-mode --no-transfer-progress clean verify
+
+  imagem:
+    name: Imagem Docker e stack
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Baixar o código
+        uses: actions/checkout@v6
+
+      # constrói a imagem de produção do zero, como na VPS, e sobe db + api pelo
+      # docker-compose: confere o HEALTHCHECK, o depends_on, o usuário sem root,
+      # o limite de memória da JVM, os logs em JSON e o graceful shutdown
+      - name: Testar a imagem de produção e a stack do docker-compose
+        run: bash scripts/testar-stack.sh

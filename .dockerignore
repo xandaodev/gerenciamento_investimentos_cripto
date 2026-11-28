@@ -1,0 +1,7 @@
+# Lista de permissão: o build da imagem só recebe o que precisa para compilar.
+# Tudo o mais fica fora, inclusive o .env (com as senhas), o .git e o target
+*
+!pom.xml
+!mvnw
+!.mvn/
+!src/main/

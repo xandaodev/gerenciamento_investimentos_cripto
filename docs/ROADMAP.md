@@ -107,10 +107,19 @@ Prioridade das fases:
   - **Correção:** adicionar o Actuator expondo só `health` publicamente, métricas (Micrometer), logs em JSON com ID de correlação, alerta para erros 500 e desligar o `show-sql` fora do ambiente local.
   - **Feito:** Actuator numa porta de gerenciamento privada (`8081`, só no loopback do container), com health completo, probes e métricas do Prometheus. O único health público é `GET /saude`, só com o status. Métricas de erros 500, de bloqueios por força bruta e de falhas da Binance. Logs em JSON (ECS) no docker-compose, com o ID de cada requisição (`X-Request-Id`, também no `requestId` dos erros), e rotação dos logs dos containers. `show-sql` desligado por padrão (`JPA_SHOW_SQL`). **Pendente:** o alerta ativo para erros 500 ficou para quando houver uma ferramenta de monitoramento (decisão do autor). Os sinais já estão prontos: a métrica `criptovision.erros.internos`, o `/saude` e os logs de `ERROR`.
 
-- [ ] **#15 — A imagem Docker não está pronta para produção**
+- [x] **#15 — A imagem Docker não está pronta para produção**
   - **Problema:** a imagem usa o JDK completo em vez do JRE, roda como root, não tem build multi-stage nem `HEALTHCHECK`. O `depends_on` não espera o MySQL ficar saudável e não há limites de memória da JVM.
   - **Arquivo:** `Dockerfile`, `docker-compose.yml`
   - **Correção:** build multi-stage com imagem JRE, usuário sem privilégios, `HEALTHCHECK` usando o Actuator, `depends_on` com `condition: service_healthy` e `-XX:MaxRAMPercentage` configurado.
+  - **Feito:**
+    - build multi-stage: o JAR é compilado dentro do Docker, sem Java na VPS, e roda num JRE Alpine, separado em camadas;
+    - usuário `10001`, sem privilégios e sem permissão de escrita no próprio código;
+    - `HEALTHCHECK` no `/actuator/health` da porta de gerenciamento;
+    - healthcheck do MySQL, com `depends_on: service_healthy` na API e no backup;
+    - `mem_limit` configurável (`API_LIMITE_MEMORIA`) com `-XX:MaxRAMPercentage=75` e `-XX:+ExitOnOutOfMemoryError`;
+    - Java como PID 1, com 40s para o graceful shutdown;
+    - `.dockerignore` em lista de permissão;
+    - o `scripts/testar-stack.sh` confere tudo isso contra o `docker-compose.yml` real e roda no CI.
 
 - [ ] **#16 — A integração com a Binance tem riscos de disponibilidade e latência**
   - **Problema:**
