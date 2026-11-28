@@ -121,6 +121,18 @@
             <version>${springdoc.version}</version>
         </dependency>
 
+        <!-- Health check, probes e métricas (Micrometer), numa porta de gerenciamento privada -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-actuator</artifactId>
+        </dependency>
+
+        <!-- Métricas no formato do Prometheus, para uma ferramenta de monitoramento coletar -->
+        <dependency>
+            <groupId>io.micrometer</groupId>
+            <artifactId>micrometer-registry-prometheus</artifactId>
+        </dependency>
+
         <!-- Cache em memória com tamanho limitado (contadores de tentativas de login) -->
         <dependency>
             <groupId>com.github.ben-manes.caffeine</groupId>

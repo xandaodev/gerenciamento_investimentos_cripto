@@ -1,6 +1,7 @@
 package br.com.criptovision.security;
 
 import br.com.criptovision.exception.TentativasExcedidasException;
+import br.com.criptovision.observabilidade.MetricasCriptoVision;
 import org.springframework.stereotype.Component;
 
 import java.time.Clock;
@@ -34,17 +35,23 @@ public class ProtecaoForcaBruta {
     private final LimiteDeTentativas loginPorIp;
     private final LimiteDeTentativas falhasPorLogin;
     private final LimiteDeTentativas cadastroPorIp;
+    private final MetricasCriptoVision metricas;
 
-    public ProtecaoForcaBruta(TentativasProperties propriedades, Clock clock) {
+    public ProtecaoForcaBruta(
+        TentativasProperties propriedades,
+        Clock clock,
+        MetricasCriptoVision metricas
+    ) {
         this.loginPorIp = criar("login por IP", propriedades.loginPorIp(), clock);
         this.falhasPorLogin = criar("falhas por login", propriedades.falhasPorLogin(), clock);
         this.cadastroPorIp = criar("cadastro por IP", propriedades.cadastroPorIp(), clock);
+        this.metricas = metricas;
     }
 
     /** Chamado antes de autenticar. Lança {@link TentativasExcedidasException} se bloqueado. */
     public void verificarLogin(String ip, String login) {
-        recusarSeBloqueado(loginPorIp.tentar(ip));
-        recusarSeBloqueado(falhasPorLogin.bloqueio(chaveDoLogin(login)));
+        recusarSeBloqueado(loginPorIp.tentar(ip), "login-por-ip");
+        recusarSeBloqueado(falhasPorLogin.bloqueio(chaveDoLogin(login)), "falhas-por-login");
     }
 
     public void registrarFalhaDeLogin(String login) {
@@ -57,7 +64,7 @@ public class ProtecaoForcaBruta {
 
     /** Chamado antes de cadastrar. Lança {@link TentativasExcedidasException} se bloqueado. */
     public void verificarCadastro(String ip) {
-        recusarSeBloqueado(cadastroPorIp.tentar(ip));
+        recusarSeBloqueado(cadastroPorIp.tentar(ip), "cadastro-por-ip");
     }
 
     // "Alexandre" e " alexandre " são a mesma conta (o cadastro normaliza o login)
@@ -69,8 +76,10 @@ public class ProtecaoForcaBruta {
             : chave;
     }
 
-    private static void recusarSeBloqueado(Optional<Duration> bloqueio) {
+    // a métrica conta cada recusa: um pico indica um ataque em andamento
+    private void recusarSeBloqueado(Optional<Duration> bloqueio, String limite) {
         if (bloqueio.isPresent()) {
+            metricas.tentativaBloqueada(limite);
             throw new TentativasExcedidasException(bloqueio.get());
         }
     }

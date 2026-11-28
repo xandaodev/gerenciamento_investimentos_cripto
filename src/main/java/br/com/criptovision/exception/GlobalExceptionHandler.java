@@ -1,6 +1,8 @@
 package br.com.criptovision.exception;
 
 import br.com.criptovision.dto.ErroCampoDTO;
+import br.com.criptovision.observabilidade.IdentificadorRequisicaoFilter;
+import br.com.criptovision.observabilidade.MetricasCriptoVision;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -33,6 +35,12 @@ public class GlobalExceptionHandler {
 
     private static final Logger LOGGER =
         LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    private final MetricasCriptoVision metricas;
+
+    public GlobalExceptionHandler(MetricasCriptoVision metricas) {
+        this.metricas = metricas;
+    }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<ProblemDetail> tratarValidacao(
@@ -432,6 +440,7 @@ public class GlobalExceptionHandler {
             request.getRequestURI(),
             ex
         );
+        metricas.erroInterno(ex);
 
         ProblemDetail problema = criarProblema(
             HttpStatus.INTERNAL_SERVER_ERROR,
@@ -455,6 +464,7 @@ public class GlobalExceptionHandler {
             request.getRequestURI(),
             ex
         );
+        metricas.erroInterno(ex);
 
         ProblemDetail problema = criarProblema(
             HttpStatus.INTERNAL_SERVER_ERROR,
@@ -486,6 +496,12 @@ public class GlobalExceptionHandler {
             "dataHora",
             OffsetDateTime.now(ZoneOffset.UTC)
         );
+
+        // o mesmo ID dos logs: com ele, um erro relatado pelo usuário leva direto aos logs
+        String identificador = IdentificadorRequisicaoFilter.atual();
+        if (identificador != null) {
+            problema.setProperty("requestId", identificador);
+        }
 
         return problema;
     }

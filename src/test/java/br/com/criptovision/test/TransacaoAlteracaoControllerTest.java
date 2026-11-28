@@ -4,6 +4,8 @@ import br.com.criptovision.controller.TransacaoController;
 import br.com.criptovision.dto.TransacaoRequestDTO;
 import br.com.criptovision.exception.AlteracaoHistoricoInvalidaException;
 import br.com.criptovision.exception.GlobalExceptionHandler;
+import br.com.criptovision.observabilidade.MetricasCriptoVision;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import br.com.criptovision.exception.TransacaoNaoEncontradaException;
 import br.com.criptovision.model.TipoTransacao;
 import br.com.criptovision.model.Transacao;
@@ -78,7 +80,9 @@ public class TransacaoAlteracaoControllerTest {
         mockMvc = MockMvcBuilders
             .standaloneSetup(controller)
             .setControllerAdvice(
-                new GlobalExceptionHandler()
+                new GlobalExceptionHandler(
+                    new MetricasCriptoVision(new SimpleMeterRegistry())
+                )
             )
             .setValidator(validator).setCustomArgumentResolvers(
                 new AuthenticationPrincipalArgumentResolver()

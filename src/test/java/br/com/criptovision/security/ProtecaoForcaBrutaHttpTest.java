@@ -1,8 +1,11 @@
 package br.com.criptovision.security;
 
 import br.com.criptovision.model.Usuario;
+import br.com.criptovision.observabilidade.MetricasCriptoVision;
 import br.com.criptovision.repository.TransacaoRepository;
 import br.com.criptovision.repository.UsuarioRepository;
+import io.micrometer.core.instrument.Counter;
+import io.micrometer.core.instrument.MeterRegistry;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,6 +18,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -56,6 +60,9 @@ class ProtecaoForcaBrutaHttpTest {
     @Autowired
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
+    private MeterRegistry meterRegistry;
+
     @BeforeEach
     void limparBanco() {
         transacaoRepository.deleteAll();
@@ -71,7 +78,7 @@ class ProtecaoForcaBrutaHttpTest {
                 .andExpect(status().isUnauthorized());
         }
 
-        esperarBloqueio(login("10.0.0.1", "conta.atacada", SENHA));
+        esperarBloqueio("falhas-por-login", () -> login("10.0.0.1", "conta.atacada", SENHA));
     }
 
     @Test
@@ -82,7 +89,7 @@ class ProtecaoForcaBrutaHttpTest {
                 .andExpect(status().isUnauthorized());
         }
 
-        esperarBloqueio(login("10.0.0.2", "conta.inexistente", "senha-errada"));
+        esperarBloqueio("falhas-por-login", () -> login("10.0.0.2", "conta.inexistente", "senha-errada"));
     }
 
     @Test
@@ -96,7 +103,7 @@ class ProtecaoForcaBrutaHttpTest {
         login("10.0.0.3", "Conta.Variada", "senha-errada")
             .andExpect(status().isUnauthorized());
 
-        esperarBloqueio(login("10.0.0.3", "conta.variada", SENHA));
+        esperarBloqueio("falhas-por-login", () -> login("10.0.0.3", "conta.variada", SENHA));
     }
 
     @Test
@@ -139,7 +146,7 @@ class ProtecaoForcaBrutaHttpTest {
                 .andExpect(status().isUnauthorized());
         }
 
-        esperarBloqueio(login("10.0.0.6", "alvo7", "senha-errada"));
+        esperarBloqueio("login-por-ip", () -> login("10.0.0.6", "alvo7", "senha-errada"));
 
         login("10.0.0.7", "alvo7", "senha-errada")
             .andExpect(status().isUnauthorized());
@@ -150,13 +157,20 @@ class ProtecaoForcaBrutaHttpTest {
         cadastrar("10.0.0.8", "novo.um").andExpect(status().isCreated());
         cadastrar("10.0.0.8", "novo.dois").andExpect(status().isCreated());
 
-        esperarBloqueio(cadastrar("10.0.0.8", "novo.tres"));
+        esperarBloqueio("cadastro-por-ip", () -> cadastrar("10.0.0.8", "novo.tres"));
 
         cadastrar("10.0.0.9", "novo.tres").andExpect(status().isCreated());
     }
 
-    private void esperarBloqueio(ResultActions resposta) throws Exception {
-        resposta
+    @FunctionalInterface
+    private interface Requisicao {
+        ResultActions executar() throws Exception;
+    }
+
+    private void esperarBloqueio(String limite, Requisicao requisicao) throws Exception {
+        double antes = bloqueios(limite);
+
+        requisicao.executar()
             .andExpect(status().isTooManyRequests())
             .andExpect(header().string(
                 HttpHeaders.RETRY_AFTER,
@@ -170,6 +184,18 @@ class ProtecaoForcaBrutaHttpTest {
             .andExpect(jsonPath("$.detail").value(
                 containsString("Tente novamente em")
             ));
+
+        // cada recusa conta na métrica, com o limite que a causou
+        assertThat(bloqueios(limite)).isEqualTo(antes + 1);
+    }
+
+    private double bloqueios(String limite) {
+        Counter contador = meterRegistry
+            .find(MetricasCriptoVision.TENTATIVAS_BLOQUEADAS)
+            .tag("limite", limite)
+            .counter();
+
+        return contador == null ? 0 : contador.count();
     }
 
     private void criarUsuario(String login) {

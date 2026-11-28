@@ -101,10 +101,11 @@ Prioridade das fases:
   - **Correção:** definir a regra correta (por exemplo, custo da posição atual a partir da carteira reconstruída), calcular em `BigDecimal`, devolver um DTO JSON com a moeda explícita e documentar a regra.
   - **Feito:** o endpoint devolve JSON com três totais exatos em `BigDecimal`: o custo das posições abertas (a partir da carteira reconstruída, o mesmo custo do PNL), o total aportado em compras e o total recebido em vendas, mais a moeda `USDT`. O custo das posições nunca fica negativo e é zero depois de vender tudo. A regra está no `BUSINESS_RULES`, seção 19. Com isso, nenhum cálculo financeiro usa mais `double`.
 
-- [ ] **#14 — Não há observabilidade**
+- [x] **#14 — Não há observabilidade**
   - **Problema:** faltam Actuator (health/readiness), métricas, logs estruturados e alertas para `HistoricoInconsistenteException` (dívida #3 do §15). O `spring.jpa.show-sql=true` está ligado em produção.
   - **Arquivo:** `pom.xml`, `src/main/resources/application.properties`, `src/main/java/br/com/criptovision/exception/GlobalExceptionHandler.java`
   - **Correção:** adicionar o Actuator expondo só `health` publicamente, métricas (Micrometer), logs em JSON com ID de correlação, alerta para erros 500 e desligar o `show-sql` fora do ambiente local.
+  - **Feito:** Actuator numa porta de gerenciamento privada (`8081`, só no loopback do container), com health completo, probes e métricas do Prometheus. O único health público é `GET /saude`, só com o status. Métricas de erros 500, de bloqueios por força bruta e de falhas da Binance. Logs em JSON (ECS) no docker-compose, com o ID de cada requisição (`X-Request-Id`, também no `requestId` dos erros), e rotação dos logs dos containers. `show-sql` desligado por padrão (`JPA_SHOW_SQL`). **Pendente:** o alerta ativo para erros 500 ficou para quando houver uma ferramenta de monitoramento (decisão do autor). Os sinais já estão prontos: a métrica `criptovision.erros.internos`, o `/saude` e os logs de `ERROR`.
 
 - [ ] **#15 — A imagem Docker não está pronta para produção**
   - **Problema:** a imagem usa o JDK completo em vez do JRE, roda como root, não tem build multi-stage nem `HEALTHCHECK`. O `depends_on` não espera o MySQL ficar saudável e não há limites de memória da JVM.

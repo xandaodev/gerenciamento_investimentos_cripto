@@ -108,6 +108,7 @@ br.com.criptovision
 ├── dto
 ├── exception
 ├── model
+├── observabilidade
 ├── repository
 ├── security
 └── service
@@ -192,13 +193,14 @@ Todas as respostas de erro seguem o formato Problem Details (RFC 7807), com o ti
   "detail": "Um ou mais campos possuem valores inválidos.",
   "instance": "/transacoes",
   "dataHora": "2026-08-05T20:00:00Z",
+  "requestId": "3f2a9c1e-5b7d-4e8a-9c0f-1a2b3c4d5e6f",
   "erros": [
     { "campo": "quantidade", "mensagem": "A quantidade deve ser maior que zero." }
   ]
 }
 ```
 
-O campo `erros` aparece somente em falhas de validação de campos.
+O campo `erros` aparece somente em falhas de validação de campos. O `requestId` é o mesmo do cabeçalho `X-Request-Id` e das linhas de log da requisição: num erro relatado por um usuário, ele leva direto ao log com a causa.
 
 O `GlobalExceptionHandler` utiliza os seguintes status:
 
@@ -208,10 +210,10 @@ O `GlobalExceptionHandler` utiliza os seguintes status:
 - `405 Method Not Allowed`: método HTTP não aceito pela rota;
 - `409 Conflict`: login já cadastrado, ou alteração/exclusão que tornaria o histórico inconsistente;
 - `415 Unsupported Media Type`: tipo de conteúdo não suportado;
-- `500 Internal Server Error`: histórico já persistido inconsistente, erro de banco ou erro inesperado. O detalhe da resposta é genérico e a causa é registrada no log;
+- `500 Internal Server Error`: histórico já persistido inconsistente, erro de banco ou erro inesperado. O detalhe da resposta é genérico e a causa é registrada no log, com o ID da requisição. Cada `500` também incrementa a métrica `criptovision.erros.internos`, com o tipo da exceção;
 - `503 Service Unavailable`: serviço de cotações indisponível e sem cotação anterior utilizável.
 
-Requisições sem token válido em rotas protegidas são respondidas pelo `AutenticacaoEntryPoint` com `401` no mesmo formato.
+Requisições sem token válido em rotas protegidas são respondidas pelo `AutenticacaoEntryPoint` com `401` no mesmo formato, também com o `requestId`.
 
 ### `model`
 
@@ -224,6 +226,13 @@ Classes atuais:
 * `Usuario`;
 * `Carteira`;
 * `Moeda`.
+
+### `observabilidade`
+
+Contém o que liga as requisições aos logs e às métricas:
+
+* `IdentificadorRequisicaoFilter`: o primeiro filtro de toda requisição. Dá a ela um ID, que vai para o MDC (e, portanto, para todas as linhas de log da requisição), para o cabeçalho `X-Request-Id` da resposta e para o campo `requestId` das respostas de erro. Um `X-Request-Id` recebido do cliente só é aproveitado se tiver até 64 caracteres entre letras, dígitos, `.`, `_` e `-`; qualquer outro valor é trocado por um UUID, para que ninguém escreva texto livre nos logs;
+* `MetricasCriptoVision`: as métricas de negócio, descritas em "Observabilidade" na seção 12.
 
 ### `repository`
 
@@ -757,7 +766,7 @@ Esse modelo faz com que o histórico de transações seja a fonte principal dos 
 
 ### Limitações atuais
 
-- inconsistências do histórico são registradas apenas como log de erro, sem logs estruturados ou alertas;
+- inconsistências do histórico vão para o log de erro (em JSON no docker-compose, com o ID da requisição) e para a métrica `criptovision.erros.internos`, mas ainda não disparam um alerta: isso depende de uma ferramenta de monitoramento, ainda não escolhida;
 - a carteira é reconstruída repetidamente em diferentes endpoints.
 
 ---
@@ -896,6 +905,14 @@ GET /carteira/simulador/venda?ticker=&precoAlvo=
 ```http
 GET /analise/aportes-por-moeda
 ```
+
+## Saúde
+
+```http
+GET /saude
+```
+
+Público, para um monitor de disponibilidade: responde `{"status":"UP"}` com `200`, ou `DOWN` com `503` quando o banco não responde, sem nenhum outro detalhe. O health completo e as métricas ficam na porta de gerenciamento (veja "Observabilidade" na seção 12).
 
 Todos os endpoints de transações, carteira e análises exigem autenticação e operam exclusivamente sobre os dados do usuário identificado pelo JWT.
 
@@ -1075,6 +1092,39 @@ Java executa o arquivo app.jar
 Flyway aplica as migrations pendentes
 ```
 
+### Observabilidade
+
+O Actuator fica numa **porta de gerenciamento separada** (`8081`, `MANAGEMENT_SERVER_PORT`), que por padrão só escuta no loopback (`MANAGEMENT_SERVER_ADDRESS=127.0.0.1`). No docker-compose, isso quer dizer de dentro do próprio container: a porta não é publicada e o Caddy só repassa a `8080`. Por isso o Spring Security libera os endpoints do Actuator (`EndpointRequest.toAnyEndpoint()`): quem os alcança já está dentro do servidor. O `ConfiguracaoDeProducaoTest` trava esses padrões, porque os testes HTTP usam uma porta de gerenciamento aleatória e não os veriam.
+
+| Onde | Caminho | Conteúdo |
+| --- | --- | --- |
+| porta da API (pública) | `GET /saude` | só `UP` (`200`) ou `DOWN` (`503`); inclui o banco |
+| porta de gerenciamento | `/actuator/health` | health completo, com o banco, o disco e as probes |
+| porta de gerenciamento | `/actuator/health/liveness` e `/actuator/health/readiness` | probes, para o `HEALTHCHECK` do container e orquestradores |
+| porta de gerenciamento | `/actuator/metrics` e `/actuator/prometheus` | métricas, no formato do Spring e no do Prometheus |
+
+Só `health`, `metrics` e `prometheus` são expostos. Endpoints como `env`, `configprops` e `heapdump` revelariam segredos ou a memória da JVM.
+
+Dentro do container, as métricas podem ser lidas com:
+
+```bash
+docker compose exec api wget -qO- http://127.0.0.1:8081/actuator/prometheus
+```
+
+Além das métricas que o Spring já publica (`http_server_requests`, com o status de cada rota; JVM; pool de conexões do Hikari), o `MetricasCriptoVision` publica:
+
+| Métrica | Tag | Quando sobe |
+| --- | --- | --- |
+| `criptovision.erros.internos` | `excecao` (tipo da exceção) | toda resposta `500`, inclusive `HistoricoInconsistenteException` |
+| `criptovision.tentativas.bloqueadas` | `limite` (`login-por-ip`, `falhas-por-login`, `cadastro-por-ip`) | toda recusa `429` da proteção contra força bruta |
+| `criptovision.cotacoes.provedor.indisponivel` | `resultado` (`cotacao_anterior`, `sem_cotacao`) | toda falha da Binance, pelo que a API fez: usou uma cotação anterior ou ficou sem cotação |
+
+As tags nunca levam IDs, tickers ou logins, para que o número de séries não cresça sem limite. Ticker desconhecido (`400`) não conta como falha do provedor.
+
+**Logs.** Cada linha de log de uma requisição leva o ID dela: no texto, como `[id] ` antes do nome da classe (`logging.pattern.correlation`); no docker-compose, em JSON no formato ECS (`LOGGING_STRUCTURED_FORMAT_CONSOLE=ecs`), um objeto por linha, com o ID no campo `requestId`. O SQL do Hibernate só vai para o log com `JPA_SHOW_SQL=true`, desligado por padrão. Todos os serviços do compose usam o driver `json-file` com rotação (5 arquivos de 10 MB por container), para que os logs não encham o disco da VPS.
+
+**Alertas.** Ainda não há alerta ativo: os sinais estão prontos (a métrica `criptovision.erros.internos`, o `/saude` e os logs de `ERROR`) para quando houver uma ferramenta de monitoramento. Um monitor externo de disponibilidade (como o UptimeRobot) pode consultar `https://<DOMINIO>/saude` sem nenhuma mudança na API.
+
 ---
 
 ## 13. Testes automatizados
@@ -1106,6 +1156,7 @@ Principais grupos:
 * `LimiteDeTentativasTest`, para a janela fixa com relógio ajustável e para a atomicidade com tentativas simultâneas; `ProtecaoForcaBrutaTest`, para a normalização da chave do login, o tempo do `Retry-After` e a validação dos limites; e `ProtecaoForcaBrutaHttpTest`, que verifica por `MockMvc` os bloqueios por login e por IP, o reset depois de um login com sucesso e a resposta `429`;
 * `ProxyReversoHttpTest` e `SemProxyReversoHttpTest`, que sobem um Tomcat real: com `server.forward-headers-strategy=native`, o limite por IP usa o IP informado pelo proxy e o HSTS é enviado em HTTPS; sem a propriedade, um `X-Forwarded-For` forjado é ignorado;
 * `CorsPropertiesTest`, para a leitura e a validação de `CORS_ALLOWED_ORIGINS`, inclusive a falha na inicialização com uma origem inválida, e `CorsOrigensPadraoHttpTest` e `CorsOrigensConfiguradasHttpTest`, que verificam por `MockMvc` o preflight de origens permitidas e recusadas, com as origens padrão e com origens configuradas;
+* `ObservabilidadeHttpTest`, que sobe um Tomcat real com as duas portas: o `/saude` público só com o status, o Actuator ausente da porta da API, e o health completo, as probes e as métricas do Prometheus na porta de gerenciamento; `ConfiguracaoDeProducaoTest`, que lê o `application.properties` e trava os padrões de produção (porta `8081` no loopback, só `health`, `metrics` e `prometheus` expostos, `/saude` sem detalhes, `show-sql` desligado); `IdentificadorRequisicaoHttpTest`, para o ID gerado, o aproveitado do cliente, o inseguro trocado e o `requestId` nos erros `400` e `401`; `ErrosInternosHttpTest`, que verifica que um `500` conta na métrica com o tipo da exceção e vai para o log com o ID da requisição; e `LogsEmJsonTest`, que usa o encoder do Spring Boot para garantir que o ID vira o campo `requestId` do JSON. As métricas da força bruta e das cotações são verificadas no `ProtecaoForcaBrutaHttpTest` e no `CotacaoServiceTest`;
 * `CadastroUsuarioHttpTest`, `PadronizacaoErrosHttpTest` e `OpenApiDocumentationTest` para o cadastro, o login, o formato dos erros e a documentação.
 
 Essa suíte rápida, que não precisa de banco externo nem de Docker, pode ser executada com:
@@ -1165,7 +1216,7 @@ Os principais pontos identificados são:
 
 1. o `AnaliseController` ainda acessa o repository diretamente;
 2. a carteira é reconstruída repetidamente em diferentes endpoints;
-3. inconsistências do histórico não possuem logs estruturados nem alertas;
+3. inconsistências do histórico ainda não disparam alerta. Já vão para o log em JSON, com o ID da requisição, e para a métrica `criptovision.erros.internos`, mas o alerta depende de uma ferramenta de monitoramento, ainda não escolhida;
 4. ~~as simulações de DCA e de venda e o endpoint `/carteira/total` ainda utilizam `double`~~ (resolvida: todo o cálculo financeiro usa `BigDecimal`);
 5. parte da injeção de dependências ainda é realizada por atributos (`@Autowired` em `CarteiraController`, `TransacaoController` e `AnaliseController`);
 6. não há paginação ou filtros no histórico;
